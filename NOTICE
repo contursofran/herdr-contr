@@ -1,0 +1,11 @@
+herdr-contr
+
+This repository started as a copy of Flockbook
+(https://github.com/minchenlee/flockbook) at commit
+0cadf31cdaa3ce000ea3748648461e0f8b265450. The first commit of this
+repository is that tree with no changes.
+
+Flockbook is licensed under the MIT License, Copyright (c) 2026 Minchen Lee.
+See LICENSE.
+
+The software that the code uses is listed in THIRD_PARTY_NOTICES.md.
