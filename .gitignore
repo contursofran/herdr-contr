@@ -5,6 +5,7 @@ build/
 DerivedData/
 .DS_Store
 xcuserdata/
-.claude/
+.claude/*
+!.claude/settings.json
 __pycache__/
 tmp/
