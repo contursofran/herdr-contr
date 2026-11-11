@@ -1,0 +1,37 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="640" height="400" viewBox="0 0 640 400">
+<!-- Flockbook dmg window background: dusk sky (peach, rose, indigo) with the V flock and three arrowheads.
+     Finder draws icon labels black in light mode and white in dark mode. The flat band behind the label row
+     (y 234-276, #B35781, luminance 0.179) keeps both at >= 4.5:1.
+     Render: rsvg-convert -w 640 background.svg -o background.png; rsvg-convert -w 1280 background.svg -o background@2x.png -->
+<defs>
+<path id="bird" d="M-50 12 L0 -28 L0 -6 Z M0 -28 L50 12 L0 -6 Z"/>
+<linearGradient id="g" x1="0" y1="0" x2="0" y2="1">
+<stop offset="0" stop-color="#FFE9D6"/>
+<stop offset="0.26" stop-color="#FFD0C2"/>
+<stop offset="0.47" stop-color="#E9A1B8"/>
+<stop offset="0.585" stop-color="#B35781"/>
+<stop offset="0.69" stop-color="#B35781"/>
+<stop offset="0.86" stop-color="#4B2D6E"/>
+<stop offset="1" stop-color="#2B1F4F"/>
+</linearGradient>
+<radialGradient id="sun" cx="0.78" cy="0.12" r="0.5">
+<stop offset="0" stop-color="#FFF6E8" stop-opacity="0.8"/>
+<stop offset="1" stop-color="#FFF6E8" stop-opacity="0"/>
+</radialGradient>
+</defs>
+<rect width="640" height="400" fill="url(#g)"/>
+<rect width="640" height="400" fill="url(#sun)"/>
+<g fill="#5A2A5C" fill-opacity="0.18">
+  <use href="#bird" transform="translate(560 54) scale(0.42)"/>
+<use href="#bird" transform="translate(528 78) scale(0.30)"/>
+  <use href="#bird" transform="translate(592 78) scale(0.30)"/>
+<use href="#bird" transform="translate(500 98) scale(0.22)"/>
+  <use href="#bird" transform="translate(620 98) scale(0.22)"/>
+</g>
+<g fill="#7A3566">
+<use href="#bird" transform="translate(284 180) rotate(90) scale(0.42)" fill-opacity="0.35"/>
+<use href="#bird" transform="translate(320 180) rotate(90) scale(0.42)" fill-opacity="0.6"/>
+<use href="#bird" transform="translate(356 180) rotate(90) scale(0.42)" fill-opacity="0.95"/>
+</g>
+<text x="320" y="330" text-anchor="middle" font-family="SF Pro Text, Helvetica Neue, sans-serif" font-size="14" font-weight="600" fill="#FFFFFF" fill-opacity="0.95" letter-spacing="0.2">Drag Flockbook to Applications</text>
+</svg>
