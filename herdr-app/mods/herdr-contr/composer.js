@@ -406,7 +406,8 @@ export class Composer {
     if (ok) await this.onSendDone?.(a, cx);
   }
 
-  render(agent, t) {
+  // `width`: the chat's column, so the box lines up with the messages.
+  render(agent, t, width = 800) {
     const tags = tagsFor(agent, agent ? this.status.get(agent.address) : null);
     const branch = tags.find((x) => x.kind === "branch");
     const b = this.box(agent);
@@ -439,11 +440,11 @@ export class Composer {
     return v_flex().id("composer").w_full().px(16).pb(14).pt(6).gap(6).items_center()
       .key_context(PASTE_CONTEXT)
       .on_action(PASTE_ACTION, (_e, cx) => { const text = cx.read_from_clipboard?.(); cx.spawn((cx) => this.paste(cx, text)); })
-      .when(setting("status_row") !== "hide", (el) => el.child(h_flex().id("tags").w_full().max_w(800).gap(5).items_center().overflow_x_scroll().children(tags.map(tag))))
-      .when(Boolean(s), (el) => el.child(v_flex().id("slash").w_full().max_w(800).p(4).gap(0).rounded(12).bg(t.raised)
+      .when(setting("status_row") !== "hide", (el) => el.child(h_flex().id("tags").w_full().max_w(width).gap(5).items_center().overflow_x_scroll().children(tags.map(tag))))
+      .when(Boolean(s), (el) => el.child(v_flex().id("slash").w_full().max_w(width).p(4).gap(0).rounded(12).bg(t.raised)
         .border(1).border_color(t.border).shadow_sm().on_scroll_wheel((e, cx) => this.slashWheel(e, cx))
         .children(shown.map(row)).when(Boolean(more), (l) => l.child(more))))
-      .child(v_flex().id("box").w_full().max_w(800).rounded(16).bg(t.raised).border(1).border_color(t.border).shadow_sm().px(12).pt(10).pb(8).gap(6)
+      .child(v_flex().id("box").w_full().max_w(width).rounded(16).bg(t.raised).border(1).border_color(t.border).shadow_sm().px(12).pt(10).pb(8).gap(6)
         .when(this.files.length > 0, (el) => el.child(h_flex().gap(6).flex_wrap().children(this.files.map(fileChip))))
         .child(div().id("slash-keys").w_full()
           .when(Boolean(s), (el) => el.key_context(SLASH_CONTEXT))
@@ -463,7 +464,7 @@ export class Composer {
             .bg(empty || this.sending ? t.chrome : t.accent).text_color(empty || this.sending ? t.dim : t.background)
             .on_click((_e, cx) => cx.spawn((cx) => this.submit(cx)))
             .child(this.sending ? svg(icon("spinner")).size(13).spin(SPIN_MS) : svg(icon("send")).size(14)))))
-      .when(Boolean(this.note), (el) => el.child(div().id("send-note").w_full().max_w(800).text_size(12)
+      .when(Boolean(this.note), (el) => el.child(div().id("send-note").w_full().max_w(width).text_size(12)
         .text_color(this.note.bad ? t.blocked : t.muted).child(this.note.text)));
   }
 }
