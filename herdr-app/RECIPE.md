@@ -34,7 +34,13 @@ Left to right:
      shows where it goes, the row dims, and the release moves it there. A move under 4 px is a
      click. Leaving the list, another mouse button or a press elsewhere cancels. The same in the
      floating sidebar. The tab drag in the top bar and this one share `drag.js`.
-   - At the bottom: a **herdr-contr** row (the herdr-contr settings dialog), and **Settings**.
+   - At the bottom, the plan usage: one 24 px row per plan with data, Claude then Codex (11.5 px,
+     `muted`). The 22 px column has an 18 x 4 px meter (`border` track, `muted` fill) of the most used
+     window; then the name; then each window in Menlo 10.5 px, `dim`: "5h 38% 2h · wk 12% 3d" (kind,
+     whole percent used, time to its reset). A window past its reset shows 0%. The text clips at the
+     right. The helper's `usage` command reads it: when the sidebar opens and every 5 minutes, off the
+     UI thread, one read for all the views that show it. A plan with no data has no row.
+   - Then a **herdr-contr** row (the herdr-contr settings dialog), and **Settings**.
 2. **Work area**: a stack of four screens. The bar floats over the first three.
    - **Top bar** (56 px, over the content, no background of its own). The sidebar button (28 px,
      round, with a `chrome` backing) sits right of the window buttons while the sidebar is hidden.
@@ -195,7 +201,10 @@ drawn by Herdr's `frames`; every loader of the mod is this one); done is a check
   - The ids `sidebar`, `screen`, `chat` and `tab` are what the mod switches.
 - **Layout** `layouts/herdr-contr.json`: the same `work` column and theme, but `sidebar` is
   Herdr's own, as in Herdr's `main` layout (268 px, shown: the blocks `workspace-chrome`, `spaces`,
-  `agents` and the `workspace-chrome` footer), with `traffic_lights: [12, 16]`. The mod knows it by
+  `agents` and the `workspace-chrome` footer), with `traffic_lights: [12, 16]`. Between the lists and
+  the footer is the mod's `usage` block (56 px, view `usage`): the same plan usage rows as the mod's own
+  sidebar. It starts hidden; the mod shows it (`layout.show`) when a plan has data and hides it when none
+  has. The chat, Needs you and Overview screens start the reads too, so the hidden block can show. The mod knows it by
   `shared("layout") === "herdr-contr"`: there the left edge opens no floating sidebar, the
   sidebar shows unless `layouts/.state/herdr-contr.json` hides it, and the bar leaves no room
   for the window buttons while the sidebar shows. ⌘B hides and shows Herdr's sidebar. The top bar

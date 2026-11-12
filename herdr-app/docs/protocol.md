@@ -52,6 +52,7 @@ does not download; `install-isolated.sh` copies the sidecar in.
 | `queue` | `--terminal <addr>` `[--cache <file>]` (Rust sidecar only; `serve` and other machines) | `queued` |
 | `working` | `--terminal <addr>` `[--cache <file>]` (Rust sidecar only; read only) | `working` |
 | `commands` | `--terminal <addr>` `[--cache <file>]` (Rust sidecar only) | `commands` |
+| `usage` | — (Rust sidecar only; read only) | `usage` |
 | `helper install` | `--machine <m> --sha256 <hex> [--cache <file>]` | `installed` |
 | `helper remove` | `--machine <m> [--cache <file>]` | `removed` |
 | `phone status` / `on` / `off` | `--home <herdr-app home>` (Rust sidecar only) | `phone` |
@@ -161,7 +162,7 @@ Targets: `x86_64-unknown-linux-musl`, `aarch64-unknown-linux-musl`, `universal-a
 ### `version`
 
 ```json
-{"commands":["version","feed","status","card","approve","answer","send","paste-image","helper","queue","phone","commands","working"],"release":"0.9.0","type":"version"}
+{"commands":["version","feed","status","card","approve","answer","send","paste-image","helper","queue","phone","commands","working","usage"],"release":"0.9.0","type":"version"}
 ```
 
 `commands`: the commands this sidecar has. The mod hides actions whose command is missing.
@@ -368,6 +369,23 @@ while a Claude Code, Codex or Grok Build agent works. No queue: `agent` is `""` 
 - The agent's working line on its screen, while the agent works (Claude Code only). Key hints such as
   "esc to interrupt" are left out of `detail`; `detail` can be empty.
 - None on screen, the agent is not working, or another agent kind: `text` and `detail` are `null`.
+
+### `usage` (`usage`)
+
+```json
+{"type":"usage","plans":[{"plan":"claude","windows":[{"kind":"five_hour","used_percent":38.0,"resets_at":1763000000},{"kind":"seven_day","used_percent":12.0,"resets_at":null}],"read_at":1762990000}]}
+```
+
+- The plan usage of Claude and Codex, as contr's `internal/usage` reads it. Claude first, then Codex. A plan
+  with no data is not in `plans`.
+- Claude: the file `usage/claude.json` (schema 1) in contr's state folder (`CONTR_STATE_DIR`, else macOS
+  `~/Library/Application Support/contr`, else `$XDG_STATE_HOME/contr` or `~/.local/state/contr`). contr's
+  status line command writes it. Kinds `five_hour` and `seven_day`.
+- Codex: `codex app-server` (`initialize`, `initialized`, `account/rateLimits/read`; killed after 10 s), with
+  `codex` from PATH, else from the login shell's PATH. Else the last `token_count` line of the newest rollout
+  file in the two newest day folders of `$CODEX_HOME/sessions` (default `~/.codex`). Kinds `primary` (5 h) and
+  `secondary` (week).
+- `used_percent`: 0 to 100. `resets_at` and `read_at`: Unix seconds; `resets_at` can be `null`.
 
 ### `commands` (`commands`)
 
