@@ -296,6 +296,9 @@ pub struct ClaudeStatusInfo {
     pub cost_usd: Option<f64>,
     pub context_percent: Option<i64>,
     pub context_size: Option<i64>,
+    /// The tokens in the context now: the sum of `current_usage`'s input, cache write and cache read tokens; else
+    /// `used_percentage` of `context_window_size`.
+    pub context_used: Option<i64>,
 }
 
 /// An `NSNumber` from JSONSerialization: numbers, and booleans as 1 / 0.
@@ -333,6 +336,19 @@ impl ClaudeStatusInfo {
             .map(|d| d.clamp(0.0, 100.0).round() as i64);
         // NSNumber.intValue: truncated.
         let size = number(ctx.and_then(|c| c.get("context_window_size"))).map(|d| d as i64);
+        let usage = ctx.and_then(|c| c.get("current_usage")).and_then(|v| v.as_object());
+        let used = usage
+            .map(|u| {
+                ["input_tokens", "cache_creation_input_tokens", "cache_read_input_tokens"]
+                    .iter()
+                    .filter_map(|k| number(u.get(*k)))
+                    .sum::<f64>() as i64
+            })
+            .filter(|n| *n > 0)
+            .or_else(|| match (number(ctx.and_then(|c| c.get("used_percentage"))), size) {
+                (Some(p), Some(s)) if p.is_finite() && s > 0 => Some((p.clamp(0.0, 100.0) * s as f64 / 100.0).round() as i64),
+                _ => None,
+            });
         Some(ClaudeStatusInfo {
             session: sid.into(),
             model: non_empty(model),
@@ -340,6 +356,7 @@ impl ClaudeStatusInfo {
             cost_usd: cost,
             context_percent: pct,
             context_size: size,
+            context_used: used,
         })
     }
 
@@ -363,6 +380,12 @@ impl ClaudeStatusInfo {
 
     /// The row's tags: model, effort, context, cost; a field Claude Code did not send has none.
     pub fn tags(&self) -> Vec<StatusTag> {
+        self.tags_with_limit(None)
+    }
+
+    /// As `tags`. With `compact_limit` (Claude Code's `autoCompactWindow`) and the tokens used known, the context tag
+    /// is "ctx 120k / 250k", and its percent and warning are against that limit.
+    pub fn tags_with_limit(&self, compact_limit: Option<i64>) -> Vec<StatusTag> {
         let mut out = vec![];
         if let Some(m) = &self.model {
             out.push(StatusTag::plain(StatusTagKind::Model, m, &format!("Model {m}"), None, false));
@@ -370,7 +393,17 @@ impl ClaudeStatusInfo {
         if let Some(e) = &self.effort {
             out.push(StatusTag::plain(StatusTagKind::Effort, e, &format!("Effort {e}"), None, false));
         }
-        if let Some(p) = self.context_percent {
+        if let Some((used, limit)) = self.context_used.zip(compact_limit.filter(|l| *l > 0)) {
+            let p = (used as f64 * 100.0 / limit as f64).round().clamp(0.0, 100.0) as i64;
+            let (u, l) = (kilo(used), kilo(limit));
+            out.push(StatusTag::plain(
+                StatusTagKind::Context,
+                &format!("ctx {u} / {l}"),
+                &format!("Context {u} of {l} tokens before auto-compact"),
+                Some(p),
+                p >= StatusTag::WARN_PERCENT,
+            ));
+        } else if let Some(p) = self.context_percent {
             out.push(StatusTag::plain(
                 StatusTagKind::Context,
                 &format!("ctx {p}%"),
@@ -387,6 +420,11 @@ impl ClaudeStatusInfo {
     }
 }
 
+/// Tokens in thousands, rounded: 120000 -> "120k"; under 1000 as is.
+fn kilo(n: i64) -> String {
+    if n < 1000 { n.to_string() } else { format!("{}k", (n as f64 / 1000.0).round() as i64) }
+}
+
 /// One session's saved status line: the owner's command's output as styled lines, and the JSON's facts.
 #[derive(Clone, Debug, PartialEq)]
 pub struct StatusLineRecord {
@@ -398,7 +436,12 @@ pub struct StatusLineRecord {
 impl StatusLineRecord {
     /// The row's tags: Claude Code's facts, then the owner's parts that do not repeat them.
     pub fn tags(&self) -> Vec<StatusTag> {
-        let mut out = self.info.as_ref().map(|i| i.tags()).unwrap_or_default();
+        self.tags_with_limit(None)
+    }
+
+    /// As `tags`, with the context against `compact_limit` (see `ClaudeStatusInfo::tags_with_limit`).
+    pub fn tags_with_limit(&self, compact_limit: Option<i64>) -> Vec<StatusTag> {
+        let mut out = self.info.as_ref().map(|i| i.tags_with_limit(compact_limit)).unwrap_or_default();
         for p in self.parts() {
             let text: String = p.iter().map(|r| r.text.as_str()).collect();
             out.push(StatusTag { kind: StatusTagKind::Own, text: text.clone(), spoken: text, percent: None, warn: false, runs: p });

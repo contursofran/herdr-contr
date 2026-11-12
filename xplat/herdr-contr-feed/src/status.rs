@@ -35,6 +35,14 @@ pub fn folder(settings: &Path) -> Option<PathBuf> {
     words.get(i + 1).map(PathBuf::from)
 }
 
+/// Claude Code's auto-compact limit in tokens: `autoCompactWindow` in its settings. None when not set.
+pub fn compact_limit(settings: &Path) -> Option<i64> {
+    let d = std::fs::read(settings).ok()?;
+    let o: Value = serde_json::from_slice(&d).ok()?;
+    let n = o.get("autoCompactWindow")?;
+    n.as_i64().or_else(|| n.as_f64().map(|f| f as i64)).filter(|n| *n > 0)
+}
+
 /// Splits a command line into words: single quotes, double quotes and backslashes as a POSIX shell reads them.
 pub fn shell_words(s: &str) -> Vec<String> {
     let (mut out, mut cur, mut has, mut quote, mut esc): (Vec<String>, String, bool, Option<char>, bool) = (vec![], String::new(), false, None, false);
@@ -104,7 +112,7 @@ pub fn run(agent: &str, log: Option<&Path>, settings: &Path, out: &mut JsonLines
             let sid = log.file_stem().map(|s| s.to_string_lossy().to_string()).unwrap_or_default();
             if let Some(rec) = StatusLineFolder::new(&dir).record(&sid, now) {
                 if !rec.is_empty() {
-                    tags = rec.tags().into_iter().map(|t| Tag { kind: t.kind.raw().into(), text: t.text, percent: t.percent, warn: t.warn }).collect();
+                    tags = rec.tags_with_limit(compact_limit(settings)).into_iter().map(|t| Tag { kind: t.kind.raw().into(), text: t.text, percent: t.percent, warn: t.warn }).collect();
                     source = "statusline";
                 }
             }
