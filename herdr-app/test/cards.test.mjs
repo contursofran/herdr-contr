@@ -262,3 +262,21 @@ test("another press was being handled at the same moment: it says press again, a
   byId(el, "card-allow")._h.on_click({}, cx); await cx.settle();
   assert.equal(acts.length, n + 2, "the second press goes to the sidecar");
 });
+
+test("a preview picker (noOther): no own-answer row, and its number picks nothing", async () => {
+  cardNow = { ...question, question: { ...question.question, questions: [{ ...question.question.questions[0], noOther: true }] } };
+  const cx = fakeCx(); const c = new Cards(cx); await c.poll(cx, "t1", true);
+  const v = c.view("t1", T);
+  assert.equal(byId(v, "card-q0-other"), null);
+  assert.ok(byId(v, "card-q0-o1"), "every option shows");
+  let focused = 0; c.others[0].focus = () => { focused++; };
+  assert.equal(c.key_down({ key: "3", modifiers: {} }, cx, "t1"), false);
+  assert.equal(focused, 0);
+});
+
+test("the card takes the width it is given (the reply box's)", async () => {
+  cardNow = question;
+  const cx = fakeCx(); const c = new Cards(cx); await c.poll(cx, "t1", true);
+  assert.equal(byId(c.view("t1", T, "card", 1040), "card")._a.max_w, 1040);
+  assert.equal(byId(c.view("t1", T), "card")._a.max_w, 800, "800 when not given");
+});

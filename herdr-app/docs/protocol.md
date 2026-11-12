@@ -309,8 +309,9 @@ approval is the `card` command's job.
 
 `question`: `toolUseId`, `agent`, `delivery` (`picker`: keys drive the agent's picker;
 `message`: the answer is a normal message), `state` (`pending`, `answered`, `declined`),
-`answers` (when answered), `questions[]` with `id`, `header`, `text`, `multi`, and `options[]`
-(`label`, `detail`, `recommended`).
+`answers` (when answered), `questions[]` with `id`, `header`, `text`, `multi`, `options[]`
+(`label`, `detail`, `recommended`), and `noOther: true` when the picker has no own-answer row
+(Claude's preview layout; left out otherwise).
 
 ### `status` (`status`)
 

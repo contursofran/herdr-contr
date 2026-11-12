@@ -153,7 +153,7 @@ pub fn option(label: &str, detail: &str, recommended: bool) -> QOption {
 
 /// Swift `Question(id:header:text:options:multiSelect:)`: `id` None is the text (Swift's default).
 pub fn new_question(id: Option<&str>, header: &str, text: &str, options: Vec<QOption>, multi_select: bool) -> Question {
-    Question { id: id.unwrap_or(text).into(), header: header.into(), text: text.into(), options, multi_select }
+    Question { id: id.unwrap_or(text).into(), header: header.into(), text: text.into(), options, multi_select, no_other: false }
 }
 
 /// Swift `QuestionRequest(toolUseId:agent:delivery:questions:)`: pending, no headers.
@@ -881,6 +881,28 @@ fn claude_steps(q: &QuestionRequest, answers: &[QuestionAnswer]) -> Vec<Step> {
     out
 }
 
+/// Claude's preview layout, read from the screen: one question, one choice, no typed answer. The focus moves
+/// with Up or Down from the row that has it to the pick, then Enter selects it. Anything else is refused before
+/// any key: answer in the terminal.
+fn preview_steps(q: &QuestionRequest, answers: &[QuestionAnswer], p: &ClaudeParse) -> Result<Vec<Step>, HerdrError> {
+    let refuse = |why: &str| Err(unsupported(format!("{why} in the preview layout: answer in the terminal")));
+    if q.questions.len() != 1 || q.questions[0].multi_select || p.question.multi_select {
+        return refuse("more than one question or a multi-choice question");
+    }
+    if other_text(&answers[0]).is_some() {
+        return refuse("a typed answer");
+    }
+    let Some(from) = p.focus_row else { return refuse("no option has the focus") };
+    let to = answers[0].picks[0];
+    let key = if to < from { "Up" } else { "Down" };
+    let mut out = vec![];
+    if to != from {
+        out.push(Step::Keys(vec![key.to_string(); to.abs_diff(from)]));
+    }
+    out.push(keys(&["Enter"]));
+    Ok(out)
+}
+
 /// Codex 0.162 (Plan mode picker). Digit picks and moves on; on the last question it submits all.
 /// Free text: Down to "None of the above" (row n+1), Tab opens the notes, text, Enter. No multiSelect.
 fn codex_steps(q: &QuestionRequest, answers: &[QuestionAnswer]) -> Result<Vec<Step>, HerdrError> {
@@ -1078,13 +1100,33 @@ pub struct ClaudeParse {
     pub submit_focused: bool,
     /// Focus marks on rows and Submit; 0 when a mark stands anywhere else.
     pub focus_marks: usize,
+    /// Claude's preview layout: a box with the focused option's preview right of the rows.
+    pub preview: bool,
+    /// The option row with the focus mark (0-based); None on the Other row, Submit or no mark.
+    pub focus_row: Option<usize>,
 }
 
 re!(claude_opt_re, r"(?R)^(\s*(?:❯\s*)?)(\d+)\.\s+(\[[ ✔]\]\s+)?(.*)$");
 
+/// Claude's preview layout: the option rows on the left, the focused option's `preview` in a box on the right.
+/// The byte index where the box starts on this line: a box-drawing edge after two spaces. None: no box here.
+pub(crate) fn preview_cut(l: &str) -> Option<usize> {
+    let mut spaces = 0usize;
+    for (i, c) in l.char_indices() {
+        if matches!(c, '┌' | '│' | '└' | '├' | '╭' | '╰') && spaces >= 2 {
+            return Some(i);
+        }
+        spaces = if c == ' ' { spaces + 1 } else { 0 };
+    }
+    None
+}
+
 /// `claude_screen` plus `typed`: text typed into the "Other" row. 2.1.296 always shows that row as the last
 /// numbered row before the line above "Chat about this": "Type something." (multiSelect "Type something") when
 /// empty, else the typed text. It is never an option. No such line: None (not a layout this reads).
+/// The preview layout (an option with a `preview`): the box on the right is cut off each line, a wrapped label
+/// goes on with its row, other lines (the notes hint) are not read, and the picker has no "Other" row
+/// (`no_other`) unless its last row says "Type something".
 pub fn claude_parse(screen: &str) -> Option<ClaudeParse> {
     let lines: Vec<&str> = screen.split('\n').collect();
     let end = lines.iter().rposition(|l| l.contains("Chat about this"))?;
@@ -1095,10 +1137,32 @@ pub fn claude_parse(screen: &str) -> Option<ClaudeParse> {
         .filter(|h| !h.is_empty() && *h != "Submit")
         .map(String::from)
         .collect();
+    // The preview box starts on or after row 1 and stops before the separator line.
+    let first_row = lines[bar + 1..end]
+        .iter()
+        .position(|l| claude_opt_re().captures(l).is_some_and(|m| &m[2] == "1" && gcount(&m[1]) >= 2))
+        .map(|i| bar + 1 + i);
+    let body: Vec<String> = lines[bar + 1..end].iter().map(|l| l.to_string()).collect();
+    let mut preview = false;
+    let body: Vec<String> = body
+        .into_iter()
+        .enumerate()
+        .map(|(i, l)| {
+            if first_row.is_some_and(|f| bar + 1 + i >= f) && !trim_ws(&l).starts_with("──") {
+                if let Some(c) = preview_cut(&l) {
+                    preview = true;
+                    return l[..c].trim_end().to_string();
+                }
+            }
+            l
+        })
+        .collect();
     let mut text: Vec<String> = vec![];
     let mut options: Vec<QOption> = vec![];
+    let mut raws: Vec<String> = vec![];
     let (mut multi, mut in_options, mut closed) = (false, false, false);
-    let (mut last_raw, mut last_focused, mut submit_focused) = (String::new(), false, false);
+    let (mut last_focused, mut submit_focused) = (false, false);
+    let (mut focus_row, mut label_column) = (None::<usize>, 0usize);
     // The Submit control (multiSelect) is the line right after the last row and right before the separator;
     // the same text anywhere else is option text. `since_row`: lines with text since the last numbered row.
     // Rows: after the two-column focus slot ("❯ "), their number in the column of row 1, numbered 1, 2, 3…; a
@@ -1106,7 +1170,7 @@ pub fn claude_parse(screen: &str) -> Option<ClaudeParse> {
     // `marks` counts the focus marks on rows and on Submit; a mark on any other line means the hub does not
     // know where the focus is (focus_marks 0: no key).
     let (mut marks, mut since_row, mut row_column, mut stray_mark) = (0usize, 0usize, None::<usize>, false);
-    for l in &lines[bar + 1..end] {
+    for l in body.iter().map(String::as_str) {
         let t = trim_ws(l);
         if t.starts_with("──") {
             closed = true;
@@ -1139,16 +1203,30 @@ pub fn claude_parse(screen: &str) -> Option<ClaudeParse> {
             since_row = 0;
             if marked {
                 marks += 1;
+                focus_row = Some(options.len());
             }
-            let label = trim_ws(&m[4]).to_string();
+            label_column = gcount(&m[1]) + m[2].len() + 2;
             in_options = true;
             if m.get(3).is_some() {
                 multi = true;
             }
-            let (clean, rec) = strip_recommended(&label);
-            options.push(option(&clean, "", rec));
-            last_raw = label;
+            options.push(option("", "", false));
+            raws.push(trim_ws(&m[4]).to_string());
             last_focused = trim_ws(l).starts_with('❯');
+        } else if in_options && preview {
+            if marked {
+                stray_mark = true;
+            }
+            // A wrapped label: indented to the label's column, right after its row.
+            let indent = gcount(l) - gcount(l.trim_start());
+            if !t.is_empty() && since_row == 0 && indent >= label_column {
+                if let Some(r) = raws.last_mut() {
+                    r.push(' ');
+                    r.push_str(t);
+                }
+            } else if !t.is_empty() {
+                since_row += 1;
+            }
         } else if in_options {
             if marked {
                 stray_mark = true;
@@ -1169,6 +1247,11 @@ pub fn claude_parse(screen: &str) -> Option<ClaudeParse> {
             text.push(t.to_string());
         }
     }
+    for (o, raw) in options.iter_mut().zip(&raws) {
+        let (clean, rec) = strip_recommended(raw);
+        o.label = clean;
+        o.recommended = rec;
+    }
     // A long question's text is drawn with "│ " in front of each line (2.1.322): drop it when every line has it
     // and the text without it is long (claude_exact::QUOTE_MIN); a short text's own "│" stays.
     if !text.is_empty() && text.iter().all(|t| t.starts_with('│')) {
@@ -1177,24 +1260,31 @@ pub fn claude_parse(screen: &str) -> Option<ClaudeParse> {
             text = unquoted;
         }
     }
-    // The last row is the "Other" row.
-    if !closed || options.pop().is_none() {
+    let last_raw = raws.last().cloned().unwrap_or_default();
+    let empty_other = last_raw == "Type something." || last_raw == "Type something";
+    // The last row is the "Other" row; the preview layout has it only when it shows its placeholder.
+    let no_other = preview && !empty_other;
+    if !closed || (!no_other && options.pop().is_none()) {
         return None;
     }
     // The Other row keeps its raw text: "(Recommended)" there is typed text, not a mark.
-    let typed = if last_raw == "Type something." || last_raw == "Type something" { None } else { Some(last_raw) };
+    let typed = if empty_other || no_other { None } else { Some(last_raw) };
     if options.is_empty() || text.is_empty() {
         return None;
     }
     let header = if headers.len() == 1 { headers[0].clone() } else { String::new() };
-    let question = new_question(None, &header, &text.join(" "), options, multi);
+    let mut question = new_question(None, &header, &text.join(" "), options, multi);
+    question.no_other = no_other;
+    let n = question.options.len();
     Some(ClaudeParse {
         headers,
         question,
         typed,
-        other_focused: last_focused,
+        other_focused: last_focused && !no_other,
         submit_focused,
         focus_marks: if stray_mark { 0 } else { marks },
+        preview,
+        focus_row: focus_row.filter(|&r| r < n),
     })
 }
 
@@ -1282,7 +1372,7 @@ pub fn answer_question<S: PaneScreen + ?Sized>(
         }
         return screen.send_text(&message_text(q, answers), pane_id); // the composer path: text + Enter
     }
-    let steps = steps(q, answers)?;
+    let mut steps = steps(q, answers)?;
     // Typed answers go key by key: refused before any key when the backend cannot type one of their characters.
     if let Some(bad) = answers.iter().filter_map(other_text).find(|t| !screen.can_type(t)) {
         let shown: String = bad.chars().filter(|c| !screen.can_type(&c.to_string())).collect::<BTreeSet<char>>().into_iter().collect();
@@ -1311,6 +1401,12 @@ pub fn answer_question<S: PaneScreen + ?Sized>(
         answer_keys(screen, &vec!["Left".to_string(); q.questions.len() - 1], gate, pane_id, &any, &mut sent)?;
         if !wait_screen(screen, pane_id, 2000, |s| screen_shows(q, s))? {
             return Err(stuck("back to question 1"));
+        }
+    }
+    // Claude's preview layout: arrows from the focused row to the pick, then Enter (`preview_steps`).
+    if q.agent == "claude" && q.tool_use_id.starts_with("screen-") {
+        if let Some(p) = claude_parse(&now).filter(|p| p.preview) {
+            steps = preview_steps(q, answers, &p)?;
         }
     }
     // `shown`: what the "Other" row of question `at` should hold now: empty until the hub typed its text there.
