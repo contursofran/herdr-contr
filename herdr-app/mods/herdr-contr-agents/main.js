@@ -236,8 +236,9 @@ export default class Agents extends View {
     const st = kidStatus(k, this.listed);
     const pic = icon(k.program, 14, t.foreground);
     const on = k.address === shown;
-    // A sub-agent without a pane has no terminal for the helper to read.
-    const model = this.listed.has(k.address) ? this.modelOf(cx, k.address, st) : "";
+    // Every live sub-agent is an hc terminal, with or without a pane (contr workers run in their own
+    // terminals and are not in agents()), and the helper reads it by its terminal address.
+    const model = k.address ? this.modelOf(cx, k.address, st) : "";
     // The tree cells of one line. A second line continues each "│" and "├" down to the next row.
     const cells = (top) => s.lines.map(l => top
       ? div().self_start().mt(-4).w(9).h(17).mr(4).flex_none()
