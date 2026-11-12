@@ -38,7 +38,7 @@ function setup(answer) {
   };
 }
 
-test("a row shows the model and effort after the name, once the helper answers", async () => {
+test("a row shows the model and effort on a second line, once the helper answers", async () => {
   setup({ type: "model", agent: "claude", model: "claude-opus-5-5", effort: "low" });
   let notified = 0;
   const cx = { notify: () => notified++, timer: { every() {} } };
@@ -46,7 +46,11 @@ test("a row shows the model and effort after the name, once the helper answers",
   v.render(cx);
   await settle(); await settle();
   assert.equal(notified, 1);
-  assert.ok(text(byId(v.render(cx), "ag-t1")).includes("Opus 5.5 · low"));
+  const r = byId(v.render(cx), "ag-t1");
+  assert.equal(r.kids.length, 2, "line 1 and line 2");
+  assert.equal(r.kids[0]._a.h, 26);
+  assert.ok(!text(r.kids[0]).includes("Opus 5.5"), "not on line 1");
+  assert.ok(text(r.kids[1]).includes("Opus 5.5 · low"));
   const calls = log.exec.filter(([, a]) => a[0] === "model");
   assert.deepEqual(calls[0][1].slice(0, 3), ["model", "--terminal", "t1"]);
   assert.equal(calls.length, 1, "same status: not asked again");
@@ -57,7 +61,10 @@ for (const [why, answer] of [["both parts unknown", { type: "model", model: null
     setup(answer);
     const v = make({ notify() {}, timer: { every() {} } });
     v.render({ notify() {} }); await settle(); await settle();
-    assert.deepEqual(modelEls(byId(v.render({ notify() {} }), "ag-t1")), []);
+    const r = byId(v.render({ notify() {} }), "ag-t1");
+    assert.deepEqual(modelEls(r), []);
+    assert.equal(r.kids.length, 1, "one line");
+    assert.equal(r.kids[0]._a.h, 30, "today's height");
     if (!answer) assert.equal(log.exec.filter(([, a]) => a[0] === "model").length, 0, "checks hasCommand first");
   });
 }
@@ -81,4 +88,25 @@ test("a sub-agent row shows its model too", async () => {
   const sub = () => v.subRow(theme(), { t: { address: "t2", name: "b-h47", status: "idle" }, lines: [] }, null, false, { notify() {} });
   sub(); await settle(); await settle();
   assert.equal(text(modelEls(sub())[0]), "Opus 5.5 \u00b7 low");
+});
+
+test("a sub-agent row with a model has two lines, and the tree line goes on through line 2", async () => {
+  setup({ type: "model", agent: "claude", model: "claude-opus-5-5", effort: "low" });
+  const v = make({ notify() {}, timer: { every() {} } });
+  v.models = { t1: { text: "Opus 5.5 \u00b7 low", status: "idle", at: Date.now(), busy: false } };
+  v.listed = new Map([["t1", "idle"]]);
+  const r = v.subRow(theme(), { t: { address: "t1", name: "w", status: "idle" }, lines: ["├"] }, null, false, { notify() {} });
+  assert.equal(r.kids.length, 2, "line 1 and line 2");
+  assert.equal(r.kids[0]._a.h, 26);
+  assert.equal(r.kids[1]._a.h, 14);
+  assert.ok(text(r.kids[1]).includes("Opus 5.5"));
+  assert.ok(!text(r.kids[0]).includes("Opus 5.5"), "not on line 1");
+  // The tree line goes on through line 2 under a "├"; it stops under a "└".
+  assert.equal(r.kids[1].kids[0]._a.border_l, 1.5);
+  const last = v.subRow(theme(), { t: { address: "t1", name: "w", status: "idle" }, lines: ["└"] }, null, false, { notify() {} });
+  assert.equal(last.kids[1].kids[0]._a.border_l, undefined);
+  v.models.t1.text = "";
+  const one = v.subRow(theme(), { t: { address: "t1", name: "w", status: "idle" }, lines: ["├"] }, null, false, { notify() {} });
+  assert.equal(one.kids.length, 1);
+  assert.equal(one.kids[0]._a.h, 26);
 });

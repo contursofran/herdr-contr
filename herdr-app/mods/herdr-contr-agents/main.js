@@ -238,26 +238,37 @@ export default class Agents extends View {
     const on = k.address === shown;
     // A sub-agent without a pane has no terminal for the helper to read.
     const model = this.listed.has(k.address) ? this.modelOf(cx, k.address, st) : "";
-    return h_flex()
-      .id(`sub-${k.address}`)
-      .pl(39)
-      .pr(8)
-      .rounded(8)
+    // The tree cells of one line. A second line continues each "│" and "├" down to the next row.
+    const cells = (top) => s.lines.map(l => top
+      ? div().self_start().mt(-4).w(9).h(17).mr(4).flex_none()
+        .when(Boolean(l), el => el.border_l(1.5).border_color(t.input))
+        .when(l === "└" || l === "├", el => el.border_b(1.5).rounded_bl(6))
+      : div().self_stretch().w(9).mr(4).flex_none()
+        .when(l === "│" || l === "├", el => el.border_l(1.5).border_color(t.input)));
+    const line1 = h_flex()
       .h(26)
       .flex_none()
       .gap(0)
       .items_center()
+      .children(cells(true))
+      .when(Boolean(pic), el => el.child(div().mr(8).child(pic)))
+      .child(div().flex_1().min_w(0).truncate().text_color(on ? t.foreground : t.muted).child(k.name || k.template || k.program?.name || k.address))
+      .child(this.status(t, { status: st }, compact));
+    return v_flex()
+      .id(`sub-${k.address}`)
+      .pl(39)
+      .pr(8)
+      .rounded(8)
+      .flex_none()
       .text_size(12.5)
       .when(on, (el) => el.bg(t.raised))
       .hover((s) => s.bg(t.hover))
       .on_click(() => (this.listed.has(k.address) ? run("pane.focus", { terminal: k.address }) : this.peek(k.address)))
-      .children(s.lines.map(l => div().self_start().mt(-4).w(9).h(17).mr(4).flex_none()
-        .when(Boolean(l), el => el.border_l(1.5).border_color(t.input))
-        .when(l === "└" || l === "├", el => el.border_b(1.5).rounded_bl(6))))
-      .when(Boolean(pic), el => el.child(div().mr(8).child(pic)))
-      .child(div().flex_1().min_w(0).truncate().text_color(on ? t.foreground : t.muted).child(k.name || k.template || k.program?.name || k.address))
-      .when(Boolean(model), el => el.child(div().flex_none().ml(6).mr(6).text_size(11).text_color(t.muted).child(model)))
-      .child(this.status(t, { status: st }, compact));
+      .child(line1)
+      // Line 2: the model, under the name (past the tree cells and the icon).
+      .when(Boolean(model), el => el.child(h_flex().h(14).flex_none().children(cells(false))
+        .when(Boolean(pic), el => el.child(div().w(22).flex_none()))
+        .child(div().flex_1().min_w(0).truncate().text_size(11).text_color(t.muted).child(model))));
   }
 
   // compact: a ! for blocked where a header already says "Needs you".
@@ -393,14 +404,32 @@ export default class Agents extends View {
       const full = byPriority || isPinned;
       const model = this.modelOf(cx, a.address, a.status);
       const name = full ? a.space_name || label(a) : more ?? (/^\d+$/.test(label(a)) ? a.program?.name || label(a) : label(a));
-      return h_flex()
-        .id(`ag-${a.address}`)
-        .px(8)
-        .h(30)
+      // Line 1: icon, name, chevron, age, state. A row with a model is a little shorter here, and the
+      // model goes on line 2 under the name.
+      const line1 = h_flex()
+        .h(model ? 26 : 30)
         .flex_none()
-        .rounded(8)
         .items_center()
         .gap(9)
+        .when(Boolean(pic), el => el.child(div().id(`agent-fold-${a.address}`)
+          .when(subs.length > 0, el => el.on_click((_e, cx) => {
+            cx.stop_propagation();
+            this.folded.has(a.address) ? this.folded.delete(a.address) : this.folded.add(a.address);
+            cx.notify();
+          })).child(pic)))
+        .child(h_flex().flex_1().min_w(0).gap(5).items_center()
+          .child(div().min_w(0).max_w(full && more ? 120 : 200).truncate().text_color(idle ? t.muted : t.foreground).child(name))
+          .when(full && Boolean(more), el => el.child(div().flex_1().min_w(0).truncate().text_color(t.dim).child(`\u00b7 ${more}`))))
+        .when(Boolean(machine), el => el.child(div().text_size(10).text_color(t.dim).child(machine)))
+        .when(subs.length > 0, el => el.child(fold(a, subs)))
+        .when(this.hovered === a.address, el => el.child(pin))
+        .when(this.hovered !== a.address && Boolean(when), el => el.child(div().flex_none().text_size(11).text_color(t.dim).child(duration(now - when))))
+        .child(this.status(t, a, byPriority && !isPinned));
+      return v_flex()
+        .id(`ag-${a.address}`)
+        .px(8)
+        .flex_none()
+        .rounded(8)
         .when(a.focused, (el) => el.bg(t.selected))
         .cursor_pointer()
         .hover((s) => s.bg(t.hover))
@@ -410,21 +439,10 @@ export default class Agents extends View {
           cx.notify();
         })
         .on_click(() => run("pane.focus", { pane: a.pane }))
-        .when(Boolean(pic), el => el.child(div().id(`agent-fold-${a.address}`)
-          .when(subs.length > 0, el => el.on_click((_e, cx) => {
-            cx.stop_propagation();
-            this.folded.has(a.address) ? this.folded.delete(a.address) : this.folded.add(a.address);
-            cx.notify();
-          })).child(pic)))
-        .child(h_flex().flex_1().min_w(0).gap(5).items_center()
-          .child(div().min_w(0).max_w(full && more ? 120 : 200).truncate().text_color(idle ? t.muted : t.foreground).child(name))
-          .when(full && Boolean(more), el => el.child(div().flex_1().min_w(0).truncate().text_color(t.dim).child(`\u00b7 ${more}`)))
-          .when(Boolean(model), el => el.child(div().flex_none().text_size(11).text_color(t.muted).child(model))))
-        .when(Boolean(machine), el => el.child(div().text_size(10).text_color(t.dim).child(machine)))
-        .when(subs.length > 0, el => el.child(fold(a, subs)))
-        .when(this.hovered === a.address, el => el.child(pin))
-        .when(this.hovered !== a.address && Boolean(when), el => el.child(div().flex_none().text_size(11).text_color(t.dim).child(duration(now - when))))
-        .child(this.status(t, a, byPriority && !isPinned));
+        .child(line1)
+        .when(Boolean(model), el => el.child(h_flex().h(14).mb(2).flex_none().gap(9)
+          .when(Boolean(pic), el => el.child(div().w(16).flex_none()))
+          .child(div().flex_1().min_w(0).truncate().text_size(11).text_color(t.muted).child(model))));
     };
 
     // Groups in list order: spaces (grouped) or priority sections. Agents of a
