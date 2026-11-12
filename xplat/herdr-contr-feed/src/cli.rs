@@ -197,7 +197,7 @@ pub fn run(argv: &[String]) -> String {
                     let codex = env.get("CODEX_HOME").filter(|d| !d.is_empty()).cloned().unwrap_or_else(|| home + "/.codex");
                     // The process list only when the faster sources cannot answer it.
                     let procs = if found.pane.process_ids.is_empty() { vec![] } else { agentmodel::pane_procs(&herdr_core::resolver::processes(), &found.pane.process_ids) };
-                    let s = agentmodel::Sources { log, claude_settings: &status::default_settings(&env), codex_config: &PathBuf::from(codex + "/config.toml"), procs: &procs };
+                    let s = agentmodel::Sources { log, claude_settings: &status::default_settings(&env), cwd: Some(Path::new(&found.pane.cwd)).filter(|c| !c.as_os_str().is_empty()), codex_config: &PathBuf::from(codex + "/config.toml"), procs: &procs };
                     r.out.emit_value(agentmodel::line(&kind, &agentmodel::read(&kind, &s, SystemTime::now())));
                     return r.finish(true);
                 }

@@ -3,7 +3,9 @@
 //! The model: the newest one the session log names (`tail::model`).
 //! The effort, the first source that has it:
 //! - Claude Code: herdr-contr's status line record (when on; it follows `/effort`), then `--effort <level>` on the
-//!   agent's command line (contr profiles pass it), then `effortLevel` in Claude Code's settings.
+//!   agent's command line (contr profiles pass it), then Claude Code's settings: `.claude/settings.local.json`, then
+//!   `.claude/settings.json` in the agent's cwd, then the user's `settings.json`. In each file,
+//!   `modelSettings.<model>.effortLevel` for the log's model, then a top-level `effortLevel`.
 //! - Codex: the newest `turn_context` in the rollout (it follows `/model`), then `-c model_reasoning_effort=<level>`
 //!   on the command line, then `model_reasoning_effort` in Codex's `config.toml`.
 
@@ -31,6 +33,8 @@ pub struct Sources<'a> {
     pub log: Option<&'a Path>,
     /// Claude Code's settings.json.
     pub claude_settings: &'a Path,
+    /// The agent's cwd, for the project's `.claude/settings*.json`.
+    pub cwd: Option<&'a Path>,
     /// Codex's config.toml.
     pub codex_config: &'a Path,
     pub procs: &'a [Proc],
@@ -41,7 +45,7 @@ pub fn read(kind: &str, s: &Sources, now: SystemTime) -> ModelInfo {
     let model = tail::model(&lines);
     let args = || s.procs.iter().find_map(|p| effort_in_args(kind, &p.line));
     let effort = match kind {
-        "claude" => statusline_effort(s.log, s.claude_settings, now).or_else(args).or_else(|| claude_settings_effort(s.claude_settings)),
+        "claude" => statusline_effort(s.log, s.claude_settings, now).or_else(args).or_else(|| claude_settings_effort(s, model.as_deref())),
         "codex" => codex_log_effort(&lines).or_else(args).or_else(|| codex_config_effort(s.codex_config)),
         _ => None,
     };
@@ -79,9 +83,18 @@ pub fn effort_in_args(kind: &str, line: &str) -> Option<String> {
     None
 }
 
-fn claude_settings_effort(settings: &Path) -> Option<String> {
-    let o: Value = serde_json::from_slice(&std::fs::read(settings).ok()?).ok()?;
-    o.get("effortLevel")?.as_str().filter(|s| !s.is_empty()).map(String::from)
+/// Claude Code's settings, in its order: local, project, user.
+fn claude_settings_effort(s: &Sources, model: Option<&str>) -> Option<String> {
+    let project = s.cwd.map(|c| c.join(".claude"));
+    let files = [project.as_ref().map(|p| p.join("settings.local.json")), project.as_ref().map(|p| p.join("settings.json")), Some(s.claude_settings.to_path_buf())];
+    files.iter().flatten().find_map(|f| settings_file_effort(f, model))
+}
+
+/// `modelSettings.<model>.effortLevel`, then the top-level `effortLevel`. Other nested keys do not count.
+fn settings_file_effort(path: &Path, model: Option<&str>) -> Option<String> {
+    let o: Value = serde_json::from_slice(&std::fs::read(path).ok()?).ok()?;
+    let level = |v: Option<&Value>| v.and_then(|v| v.get("effortLevel")).and_then(Value::as_str).filter(|s| !s.is_empty()).map(String::from);
+    model.and_then(|m| level(o.get("modelSettings").and_then(|ms| ms.get(m)))).or_else(|| level(Some(&o)))
 }
 
 /// The newest `turn_context` line's `effort`.
@@ -154,12 +167,34 @@ mod tests {
         let settings = d.join("settings.json");
         fs::write(&settings, r#"{"effortLevel":"medium"}"#).unwrap();
         let procs = [proc(5, 1, "claude --effort low")];
-        let s = Sources { log: Some(&log), claude_settings: &settings, codex_config: &d.join("none.toml"), procs: &procs };
+        let s = Sources { log: Some(&log), claude_settings: &settings, cwd: None, codex_config: &d.join("none.toml"), procs: &procs };
         assert_eq!(read("claude", &s, SystemTime::now()), ModelInfo { model: Some("claude-opus-5-5".into()), effort: Some("low".into()) });
         let s = Sources { procs: &[], ..s };
         assert_eq!(read("claude", &s, SystemTime::now()).effort.as_deref(), Some("medium"), "settings as the default");
         let s = Sources { log: None, claude_settings: &d.join("missing.json"), ..s };
         assert_eq!(read("claude", &s, SystemTime::now()), ModelInfo::default(), "unknown parts stay unknown");
+    }
+
+    #[test]
+    fn claude_settings_effort_per_model_then_top_level_then_project_files() {
+        let d = dir("claude-settings");
+        let log = d.join("abc.jsonl");
+        fs::write(&log, r#"{"type":"assistant","message":{"model":"claude-opus-5-5","content":[]}}"#.to_string() + "\n").unwrap();
+        let user = d.join("settings.json");
+        fs::write(&user, r#"{"model":"opus","modelSettings":{"claude-sonnet-5-5":{"effortLevel":"xhigh"},"claude-opus-5-5":{"effortLevel":"medium"}},"x":{"effortLevel":"low"}}"#).unwrap();
+        let s = Sources { log: Some(&log), claude_settings: &user, cwd: None, codex_config: &d.join("none.toml"), procs: &[] };
+        assert_eq!(read("claude", &s, SystemTime::now()).effort.as_deref(), Some("medium"), "the log's model in modelSettings");
+        fs::write(&user, r#"{"effortLevel":"high","modelSettings":{"claude-sonnet-5-5":{"effortLevel":"xhigh"}},"x":{"effortLevel":"low"}}"#).unwrap();
+        assert_eq!(read("claude", &s, SystemTime::now()).effort.as_deref(), Some("high"), "top level when the model has none");
+        fs::write(&user, r#"{"modelSettings":{"claude-sonnet-5-5":{"effortLevel":"xhigh"}},"x":{"effortLevel":"low"}}"#).unwrap();
+        assert_eq!(read("claude", &s, SystemTime::now()).effort, None, "another model's or a nested key does not count");
+        let cwd = d.join("proj");
+        fs::create_dir_all(cwd.join(".claude")).unwrap();
+        fs::write(cwd.join(".claude/settings.json"), r#"{"effortLevel":"low"}"#).unwrap();
+        let s = Sources { cwd: Some(&cwd), ..s };
+        assert_eq!(read("claude", &s, SystemTime::now()).effort.as_deref(), Some("low"), "project settings");
+        fs::write(cwd.join(".claude/settings.local.json"), r#"{"modelSettings":{"claude-opus-5-5":{"effortLevel":"max"}}}"#).unwrap();
+        assert_eq!(read("claude", &s, SystemTime::now()).effort.as_deref(), Some("max"), "local settings first");
     }
 
     #[test]
@@ -173,7 +208,7 @@ mod tests {
         let config = d.join("config.toml");
         fs::write(&config, "model = \"gpt-6\"\nmodel_reasoning_effort = \"medium\" # default\n[profiles.x]\nmodel_reasoning_effort = \"low\"\n").unwrap();
         let procs = [proc(5, 1, "codex -c model_reasoning_effort=xhigh")];
-        let s = Sources { log: Some(&log), claude_settings: &d.join("none.json"), codex_config: &config, procs: &procs };
+        let s = Sources { log: Some(&log), claude_settings: &d.join("none.json"), cwd: None, codex_config: &config, procs: &procs };
         assert_eq!(read("codex", &s, SystemTime::now()), ModelInfo { model: Some("gpt-6".into()), effort: Some("high".into()) });
         let s = Sources { log: None, ..s };
         assert_eq!(read("codex", &s, SystemTime::now()).effort.as_deref(), Some("xhigh"));
