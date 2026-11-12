@@ -109,6 +109,11 @@ Left to right:
    - **Tab panes**: a split tab, or a tab with a shell, shows its own panes (a 56 px top bar
      above them, 8 px padding, 6 px gaps, 8 px corners, 1 px border, `muted` border on focus).
 
+Orchestration: at the right end of the row above the reply box, an "Orchestrating" pill
+(`selected` fill, `working` dot, "· N workers" in `muted`) when the agent's terminal has the hc
+label `contr.orchestrating` or live child terminals; else, for Claude Code, an "Orchestrate"
+button that puts `/contr:orchestrate ` in the box.
+
 Status marks: working is a 13 px braille loader (`working` color: ⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏ in Menlo, 80 ms a frame,
 drawn by Herdr's `frames`; every loader of the mod is this one); done is a check
 (`done`); blocked is a 9 px dot (`blocked`); idle is a 12 px empty ring (`dim`).
