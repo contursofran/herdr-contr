@@ -188,9 +188,14 @@ per 900 ms, as Herdr's own); done is a check
   `agents` and the `workspace-chrome` footer), with `traffic_lights: [12, 16]`. The mod knows it by
   `shared("layout") === "herdr-contr"`: there the left edge opens no floating sidebar, the
   sidebar shows unless `layouts/.state/herdr-contr.json` hides it, and the bar leaves no room
-  for the window buttons while the sidebar shows. ⌘B hides and shows Herdr's sidebar. The mod's
-  bar stays: each screen draws it, with the tab capsule, Needs you and Overview. Herdr's `tabs`
-  block would show the tabs a second time and has no Needs you or Overview.
+  for the window buttons while the sidebar shows. ⌘B hides and shows Herdr's sidebar. The top bar
+  is Herdr's own too: the `work` column is Herdr's `tabs` block (42 px, `window_drag`) above a
+  `work-body` row with the `screen` stack and Herdr's `panel` (368 px, hidden: `files` and
+  `changes`), as in `main`. Herdr's bar has the tabs, + and the Files and Changes buttons; a tab
+  picked there shows its chat or its terminals (the screen sync). The `tab` column holds only
+  `tab-panes`. With a `tabs` block in the layout (`herdrTabBar()`), the chat, Needs you and
+  Overview draw no bar and leave no room for one (`barH()` is 0); Needs you is ⌘⇧I and Overview
+  ⌘⇧\.
 - **Mod** `mods/herdr-contr/` (`mod.json`: `place: "none"`): one mod, one view per block, picked
   by `props.view`: `side`, `chat`, `needs`, `overview`, `top`; overlays use `settings` (the herdr-contr
   settings dialog), `termbar` (the terminal window's bar), `menu` (right-click menus) and `side` with `peek: true` (the floating sidebar).

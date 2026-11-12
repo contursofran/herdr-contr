@@ -36,6 +36,10 @@ export function lightsRoom() {
 }
 
 export const BAR_H = 56;
+// A layout with Herdr's own tab bar (a "tabs" block) needs no bar from this mod: the screens then
+// draw none and leave no room for one. The key commands and the screen sync still run.
+export const herdrTabBar = () => find(layout(), "tabs")?.content?.mod === "tabs";
+export const barH = () => (herdrTabBar() ? 0 : BAR_H);
 
 // The tab being dragged (drag.js): one at a time, so every copy of the bar draws from it.
 const drag = dragger("x");
@@ -172,7 +176,7 @@ export function topBar(t, over = false) {
 }
 
 // Puts the bar over a screen's content (absolute, at the top).
-export const overBar = (t) => div().id("over-bar").absolute().top(0).left(0).right(0).h(BAR_H).child(topBar(t, true));
+export const overBar = (t) => herdrTabBar() ? div().id("no-bar") : div().id("over-bar").absolute().top(0).left(0).right(0).h(BAR_H).child(topBar(t, true));
 
 export class TopView {
   constructor(cx) { startTop(cx, this); }
