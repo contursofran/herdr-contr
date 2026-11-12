@@ -6,7 +6,7 @@ use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicUsize, Ordering};
 
 pub fn fixtures_dir() -> PathBuf {
-    Path::new(env!("CARGO_MANIFEST_DIR")).join("../../Tests/HerdrKitTests/Fixtures")
+    Path::new(env!("CARGO_MANIFEST_DIR")).join("../fixtures")
 }
 
 pub fn fixture(name: &str) -> String {

@@ -1,7 +1,7 @@
 # Remote protocol v1
 
 Status: spec, phase 1 of `remote-access.md`. Date: 2026-10-12.
-Swift types: `Sources/HerdrKit/HubProtocol.swift`. Fixtures: `Tests/HerdrKitTests/Fixtures/hub/` (one file per message type; the Rust hub must pass the same files).
+Swift types: `Sources/HerdrKit/HubProtocol.swift`. Fixtures: `xplat/fixtures/hub/` (one file per message type; the Rust hub must pass the same files).
 
 ## 1. Transport and framing
 

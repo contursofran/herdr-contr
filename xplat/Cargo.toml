@@ -1,6 +1,6 @@
 [workspace]
 resolver = "2"
-members = ["herdr-core", "flockbook-modfeed", "spike-select", "spike-virt", "spike-ime", "fb-ui", "flockbook"]
+members = ["herdr-core", "flockbook-modfeed"]
 
 [workspace.package]
 edition = "2021"
@@ -8,11 +8,8 @@ license = "MIT"
 publish = false
 
 [workspace.dependencies]
-iced = { version = "0.14", features = ["advanced", "markdown"] }
-iced_test = "0.14"
 serde = { version = "1", features = ["derive"] }
 serde_json = { version = "1", features = ["float_roundtrip"] }
-png = "0.18"
 
 [profile.release]
 debug = "line-tables-only"

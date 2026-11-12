@@ -707,7 +707,7 @@ mod tests {
     /// tables with this file, so a change on one side fails the other's check until both have it.
     #[test]
     fn tables_are_the_shared_fixture() {
-        let text = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/../../Tests/HerdrKitTests/Fixtures/slash-tables.json"));
+        let text = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/../fixtures/slash-tables.json"));
         let v: serde_json::Value = serde_json::from_str(text).unwrap();
         assert_eq!(v["efforts"], serde_json::json!(EFFORTS));
         assert_eq!(v["pi_thinking"], serde_json::json!(PI_THINKING));

@@ -31,7 +31,7 @@ Each step is finished and in use before the next one starts.
 Not in scope: a files panel and a pull request reader. Herdr's sidebar stays
 as Herdr draws it, for now.
 
-## Layout (step 1 reduces it)
+## Layout
 
 | Path | Holds |
 |---|---|
@@ -43,7 +43,10 @@ as Herdr draws it, for now.
 | `herdr-app/install.sh`, `herdr-app/install-isolated.sh` | the install into a Herdr home, and into a test home |
 | `xplat/flockbook-modfeed` | the helper (Rust): reads the agents' session logs and talks to hc |
 | `xplat/herdr-core` | the helper's hc client |
-| `Sources`, `Tests`, `site`, `web`, `docs`, `scripts`, the other `xplat` folders | Flockbook's Mac app, website and Linux port: step 1 removes what the mod and the helper do not use |
+| `xplat/fixtures` | the session logs and hub answers that the helper's tests read |
+| `xplat/flockbook-modfeed/web` | the phone page that the helper embeds (built output; do not edit) |
+| `web`, `scripts/web-build.mjs`, `scripts/sw-test.mjs` | the phone page's source, its build into `xplat/flockbook-modfeed/web`, and its service worker test |
+| `docs/design`, `docs/research` | the notes on the phone page's protocol and on the question keys, that the helper's code names |
 
 Herdr's API for mods is in the Herdr app's home: `AGENTS.md`, `herdr.d.ts`
 and `gpui-kit.d.ts`. Read them there. Do not copy them into this repository.
