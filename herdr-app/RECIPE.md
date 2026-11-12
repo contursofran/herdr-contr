@@ -227,7 +227,11 @@ drawn by Herdr's `frames`; every loader of the mod is this one); done is a check
   `herdr-contr-agents` and the `workspace-chrome` footer), with `traffic_lights: [12, 16]`. Between the lists and
   the footer is the mod's `usage` block (56 px, view `usage`): the same plan usage rows as the mod's own
   sidebar. It starts hidden; the mod shows it (`layout.show`) when a plan has data and hides it when none
-  has. The chat, Needs you and Overview screens start the reads too, so the hidden block can show. The mod knows it by
+  has. The chat, Needs you and Overview screens start the reads too, so the hidden block can show. Under it, just
+  above the footer, is the mod's `settings-row` block (32 px, view `settings-row`): one row as Herdr's footer rows
+  (28 px, 8 px in, 14 px `sliders` icon, label "herdr-contr", muted, hover background) that opens the herdr-contr
+  settings dialog. On hover it shows the key `⌘⇧,` at the right. On the rail (sidebar under 160 px) it is the icon
+  only, with a tooltip. The mod knows it by
   `shared("layout") === "herdr-contr"`: there the left edge opens no floating sidebar, the
   sidebar shows unless `layouts/.state/herdr-contr.json` hides it, and the bar leaves no room
   for the window buttons while the sidebar shows. ⌘B hides and shows Herdr's sidebar. The top bar

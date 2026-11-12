@@ -17,9 +17,9 @@ beforeEach(() => { reset(); fake.shared.layout = "herdr-contr"; });
 test("the sidebar is Herdr's, shown, and the work area is the mod's screen stack", () => {
   const side = find(layout, "sidebar");
   assert.equal(side.hidden, undefined);
-  assert.deepEqual(mods(side), ["workspace-chrome", "herdr-contr-spaces", "herdr-contr-agents", "herdr-contr", "workspace-chrome"]);
+  assert.deepEqual(mods(side), ["workspace-chrome", "herdr-contr-spaces", "herdr-contr-agents", "herdr-contr", "herdr-contr", "workspace-chrome"]);
   // The plan usage: between the lists and Herdr's footer, hidden until a plan has data.
-  assert.deepEqual(side.children.map((c) => c.id).slice(-3), ["sidebar-lists", "usage", "sidebar-footer"]);
+  assert.deepEqual(side.children.map((c) => c.id).slice(-4), ["sidebar-lists", "usage", "settings-row", "sidebar-footer"]);
   const usage = find(layout, "usage");
   assert.deepEqual([usage.content.props.view, usage.size.px, usage.hidden], ["usage", 56, true]);
   const screen = find(layout, "screen");
