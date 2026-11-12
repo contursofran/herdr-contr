@@ -103,6 +103,8 @@ fn installs_into_an_empty_home_puts_the_helper_in_place_and_runs_check() {
     assert_eq!(r.status.code(), Some(0), "{}", both(&r));
     assert!(s.app.join("layouts/herdr-contr-own.json").exists());
     assert!(s.app.join("mods/herdr-contr/mod.json").exists());
+    // The layout to switch to is herdr-contr: Herdr's sidebar and tab bar (decision 6).
+    assert!(out(&r).contains(r#"Installed. In herdr-app run: layout.switch {"name": "herdr-contr"}"#), "{}", out(&r));
     assert!(s.app.join("themes/herdr-contr-light.json").exists());
     assert_eq!(read(s.app.join("herdr-contr/bin/herdr-contr-feed")), read(&s.helper));
     let mode = fs::metadata(s.app.join("herdr-contr/bin/herdr-contr-feed")).unwrap().permissions().mode();
