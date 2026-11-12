@@ -442,10 +442,10 @@ export class Composer {
     // Claude Code session an Orchestrate button that starts /contr:orchestrate in the box.
     const orch = orchestration(agent);
     const pill = orch
-      ? h_flex().id("orchestrating").h(22).px(8).gap(5).items_center().rounded(11).flex_none().text_size(11.5)
+      ? h_flex().id("orchestrating").h(22).px(8).gap(5).items_center().rounded(11).flex_shrink(1).min_w(0).overflow_hidden().text_size(11.5)
         .bg(t.selected).text_color(t.foreground).border(1).border_color(t.border)
-        .child(div().size(6).rounded(3).bg(t.working)).child("Orchestrating")
-        .when(orch.workers > 0, (el) => el.child(div().text_color(t.muted).child(`· ${orch.workers} ${orch.workers === 1 ? "worker" : "workers"}`)))
+        .child(div().size(6).flex_none().rounded(3).bg(t.working)).child(div().flex_none().child("Orchestrating"))
+        .when(orch.workers > 0, (el) => el.child(div().min_w(0).truncate().text_color(t.muted).child(`· ${orch.workers} ${orch.workers === 1 ? "worker" : "workers"}`)))
       : agent?.app === "claude-code"
         ? h_flex().id("orchestrate").h(22).px(8).items_center().rounded(11).flex_none().text_size(11.5)
           .text_color(t.muted).border(1).border_color(t.border).hover((st) => st.bg(t.hover).text_color(t.foreground))
@@ -459,7 +459,7 @@ export class Composer {
       .key_context(PASTE_CONTEXT)
       .on_action(PASTE_ACTION, (_e, cx) => { const text = cx.read_from_clipboard?.(); cx.spawn((cx) => this.paste(cx, text)); })
       // Above the box: the agent's working line on the left (#47), the context tag and the pill on the right (#40).
-      .when(Boolean(work) || (showTags && Boolean(ctxTag)) || Boolean(pill), (el) => el.child(h_flex().id("tags-row").w_full().max_w(width).gap(5).items_center()
+      .when(Boolean(work) || (showTags && Boolean(ctxTag)) || Boolean(pill), (el) => el.child(h_flex().id("tags-row").w_full().max_w(width).min_w(0).overflow_hidden().gap(5).items_center()
         .child(work
           ? h_flex().id("working").flex_1().min_w(0).gap(8).items_center().text_size(12.5)
             .child(loader(12).flex_none().text_color(t.working))

@@ -2329,3 +2329,59 @@ fn claude_review_bar_only_in_question_text() {
     assert!(claude_review_exact(&q, &[ans(&[0, 2])], &review), "picks A and │B: the wrapped │B is the label");
     assert!(!claude_review_exact(&q, &[ans(&[0, 1])], &review), "picks A and B: the screen shows │B, not B");
 }
+
+// Claude's preview layout (an option with a `preview`), written by hand as Claude Code draws it (issue 58).
+const PREVIEW: &str = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/../fixtures/claude-preview-picker.txt"));
+
+#[test]
+fn claude_preview_parse() {
+    let p = claude_parse(PREVIEW).expect("parse");
+    let labels: Vec<&str> = p.question.options.iter().map(|o| o.label.as_str()).collect();
+    assert_eq!(labels, ["Chips under message", "Links only", "Draw text ourselves"], "preview: every option, no box text");
+    assert!(p.question.options[0].recommended, "preview: a wrapped (Recommended) marks the option");
+    assert!(p.question.options.iter().all(|o| o.detail.is_empty()), "preview: no box text or notes hint as a description");
+    assert!(p.preview && p.question.no_other && p.typed.is_none() && !p.other_focused, "preview: no Other row");
+    assert_eq!((p.focus_marks, p.focus_row), (1, Some(0)), "preview: the focus is on row 1");
+    assert!(p.question.text.ends_with("Where should the colored GitHub state icon go?"));
+    // With a "Type something." row, that row is the Other row as before.
+    let with = claude_parse(&PREVIEW.replace("                             └", "  4. Type something.         └")).expect("parse");
+    assert_eq!(with.question.options.len(), 3, "preview + Type something: three options");
+    assert!(!with.question.no_other, "preview + Type something: an Other row");
+    let plain = claude_parse(&claude_r6()).expect("parse");
+    assert!(!plain.preview && !plain.question.no_other, "no box: not the preview layout");
+}
+
+#[test]
+fn claude_preview_answer_arrows_then_enter() {
+    let seen = tui_agent("claude", Some("s1"));
+    let (h, shown) = claude_screen(PREVIEW).expect("parse");
+    let q = screen_request(&h, vec![shown]);
+    for (pick, want) in [(2usize, vec!["Down", "Down", "Enter"]), (0, vec!["Enter"])] {
+        let live = Live::new(tui_pane(seen.clone()), PREVIEW);
+        live.on(|i, l| {
+            if *i == Input::Keys(vec!["Enter".into()]) {
+                l.set("done");
+            }
+        });
+        let n = live.mark();
+        let r = answer_question(&live, "w1:p1", &q, &[ans(&[pick])], Some(&gate(&seen, yes())));
+        assert!(r.is_ok(), "preview pick {pick}: {r:?}");
+        assert_eq!(live.sent(n), want, "preview pick {pick}: arrows from the focus, then Enter; no digit");
+    }
+    // The focus on row 3: Up to row 2.
+    let at3 = PREVIEW.replace("❯ 1. Chips", "  1. Chips").replace("  3. Draw", "❯ 3. Draw");
+    let live = Live::new(tui_pane(seen.clone()), &at3);
+    live.on(|i, l| {
+        if *i == Input::Keys(vec!["Enter".into()]) {
+            l.set("done");
+        }
+    });
+    let n = live.mark();
+    let _ = answer_question(&live, "w1:p1", &q, &[ans(&[1])], Some(&gate(&seen, yes())));
+    assert_eq!(live.sent(n), ["Up", "Enter"], "preview: Up from row 3 to row 2");
+    // A typed answer: refused before any key.
+    let live = Live::new(tui_pane(seen.clone()), PREVIEW);
+    let n = live.mark();
+    let r = answer_question(&live, "w1:p1", &q, &[other(&[], "mine")], Some(&gate(&seen, yes())));
+    assert!(r.is_err() && live.after(n).is_empty(), "preview: a typed answer gets no key");
+}

@@ -549,5 +549,9 @@ test("the reply box is as wide as the chat's column", async () => {
     const el = v.render(cx);
     assert.equal(byId(el, "box")._a.max_w, v.colWidth(), `pane ${w}`);
     assert.equal(byId(el, "tags-row")._a.max_w, v.colWidth());
+    // A card above the box: as wide as the box.
+    v.cards.entry(v.address).card = { kind: "approval", request: "toolu_1", title: "Bash command", command: "ls", tool: "Bash" };
+    assert.equal(byId(v.render(cx), "chat-card")?._a.max_w, v.colWidth(), `card, pane ${w}`);
+    v.cards.entry(v.address).card = null;
   }
 });
