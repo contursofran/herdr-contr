@@ -15,3 +15,8 @@ mods that ship with the Herdr app, licensed under the Apache License, Version
 the project's favicon. Each changed file says so at its top.
 
 The software that the code uses is listed in THIRD_PARTY_NOTICES.md.
+
+The pull request and issue icons in herdr-app/mods/herdr-contr/icons
+(pull-request.svg, issue.svg) are GitHub's Octicons
+(https://github.com/primer/octicons), licensed under the MIT License,
+Copyright (c) GitHub Inc.

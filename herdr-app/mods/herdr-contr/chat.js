@@ -16,7 +16,8 @@ import { Composer, paneOf } from "./composer.js";
 import { switchStrip } from "./viewswitch.js";
 import { markdownView, codeBlockAt } from "./mdblocks.js";
 import { repoFor } from "./refs.js";
-import { textScale } from "./config.js";
+import { inlineTick } from "./inline.js";
+import { textScale, setting } from "./config.js";
 
 // Herdr's zoom: line heights round in zoomed px (estimate.js lineHeight).
 const appZoom = () => { const z = Number(settings?.()?.zoom); return z > 0 ? z : 1; };
@@ -141,6 +142,9 @@ export class ChatView {
     if (this.wantOlder) { this.wantOlder = false; cx.spawn((cx) => this.loadOlder(cx)); }
     const f = this.feed();
     if (f && settleEchoes(f)) cx.notify();
+    // Inline PR icons (inline.js): states made, updated and released here, not while drawing. Off: all released.
+    const ids = new Set(setting("inline_icons") === "on" ? (f ? this.rowsOf(f) : []).map((r) => r.id) : []);
+    cx.spawn(async (cx) => { if (await inlineTick(ids)) cx.notify(); });
     if (agent?.status === "working") { if (Date.now() - this.lastWork >= WORK_MS) cx.spawn((cx) => this.pollWorking(cx, agent.address)); }
     else if (this.work) { this.work = null; cx.notify(); }
     if (Date.now() - this.lastPoll >= (f?.echoes?.length ? CHECK_MS : POLL_MS)) return this.poll(cx);

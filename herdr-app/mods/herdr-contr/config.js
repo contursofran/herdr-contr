@@ -6,8 +6,8 @@
 import { appHome, readTextFile, writeTextFile, shared, setShared, notify } from "herdr";
 
 export const KEY_CONFIG = "herdr-contr.config";    // { file, bad, text }: the parsed file, and the text it was read from
-export const DEFAULTS = { status_row: "show", remote_helper: "ask", phone_read_only: false, text_size: "default" };
-export const CHOICES = { status_row: ["show", "hide"], remote_helper: ["ask", "never"], phone_read_only: [false, true], text_size: ["small", "default", "large"] };
+export const DEFAULTS = { status_row: "show", remote_helper: "ask", phone_read_only: false, text_size: "default", inline_icons: "off" };
+export const CHOICES = { status_row: ["show", "hide"], remote_helper: ["ask", "never"], phone_read_only: [false, true], text_size: ["small", "default", "large"], inline_icons: ["off", "on"] };
 // The chat's text size (text_size) over the default 16 px: messages, code boxes and tables follow it.
 const TEXT_PX = { small: 14, default: 16, large: 18 };
 export const textScale = () => TEXT_PX[setting("text_size")] / 16;
