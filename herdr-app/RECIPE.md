@@ -201,20 +201,26 @@ drawn by Herdr's `frames`; every loader of the mod is this one); done is a check
   - The ids `sidebar`, `screen`, `chat` and `tab` are what the mod switches.
 - **Layout** `layouts/herdr-contr.json`: the same `work` column and theme, but `sidebar` is
   Herdr's own, as in Herdr's `main` layout (268 px, shown: the blocks `workspace-chrome`, `spaces`,
-  `agents` and the `workspace-chrome` footer), with `traffic_lights: [12, 16]`. Between the lists and
+  `herdr-contr-agents` and the `workspace-chrome` footer), with `traffic_lights: [12, 16]`. Between the lists and
   the footer is the mod's `usage` block (56 px, view `usage`): the same plan usage rows as the mod's own
   sidebar. It starts hidden; the mod shows it (`layout.show`) when a plan has data and hides it when none
   has. The chat, Needs you and Overview screens start the reads too, so the hidden block can show. The mod knows it by
   `shared("layout") === "herdr-contr"`: there the left edge opens no floating sidebar, the
   sidebar shows unless `layouts/.state/herdr-contr.json` hides it, and the bar leaves no room
   for the window buttons while the sidebar shows. ⌘B hides and shows Herdr's sidebar. The top bar
-  is Herdr's own too: the `work` column is Herdr's `tabs` block (42 px, `window_drag`) above a
+  is Herdr's own too: the `work` column is the `tabs` block (mod `herdr-contr-tabs`, 42 px, `window_drag`) above a
   `work-body` row with the `screen` stack and Herdr's `panel` (368 px, hidden: `files` and
   `changes`), as in `main`. Herdr's bar has the tabs, + and the Files and Changes buttons; a tab
   picked there shows its chat or its terminals (the screen sync). The `tab` column holds only
   `tab-panes`. With a `tabs` block in the layout (`herdrTabBar()`), the chat, Needs you and
   Overview draw no bar and leave no room for one (`barH()` is 0); Needs you is ⌘⇧I and Overview
   ⌘⇧\.
+- **Mods** `mods/herdr-contr-agents/` and `mods/herdr-contr-tabs/`: copies of Herdr's `agents` and
+  `tabs` mods (Apache-2.0). The one change: the working mark is the braille loader of
+  `mods/herdr-contr/state.js` (12 px, ⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏ in Menlo, `line_height(1)`, 80 ms a frame), in place
+  of the turning arc. A mod cannot import another mod, so each copy has its own `loader()`. The tabs
+  copy keeps its window icons (`win-*.svg`); the icons of other Herdr mods (`workspace-chrome`,
+  `pane`, `files`, `changes`) stay where Herdr installs them.
 - **Mod** `mods/herdr-contr/` (`mod.json`: `place: "none"`): one mod, one view per block, picked
   by `props.view`: `side`, `chat`, `needs`, `overview`, `top`; overlays use `settings` (the herdr-contr
   settings dialog), `termbar` (the terminal window's bar), `menu` (right-click menus) and `side` with `peek: true` (the floating sidebar).

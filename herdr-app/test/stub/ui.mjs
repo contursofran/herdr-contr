@@ -50,6 +50,7 @@ export const TextareaState = {
 };
 export let lastList = null;
 export const v_virtual_list = (id, n, sizes, key, render) => { const e = mk("vl"); e._args = { id, n, sizes, key, render }; lastList = e; return e; };
+export const ScrollHandle = { new: () => mk("scroll") };
 export const VirtualListScrollHandle = {
   new: () => ({ scroll_to_item: (i, s) => calls.push(["scroll_to_item", i, s]), scroll_to_bottom: () => calls.push(["bottom"]) }),
 };
