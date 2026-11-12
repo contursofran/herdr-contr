@@ -58,7 +58,14 @@ test("status is read for the shown agent and drawn as tags", async () => {
   c.box(fake.agents[0]);
   await c.pollStatus(cx);
   const el = c.render(fake.agents[0], new Proxy({}, { get: (_t, k) => `#${k}` }));
-  assert.match(textOf(byId(el, "tags")), /Opus 5\.5.*feat\/login.*api/);
+  assert.match(textOf(byId(el, "tags")), /Opus 5\.5.*api/);
+  assert.doesNotMatch(textOf(byId(el, "tags")), /feat\/login/, "the branch is in the box, not in the tags (#47)");
+  assert.equal(byId(el, "tags-row").kids.length < 4, true);
+  const ids = el.kids.map((k) => k._a?.id ?? k._id);
+  assert.ok(ids.indexOf("box") < ids.indexOf("tags") && ids.indexOf("tags-row") < ids.indexOf("box"), "tags below the box, working row above (#47)");
+  assert.equal(byId(el, "working"), null, "no working line while it does not work");
+  const w = c.render(fake.agents[0], new Proxy({}, { get: (_t, k) => `#${k}` }), 800, { text: "Brewing…", detail: "3s" });
+  assert.match(textOf(byId(w, "working")), /Brewing….*\(3s\)/);
   assert.doesNotMatch(textOf(byId(el, "tags")), /ctx/, "the context is on the right (#40)");
   assert.equal(textOf(byId(el, "ctx-tag")), "ctx 84%");
   const warn = byId(el, "ctx-tag").kids[0];

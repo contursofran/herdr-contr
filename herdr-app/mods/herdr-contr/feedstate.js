@@ -66,7 +66,10 @@ export function applyFeed(state, answer) {
 // A message sent from the composer shows at once, dimmed, as an echo at the end of the rows. It goes away when
 // the agent's log has a user row with the same text, when the send fails, or after ECHO_MS.
 export const ECHO_MS = 120000;
-const norm = (s) => (s || "").replace(/\s+/g, " ").trim();
+// Claude Code turns a pasted image path into "[Image #N]" in its log, so both become one token.
+const PASTE_PATH = /(['"]?)\S*\/herdr-contr\/paste\/paste-[\w-]+\.(?:png|jpe?g|gif|webp)\1/gi;
+const IMAGE_TAG = /\[Image #\d+\]/g;
+const norm = (s) => (s || "").replace(PASTE_PATH, "\u0000img").replace(IMAGE_TAG, "\u0000img").replace(/\s+/g, " ").trim();
 const logged = (state, text) => state.tail.filter((r) => r.k === "user" && r.from == null && norm(r.text) === norm(text)).length;
 
 // Adds an echo of `text` and returns it. `seen` counts the same text already in the log, so a repeat waits for its own row.
