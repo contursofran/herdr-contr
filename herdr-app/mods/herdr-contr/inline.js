@@ -180,7 +180,7 @@ export function inlinePiece(key, rowId, md, repo, t, width, k, h) {
     return r.text;
   };
   const row = h_flex().flex_wrap().items_center().gap_x(fs * SPACE_EM).w_full().h(h)
-    .text_size(fs).line_height(lineHeight(fs)).text_color(t.foreground)
+    .text_size(fs).line_height(lineHeight(fs) / fs).text_color(t.foreground)
     .children(words.map((w) => w.length === 1 ? seg(w[0]) : h_flex().flex_none().items_center().children(w.map(seg))));
   drawn.set(rowId, new Set([...(drawn.get(rowId) ?? []), ...urls]));
   return row;
