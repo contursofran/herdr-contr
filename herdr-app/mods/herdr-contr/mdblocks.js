@@ -75,12 +75,22 @@ export function markdownView(id, text, t, width, k = 1, repo = null) {
   const blocks = splitBlocks(text);
   // "Inline PR icons" on: paragraphs and list items with a reference drawn with icons (#68).
   const inline = setting("inline_icons") === "on";
-  const prose = (key, md, next) => (inline && inlineSplit(key, id, md, next, repo, t, width, k)) || textView(key, md, repo, k);
+  const prose = (key, md, next) => (inline && safeSplit(key, id, md, next, repo, t, width, k)) || textView(key, md, repo, k);
   if (blocks.length === 1 && blocks[0].k === "md") return prose(`md-${id}-0`, blocks[0].text, null);
   return v_flex().w_full().children(blocks.map((b, i) =>
     b.k === "code" ? codeBox(`md-${id}-k${i}`, b, t, k)
       : b.k === "table" ? table(`md-${id}-t${i}`, b, t, width, k)
         : prose(`md-${id}-${i}`, b.text, blocks[i + 1]?.k ?? null)));
+}
+
+// inlineSplit, or null when it throws: the TextView then, so the chat never goes blank because of the
+// setting (#70). Each message text logs its error once.
+const failed = new Set();
+function safeSplit(key, rowId, md, next, repo, t, width, k) {
+  try { return inlineSplit(key, rowId, md, next, repo, t, width, k); } catch (e) {
+    if (!failed.has(md)) { failed.add(md); console.error("herdr-contr: inline PR icons failed, TextView drawn:", e); }
+    return null;
+  }
 }
 
 // A text block cut at its paragraphs and top-level list items (blocks.js: splitPieces). A piece with a
@@ -115,7 +125,7 @@ export function inlineSplit(key, rowId, md, next, repo, t, width, k = 1) {
     parts.push(group = { key: `${key}-g${j}`, lines: [...p.lines, ...p.tail], h: slot, lead });
   }
   if (!any) return null;
-  // One plain paragraph: the Textarea itself, as before the split.
+  // One plain paragraph: the drawn row itself, with no slot around it.
   if (parts.length === 1 && pieces[0].k === "para" && parts[0].lead === 0 && !pieces[0].tail.length) return parts[0].el;
   return v_flex().w_full().children(parts.map((q) => div().w_full().h(q.h).pt(q.lead).overflow_hidden()
     .child(q.el ?? textView(q.key, q.lines.join("\n"), repo, k))));

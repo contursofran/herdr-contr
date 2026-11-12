@@ -63,15 +63,18 @@ Left to right:
        one it stays text. Code, links, other URLs, words and colors such as "#fff" stay as written.
        With **Inline PR icons** on (experimental, off by default; `inline.js`), a text block is cut at
        its paragraphs and top-level list items (`splitPieces`; an item with a nested list stays whole).
-       Each piece with a reference is a disabled `Textarea` (no border, background or padding; chat text size, line
-       height and color) whose references are tokens: GitHub's pull request or issue icon (Octicons,
-       14 px) colored by state, and the reference underlined; a click opens it. `**` and backticks
-       are dropped, a link shows its label. State from `gh api` (at most 3 at once; open ones and
+       Each piece with a reference is a wrapping row of plain elements (chat text size, line height
+       and color; one child for each word, a 0.3 em gap between words). Each reference is a `Link`:
+       GitHub's pull request or issue icon (Octicons, 14 px) colored by state, and the reference
+       underlined; the `Link` opens it. Punctuation right after a reference stays with it. `**bold**`
+       is bold (700), code is Menlo 14 px on `raised` with 4 px padding, other links are an underlined
+       `Link`. No handler and no state: the chat's list renderer refuses them (#70). If the drawing
+       throws, the block is the `TextView` and the error is logged once. State from `gh api` (at most 3 at once; open ones and
        failures read again after 60 s, closed ones kept), `muted` until known. Theme colors:
        `pr_open`, `pr_draft`, `pr_merged`, `pr_closed`, `issue_open`, `issue_done`,
-       `issue_notplanned`. The state is made, updated and released in the chat's timer, never while
-       it draws, so the first frame is the `TextView`. A list item's bullet or number is a 22 px
-       column outside the `Textarea`. The pieces without a reference between them stay one
+       `issue_notplanned`. The states are read in the chat's timer, for the URLs that the shown rows
+       drew. A list item's bullet or number is a 22 px
+       column outside the row. The pieces without a reference between them stay one
        `TextView`. Each part is as tall as `markdownRaw` counts it, with the gap above it as top
        padding, so the row heights hold; a block with no piece drawn with icons is one `TextView`. Its height is the estimate's for the paragraph;
        when the icons would need one more line, the paragraph stays `TextView`.

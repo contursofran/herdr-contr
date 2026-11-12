@@ -1,5 +1,5 @@
-// Inline PR icons (#57, experimental setting): token content, states from a fake gh, the Textarea's life
-// outside render, and the height estimate.
+// Inline PR icons (#57, experimental setting): runs and words, plain elements (#70), states from a fake gh,
+// and the height estimate.
 import { test, beforeEach } from "node:test";
 import assert from "node:assert/strict";
 import { fake, log, reset, theme } from "./stub/herdr.mjs";
@@ -7,7 +7,7 @@ import { made } from "./stub/ui.mjs";
 import { KEY_CONFIG } from "../mods/herdr-contr/config.js";
 import { markdownView } from "../mods/herdr-contr/mdblocks.js";
 import { markdownHeight } from "../mods/herdr-contr/estimate.js";
-import { isParagraph, inlineContent, inlineTick, inlineViews, inlineParagraph, forgetInline, stateOf, tokenLook,
+import { isParagraph, inlineContent, inlineRuns, inlineWords, inlineTick, inlineDrawn, inlineParagraph, forgetInline, stateOf, tokenLook,
   paragraphHeight, inlineLines } from "../mods/herdr-contr/inline.js";
 
 const PR = "https://github.com/o/r/pull/51", IS = "https://github.com/o/r/issues/7";
@@ -47,38 +47,53 @@ test("off (the default): prose stays TextView, no Textarea state is made", async
   assert.equal(made.textarea, before);
 });
 
-test("on: render asks, the tick makes the state, the next render draws a disabled Textarea with tokens", async () => {
-  on();
-  const before = made.textarea;
-  assert.equal(markdownView("r1", "See PR #51", theme(), 600, 1, "o/r").tag, "md", "first frame: TextView");
-  assert.equal(made.textarea, before, "never made while drawing");
-  assert.equal(await inlineTick(new Set(["r1"])), true);
-  assert.equal(made.textarea, before + 1);
-  const el = markdownView("r1", "See PR #51", theme(), 600, 1, "o/r");
-  assert.equal(el.tag, "ta");
-  assert.equal(el._a.disabled, true);
-  assert.equal(el._a.border, 0);
-  assert.equal(el._a.p, 0);
-  // A click on a token opens its URL.
-  const opened = [];
-  el._h.on_token_click({ token: { id: PR } }, { open_url: (u) => opened.push(u) });
-  assert.deepEqual(opened, [PR]);
-  // Headings and lists stay TextView.
-  assert.equal(markdownView("r2", "# PR #51", theme(), 600, 1, "o/r").tag, "md");
+// A drawn inline row: the wrapping h_flex.
+const isRow = (e) => e?.tag === "h" && "flex_wrap" in e._a;
+const kidsOf = (el, f, o = []) => { if (el && typeof el === "object") { if (f(el)) o.push(el); (el.kids || []).forEach((c) => kidsOf(c, f, o)); } return o; };
+
+test("runs: bold, code, links and references; null with no reference", () => {
+  assert.deepEqual(inlineRuns("**Done** in PR #51, see `a b` and [docs](https://x.y).", "o/r"), [
+    { text: "Done", bold: true }, { text: " in " }, { text: "PR #51", href: PR, ref: true }, { text: ", see " },
+    { text: "a b", code: true }, { text: " and " }, { text: "docs", href: "https://x.y" }, { text: "." }]);
+  assert.equal(inlineRuns("no refs `#5`", "o/r"), null);
+  assert.ok(inlineRuns("#51 `open", "o/r").some((r) => r.text === "`"), "an unclosed backtick stays text");
 });
 
-test("text that changes while the agent writes is set again; a row that leaves the feed is released", async () => {
+test("words: punctuation stays with a reference; a reference is not cut", () => {
+  const w = inlineWords(inlineRuns("Fixed (#51), see PR #7.", "o/r"));
+  assert.deepEqual(w.map((x) => x.map((r) => r.text)), [["Fixed"], ["(", "#51", "),"], ["see"], ["PR #7", "."]]);
+});
+
+test("on: drawn from plain elements, no handler and no state; a Link for each reference", () => {
   on();
-  markdownView("r1", "See PR #51", theme(), 600, 1, "o/r");
-  await inlineTick(new Set(["r1"]));
-  const v = [...inlineViews().values()][0];
-  let released = 0; v.state.release = () => { released++; return true; };
+  const before = made.textarea;
+  const el = markdownView("r1", "I merged **PR #51,** `x` and [d](https://x.y) today", theme(), 600, 1, "o/r");
+  assert.ok(isRow(el), "the wrapping row");
+  assert.equal(made.textarea, before, "no state made while drawing");
+  assert.equal(el._a.gap_x, 16 * 0.3);
+  assert.equal(el._a.text_color, theme().foreground);
+  assert.equal(el.kids[0], "I", "a plain word is a string child");
+  const links = kidsOf(el, (e) => e.tag === "link");
+  assert.deepEqual(links.map((l) => l._a.href), [PR, "https://x.y"]);
+  assert.equal(new Set(links.map((l) => l._a.id)).size, 2, "unique ids");
+  assert.equal(kidsOf(links[0], (e) => e.tag === "svg").length, 1);
+  // "PR #51," together in one no-wrap child, bold.
+  const ref = el.kids.find((k) => typeof k === "object" && k.tag === "h");
+  assert.equal(ref._a.flex_none, undefined); assert.ok("flex_none" in ref._a);
+  assert.equal(ref.kids[1]._a.font_weight, 700);
+  assert.equal(kidsOf(el, (e) => e._a.font_family === "Menlo").length, 1, "code in the mono family");
+  assert.deepEqual(kidsOf(el, (e) => Object.keys(e._h).length > 0), [], "no handler anywhere");
+  assert.equal(markdownView("r2", "# PR #51", theme(), 600, 1, "o/r").tag, "md", "headings stay TextView");
+});
+
+test("the tick reads the URLs that render drew; a row that leaves the feed is forgotten", async () => {
+  on();
   markdownView("r1", "See PR #51 and #7", theme(), 600, 1, "o/r");
-  assert.equal(await inlineTick(new Set(["r1"])), true);
-  assert.equal(v.state.value().text, "See PR #51 and #7");
-  await inlineTick(new Set());
-  assert.equal(released, 1);
-  assert.equal(inlineViews().size, 0);
+  assert.deepEqual([...inlineDrawn().get("r1")], [PR, IS]);
+  assert.equal(await inlineTick(new Set(["r1"]), 0), true);
+  assert.equal(stateOf(PR), "pr-open");
+  await inlineTick(new Set(), 0);
+  assert.equal(inlineDrawn().size, 0);
 });
 
 test("states come from gh, cached: open again after 60 s, closed kept; neutral until known", async () => {
@@ -128,14 +143,12 @@ test("gh fails: no state, the icon stays neutral", async () => {
   assert.equal(stateOf(PR), "pr-open", "asked again after 60 s");
 });
 
-test("height: the Textarea is the estimate's paragraph height, and the drawn lines (icons too) fit in it", async () => {
+test("height: the row is the estimate's paragraph height, and the drawn lines (icons too) fit in it", async () => {
   on();
   const texts = ["Fixed in PR #51.", "Merged **PR #51** and closed #7; the `inline` part waits on o/r#9 and https://github.com/o/r/pull/12 for the review.",
     "A long one: ".concat("word ".repeat(60), "then PR #51 and #7 at the end.")];
   let drawn = 0, fell = 0;
   for (const [i, md] of texts.entries()) for (const w of [300, 600]) for (const k of [0.875, 1, 1.125]) {
-    markdownView(`h${i}`, md, theme(), w, k, "o/r");
-    await inlineTick(new Set([`h${i}`]));
     const el = inlineParagraph(`md-h${i}-0`, `h${i}`, md, "o/r", theme(), w, k);
     const lh = paragraphHeight("x", w, k);
     if (inlineLines(inlineContent(md, "o/r"), w, k) * lh > paragraphHeight(md, w, k)) { assert.equal(el, null, "icons need a line more: TextView"); fell++; continue; }
@@ -171,7 +184,7 @@ const COORD = [
   "",
   "I will report when #51 lands.",
 ].join("\n");
-// The Textareas and the TextViews in a drawn tree, and the slots (the divs with a height) under `el`.
+// The TextViews in a drawn tree, and the slots (the divs with a height) under `el`.
 const walk = (el, f) => { if (el && typeof el === "object") { f(el); (el.kids || []).forEach((c) => walk(c, f)); } };
 const tagged = (el, tag) => { const o = []; walk(el, (e) => e.tag === tag && o.push(e)); return o; };
 
@@ -191,9 +204,6 @@ test("a coordinator message: references drawn with icons, the rest TextView, hei
   on();
   let drawn = 0;
   for (const w of [360, 600, 900]) for (const k of [0.875, 1, 1.125]) {
-    forgetInline();
-    markdownView("c", COORD, theme(), w, k, "o/r");
-    await inlineTick(new Set(["c"]));
     const el = markdownView("c", COORD, theme(), w, k, "o/r");
     const blocks = splitBlocks(COORD);
     assert.equal(el.kids.length, blocks.length);
@@ -209,25 +219,23 @@ test("a coordinator message: references drawn with icons, the rest TextView, hei
     }
     assert.ok(Math.abs(sum - markdownRaw(COORD, w, k)) < 1e-9, `whole at ${w}/${k}`);
     // Most pieces with a reference draw with icons (the one-more-line fallback is rare).
-    const tas = tagged(el.kids[0], "ta").length;
+    const tas = kidsOf(el.kids[0], isRow).length;
     assert.ok(tas >= 3, `${tas} of 4 drawn at ${w}/${k}`);
     // Pieces without references stay TextView; the nested list stays in its item's TextView.
     const mds = tagged(el.kids[0], "md").map((m) => m._a.text);
     assert.ok(mds.some((t) => /Nothing else is queued/.test(t)));
     assert.ok(mds.some((t) => /2\. Install merged main[\s\S]*nested/.test(t)));
-    assert.equal(tagged(el.kids[2], "ta").length, 1, "the last paragraph");
+    assert.equal(kidsOf(el.kids[2], isRow).length, 1, "the last paragraph");
     drawn += tas;
   }
   assert.ok(drawn >= 34, `${drawn} of 36 pieces with references drawn with icons`);
 });
 
-test("a list item: its bullet or number outside the Textarea, the text indented", async () => {
+test("a list item: its bullet or number outside the row, the text indented", async () => {
   on();
   const md = "Intro.\n\n- PR #51 merged\n3. then #7";
-  markdownView("l", md, theme(), 600, 1, "o/r");
-  await inlineTick(new Set(["l"]));
   const el = markdownView("l", md, theme(), 600, 1, "o/r");
-  const rows = tagged(el, "h").filter((h) => h.kids.length === 2 && h.kids[1].kids[0]?.tag === "ta");
+  const rows = tagged(el, "h").filter((h) => h.kids.length === 2 && isRow(h.kids[1]?.kids?.[0]));
   assert.deepEqual(rows.map((r) => r.kids[0].kids[0]), ["•", "3."]);
   assert.equal(rows[0].kids[0]._a.w, 22);
   const ta = rows[0].kids[1].kids[0];

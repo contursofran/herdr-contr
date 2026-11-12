@@ -146,7 +146,7 @@ export class ChatView {
     if (this.wantOlder) { this.wantOlder = false; cx.spawn((cx) => this.loadOlder(cx)); }
     const f = this.feed();
     if (f && settleEchoes(f)) cx.notify();
-    // Inline PR icons (inline.js): states made, updated and released here, not while drawing. Off: all released.
+    // Inline PR icons (inline.js): gh states read here, not while drawing, for the shown rows. Off: none.
     const ids = new Set(setting("inline_icons") === "on" ? (f ? this.rowsOf(f) : []).map((r) => r.id) : []);
     cx.spawn(async (cx) => { if (await inlineTick(ids)) cx.notify(); });
     const status = agent?.status;
