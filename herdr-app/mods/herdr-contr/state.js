@@ -28,7 +28,7 @@ export const icon = (name) => `${MOD}/icons/${name}.svg`;
 export const BRAILLE = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"];
 export const BRAILLE_MS = 80;
 export const loader = (size) => div().flex_none().w(size).h(size).flex().items_center().justify_center()
-  .font_family("Menlo").text_size(size).line_height(size).frames(BRAILLE, BRAILLE_MS).child(BRAILLE[0]);
+  .font_family("Menlo").text_size(size).line_height(1).frames(BRAILLE, BRAILLE_MS).child(BRAILLE[0]);
 
 // Motion: a quick ease-out for fades and a soft spring for moves, as in the web app.
 export const FADE = { duration: 180, easing: "ease-out" };
