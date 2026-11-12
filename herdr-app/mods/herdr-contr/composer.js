@@ -429,7 +429,8 @@ export class Composer {
       : null;
     const empty = !b.input.value().trim() && !b.files.length;
     const tag = (x) => h_flex().h(22).px(8).gap(4).items_center().rounded(11).flex_none().text_size(11.5)
-      .bg(x.warn ? t.blocked : t.chrome).text_color(x.warn ? t.background : t.muted).border(1).border_color(x.warn ? t.blocked : t.border)
+      // A warning is an outline: no fill, so it never turns into a solid block (#43).
+      .bg(t.chrome).text_color(x.warn ? t.foreground : t.muted).border(1).border_color(x.warn ? t.blocked : t.border)
       .when(x.kind === "branch", (el) => el.child(svg(icon("branch")).size(11)))
       .when(x.kind === "cwd", (el) => el.child(svg(icon("folder")).size(11)))
       .child(div().max_w(220).truncate().child(x.text));
