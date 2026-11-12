@@ -527,3 +527,14 @@ test("while the agent works, its working line is the last row; it goes when the 
   assert.equal(log.exec.filter(([, a]) => a[0] === "working").length, before);
   forgetCommands();
 });
+
+test("the reply box is as wide as the chat's column", async () => {
+  fake.exec = (_c, args) => jl(header, logLine("c1"), { type: "splice", at: 0, count: 1 }, user("u1", "hi"), end);
+  const cx = fakeCx(); const v = new ChatView(cx); await cx.settle();
+  for (const w of [1400, 500]) {
+    v.width = w;
+    const el = v.render(cx);
+    assert.equal(byId(el, "box")._a.max_w, v.colWidth(), `pane ${w}`);
+    assert.equal(byId(el, "tags")._a.max_w, v.colWidth());
+  }
+});
