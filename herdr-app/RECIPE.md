@@ -109,8 +109,8 @@ Left to right:
    - **Tab panes**: a split tab, or a tab with a shell, shows its own panes (a 56 px top bar
      above them, 8 px padding, 6 px gaps, 8 px corners, 1 px border, `muted` border on focus).
 
-Status marks: working is a 13 px spinner (`working` color: a quarter arc over a faint fixed ring, one turn
-per 900 ms, as Herdr's own); done is a check
+Status marks: working is a 13 px braille loader (`working` color: ⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏ in Menlo, 80 ms a frame,
+drawn by Herdr's `frames`; every loader of the mod is this one); done is a check
 (`done`); blocked is a 9 px dot (`blocked`); idle is a 12 px empty ring (`dim`).
 
 ## How it behaves
@@ -237,7 +237,7 @@ per 900 ms, as Herdr's own); done is a check
   `herdr-contr-mac-light.json`.
 - **Keys** `keys.json`: the sections `layout:herdr-contr-own` and `layout:herdr-contr`, with the same keys.
 - **Art** `mods/herdr-contr/icons/`: arrow-down, bell, branch, check, close, doc, folder, gear, grid,
-  plus, search, send, sidebar, sliders, spinner, split, terminal, tool (16 × 16 SVG, 1.8 px round strokes, `currentColor`).
+  plus, search, send, sidebar, sliders, split, terminal, tool (16 × 16 SVG, 1.8 px round strokes, `currentColor`).
 
 ## Watch out
 

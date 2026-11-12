@@ -5,7 +5,7 @@ import { h_flex } from "gpui-base";
 import { theme, layout, window, settings, openOverlay, run, setAgentOrder, nextCommand, shared, setShared } from "herdr";
 import { openMenu, tabItems } from "./menu.js";
 import { spaceAgents, spaceTabs, activeTab, currentAgent, tabLabel, screenFor, showTab, closeTab, openTerminal, showNeeds, icon, tabAgents, shownScreen,
-  SPIN_MS, FADE, sidebarShown, herdrSidebar, toggleSidebar, loadSidebar, showScreen, showOverview, showSettings, watchEdge, toggleView } from "./state.js";
+  loader, FADE, sidebarShown, herdrSidebar, toggleSidebar, loadSidebar, showScreen, showOverview, showSettings, watchEdge, toggleView } from "./state.js";
 import { loadConfig, stepTextSize } from "./config.js";
 import { dragger, dropPlace } from "./drag.js";
 
@@ -18,7 +18,7 @@ function find(node, id) {
 // The status mark at the start of a tab: a spinner while working, a check when done, a dot when it
 // waits for you, an empty ring otherwise (idle, or no agent).
 export function statusMark(status, t) {
-  if (status === "working") return svg(icon("spinner")).size(13).flex_none().text_color(t.working).spin(SPIN_MS);
+  if (status === "working") return loader(13).flex_none().text_color(t.working);
   if (status === "done") return svg(icon("check")).size(13).flex_none().text_color(t.done);
   if (status === "blocked") return div().size(9).m(2).flex_none().rounded(5).bg(t.blocked);
   return div().size(12).m(0.5).flex_none().rounded(6).border(1.3).border_color(t.dim);

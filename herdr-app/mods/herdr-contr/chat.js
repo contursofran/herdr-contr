@@ -4,7 +4,7 @@
 import { div, svg } from "gpui-kit";
 import { v_flex, h_flex, TextView, Scrollbar, v_virtual_list, VirtualListScrollHandle } from "gpui-base";
 import { theme, run, shared, settings } from "herdr";
-import { currentAgent, machineOf, icon, SPIN_MS, FADE, shownScreen, watchEdge, noteWindowHeight, KEY_WIN_H } from "./state.js";
+import { currentAgent, machineOf, icon, loader, FADE, shownScreen, watchEdge, noteWindowHeight, KEY_WIN_H } from "./state.js";
 import { Appear } from "./motion.js";
 import { now, record, flush, loadTiming } from "./timing.js";
 import * as sidecar from "./sidecar.js";
@@ -237,7 +237,7 @@ export class ChatView {
         return div().w_full().h(FOOTER_H).pt(2).text_size(11.5).text_color(t.dim).child(row.text || "");
       case "working":
         return h_flex().w_full().h(STATUS_H).gap(8).items_center().text_size(12.5)
-          .child(svg(icon("spinner")).size(12).flex_none().text_color(t.working).spin(SPIN_MS))
+          .child(loader(12).flex_none().text_color(t.working))
           .child(div().flex_none().text_color(t.foreground).child(row.text))
           .when(Boolean(row.detail), (el) => el.child(div().min_w(0).truncate().text_color(t.muted).child(`(${row.detail})`)));
       case "status":
@@ -247,7 +247,7 @@ export class ChatView {
         const what = oneLine(row.text || row.perm?.title || row.perm?.tool) || "a tool";
         const pending = row.perm?.state === "pending";
         return h_flex().w_full().h(CARD_ROW_H).items_center().child(chip(t)
-          .child(pending ? svg(icon("spinner")).size(11).text_color(t.working).spin(SPIN_MS) : svg(icon("check")).size(12).text_color(t.done))
+          .child(pending ? loader(11).text_color(t.working) : svg(icon("check")).size(12).text_color(t.done))
           .child(div().max_w(Math.floor(this.colWidth() * 0.8)).truncate().child(pending ? `Running · ${what}` : what)));
       }
       case "question":
@@ -282,7 +282,7 @@ export class ChatView {
         chip(t)
           .child(svg(chipIcon(c.symbol)).size(13).flex_none())
           .child(oneLine(c.text))
-          .when(running, (el) => el.child(svg(icon("spinner")).size(11).text_color(t.working).spin(SPIN_MS)))
+          .when(running, (el) => el.child(loader(11).text_color(t.working)))
           .child(div().text_color(t.dim).child(open ? "▴" : "▾")))));
     if (!open) return box;
     const calls = chips.flatMap((c) => c.calls || []);
@@ -292,7 +292,7 @@ export class ChatView {
       .child(div().flex_1().min_w(0).truncate().text_color(t.muted).child(oneLine(k.summary)))
       .child(k.error ? div().flex_none().text_color(t.blocked).child("failed")
         : k.done ? svg(icon("check")).size(12).flex_none().text_color(t.done)
-        : svg(icon("spinner")).size(11).flex_none().text_color(t.working).spin(SPIN_MS)))));
+        : loader(11).flex_none().text_color(t.working)))));
   }
 
   // One list row: the guessed height and the reading column.
@@ -395,7 +395,7 @@ export class ChatView {
     if (this.olderBusy) box.child(h_flex().absolute().top(barH() + 6).left(0).right(0).justify_center()
       .child(h_flex().id("older").h(26).px(12).gap(6).items_center().rounded(13).bg(t.raised).border(1).border_color(t.border)
         .text_size(12).text_color(t.muted)
-        .child(svg(icon("spinner")).size(11).spin(SPIN_MS)).child("Loading earlier messages")));
+        .child(loader(11)).child("Loading earlier messages")));
     return box;
   }
 
