@@ -380,8 +380,9 @@ while a Claude Code, Codex or Grok Build agent works. No queue: `agent` is `""` 
 - The agent's model and effort, for the sidebar's agent rows. Read only. A part that is not known is `null`.
 - `model`: the newest model that the session log names.
 - `effort`, the first source that has it. Claude Code: herdr-contr's status line record, then `--effort <level>`
-  on the agent's command line (the pane's processes and their children), then `effortLevel` in Claude Code's
-  settings. Codex: the newest `turn_context` in the rollout, then `-c model_reasoning_effort=<level>` on the
+  on the agent's command line (the pane's processes and their children), then Claude Code's settings:
+  `.claude/settings.local.json`, then `.claude/settings.json` in the pane's cwd, then the user's `settings.json`.
+  In each file, `modelSettings.<model>.effortLevel` for the log's model, then a top-level `effortLevel`. Codex: the newest `turn_context` in the rollout, then `-c model_reasoning_effort=<level>` on the
   command line, then `model_reasoning_effort` in `config.toml`. Other agents: `null`.
 
 ### `usage` (`usage`)
