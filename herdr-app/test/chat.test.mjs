@@ -6,7 +6,7 @@ import { fakeCx } from "./fake-cx.mjs";
 import { agent, space } from "./fixtures.mjs";
 import { ChatView, chipIcon, oneLine } from "../mods/herdr-contr/chat.js";
 import { parseAnswer } from "../mods/herdr-contr/sidecar.js";
-import { emptyFeed, applyFeed, applyOlder, olderFrom } from "../mods/herdr-contr/feedstate.js";
+import { emptyFeed, applyFeed, applyOlder, olderFrom, addEcho, dropEcho, settleEchoes, shownRows, ECHO_MS } from "../mods/herdr-contr/feedstate.js";
 import { wrapLines, markdownHeight, rowHeight, LH } from "../mods/herdr-contr/estimate.js";
 
 const jl = (...lines) => ({ code: 0, stdout: lines.map((l) => JSON.stringify(l)).join("\n") + "\n", stderr: "" });
@@ -433,4 +433,57 @@ test("Copy message copies the row's markdown as written, for user, assistant and
   assert.equal(copy("a1"), reply);
   assert.equal(copy("n1"), "Notes updated.\nSee notes.md");
   assert.equal(copy("s1"), null, "a status row has no menu");
+});
+
+test("echoes: a sent text shows after the rows until the log has it; a repeat waits for its own row; old ones go", () => {
+  const f = emptyFeed("t1");
+  applyFeed(f, parseAnswer(jl(header, logLine("c1"), { type: "splice", at: 0, count: 1 }, user("u1", "go on"), end).stdout));
+  const a = addEcho(f, "go  on\n", 1000), b = addEcho(f, "and test", 1000);
+  assert.deepEqual(shownRows(f).map((r) => r.id), ["u1", a.id, b.id]);
+  assert.equal(settleEchoes(f, 2000), false, "the old \"go on\" is not this one");
+  applyFeed(f, parseAnswer(jl(header, logLine("c2"), { type: "splice", at: 1, count: 1 }, user("u2", "go on"), end).stdout));
+  assert.equal(settleEchoes(f, 2000), true);
+  assert.deepEqual(shownRows(f).map((r) => r.id), ["u1", "u2", b.id]);
+  assert.equal(settleEchoes(f, 1000 + ECHO_MS), true, "an echo the log never shows goes after ECHO_MS");
+  assert.deepEqual(shownRows(f).map((r) => r.id), ["u1", "u2"]);
+  const c = addEcho(f, "x", 0);
+  assert.equal(dropEcho(f, c), true); assert.equal(dropEcho(f, c), false);
+});
+
+test("a sent message shows at once, dimmed, and the chat reads the feed again and fast until the log has it", async () => {
+  let logged = false, feeds = 0, sends = 0, result = "sent";
+  fake.exec = (_c, args) => {
+    if (args[0] === "send") { sends++; return jl({ ...header, command: "send" }, { type: "done", result }, end); }
+    if (args[0] !== "feed") return jl({ ...header, command: args[0] }, end);
+    feeds++;
+    return jl(header, logLine("c1"), { type: "splice", at: 0, count: 2 }, user("u1", "hi"), ...(logged ? [user("u2", "Fix the tests")] : []), end);
+  };
+  const cx = fakeCx(); const v = new ChatView(cx); await cx.settle(); v.width = 900;
+  const b = v.composer.box(fake.agents[0]);
+  b.input.set_value("Fix the tests");
+  const before = feeds;
+  await v.composer.submit(cx); await cx.settle();
+  assert.equal(sends, 1);
+  assert.ok(feeds > before, "the feed is read again when the send is done");
+  v.render(cx);
+  assert.equal(lastList._args.n, 2);
+  const echo = lastList._args.render({ start: 1, end: 2 })[0];
+  assert.match(textOf(echo), /Fix the tests/);
+  // While it waits, the next tick reads the feed after CHECK_MS, not POLL_MS.
+  v.lastPoll = Date.now() - 500; const n = feeds;
+  await v.tick(cx); await cx.settle();
+  assert.equal(feeds, n + 1);
+  // The log has it now: the echo goes and the logged row takes its place.
+  logged = true; v.lastPoll = 0;
+  await v.tick(cx); await cx.settle();
+  v.render(cx);
+  assert.equal(lastList._args.n, 2);
+  assert.deepEqual(lastList._args.render({ start: 0, end: 2 }).map(textOf).map((s) => /Fix the tests/.test(s)), [false, true]);
+  assert.equal(v.feed().echoes.length, 0);
+  // A failed send: the echo goes and the text is back in the box.
+  result = "failed";
+  b.input.set_value("Nope");
+  await v.composer.submit(cx); await cx.settle();
+  assert.equal(v.feed().echoes.length, 0);
+  assert.equal(b.input.value(), "Nope");
 });
