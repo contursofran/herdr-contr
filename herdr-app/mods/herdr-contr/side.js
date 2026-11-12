@@ -1,5 +1,5 @@
 // The "side" view: New tab, Needs you, Overview, the spaces with a status mark per tab,
-// herdr-contr (its own settings) and Settings.
+// the plan usage (Claude, Codex), herdr-contr (its own settings) and Settings.
 import { div, svg } from "gpui-kit";
 import { v_flex, h_flex } from "gpui-base";
 import { theme, spaces, run, openOverlay, closeOverlay, props } from "herdr";
@@ -7,6 +7,7 @@ import { openMenu, spaceItems } from "./menu.js";
 import { needing, showNeeds, showOverview, showSettings, shownScreen, icon, showSpace, toggleSidebar, peekClosed, PEEK_W, PEEK_GAP, SPRING } from "./state.js";
 import { statusMark, lightsRoom, BAR_H } from "./top.js";
 import { dragger, dropPlace } from "./drag.js";
+import { startUsage, usageRows } from "./usage.js";
 
 // The workspace being dragged up or down (drag.js): one at a time, so the docked and the floating
 // sidebar draw from the same one.
@@ -34,6 +35,8 @@ export class SideView {
     // Slide in: the first frame left of its spot, then a spring to it.
     this.slid = !this.floating;
     if (!this.slid) cx?.timer?.after?.(16, (cx2) => { this.slid = true; cx2?.notify?.(); });
+    // The plan usage: read now and every USAGE_MS (usage.js shares one read between the two copies).
+    startUsage(cx);
   }
 
   // The panel goes when the pointer leaves it.
@@ -129,6 +132,7 @@ export class SideView {
           if (to >= 0) run("space.move", { id: d.id, index: list[to].index });
         })
         .children(list.map(space)))
+      .children(usageRows(t))
       .child(row("side-herdr-contr", "sliders", "herdr-contr", () => showSettings(), null, false))
       .child(row("side-settings", "gear", "Settings", () => run("app.settings")));
   }

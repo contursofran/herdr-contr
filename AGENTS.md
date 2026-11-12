@@ -88,10 +88,10 @@ and `gpui-kit.d.ts`. Read them there. Do not copy them into this repository.
 - The owner's Herdr app and hc core are live. Do not edit files in the
   owner's Herdr home (`~/.config/herdr-app`) by hand. Never send input to the
   owner's Herdr app. Never stop, restart or send input to the owner's hc core.
-- Try the mod only in a test home: `herdr-app/install-isolated.sh <folder>`
-  and `HERDR_APP_HOME=<folder>`, with a scratch `HC_SESSION` and scratch XDG
-  folders. If you cannot be sure that a run uses the scratch core, do not
-  start it. Report that instead.
+- Never start `herdr-app` (owner, 2026-11-12). It is one app per Mac: a
+  second start, even with a test home and a scratch `HC_SESSION`, replaces
+  the owner's window. Check the mod with `npm test`. The coordinator looks at
+  merged `main` in the owner's app (see below).
 - An agent can install merged `main` into the real Herdr home with the
   helper's `install` (owner, 2026-11-12): build the helper, run `install
   --dry-run` first, then `install --helper`. After it, `herdr-app do

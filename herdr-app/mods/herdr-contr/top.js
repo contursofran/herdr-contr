@@ -8,6 +8,7 @@ import { spaceAgents, spaceTabs, activeTab, currentAgent, tabLabel, screenFor, s
   loader, FADE, sidebarShown, herdrSidebar, toggleSidebar, loadSidebar, showScreen, showOverview, showSettings, watchEdge, toggleView } from "./state.js";
 import { loadConfig, stepTextSize } from "./config.js";
 import { dragger, dropPlace } from "./drag.js";
+import { startUsage } from "./usage.js";
 
 function find(node, id) {
   if (node?.id === id) return node;
@@ -85,6 +86,8 @@ export function startTop(cx, owner) {
   const settings = async (cx) => { await loadConfig(); cx.notify(); };
   cx?.spawn?.(settings);
   cx?.timer?.every(60_000, (cx) => cx.spawn(settings));
+  // The plan usage: also read here, so the hidden usage block of the herdr-contr layout shows when a plan has data.
+  startUsage(cx);
 }
 
 // Keeps the screen right for the shown tab: the chat for an agent, the tab's terminals for a

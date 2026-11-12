@@ -22,7 +22,7 @@ fn run(sock: &str, args: &[&str]) -> Vec<Value> {
 fn protocol_lines() {
     let v = run("/nonexistent.sock", &["version"]);
     assert_eq!(v[0], serde_json::json!({"type":"header","protocol":1,"sidecar":"0.1.0","cmd":"version"}));
-    assert_eq!(v[1]["commands"], serde_json::json!(["version", "feed", "status", "card", "approve", "answer", "send", "paste-image", "helper", "queue", "phone", "commands", "working"]));
+    assert_eq!(v[1]["commands"], serde_json::json!(["version", "feed", "status", "card", "approve", "answer", "send", "paste-image", "helper", "queue", "phone", "commands", "working", "usage"]));
     assert_eq!(v.last().unwrap()["type"], "end");
     assert_eq!(v.last().unwrap()["ok"], true);
 
@@ -139,4 +139,23 @@ fn send_refuses_when_the_agents_box_has_text() {
     fake.clear_screen("t1");
     assert_ne!(send()["result"], "box_not_empty", "no screen: it goes as before");
     assert!(fake.calls("terminal.send").len() > typed);
+}
+
+#[test]
+fn usage_reads_the_fake_homes_only() {
+    let d = tempfile::tempdir().unwrap();
+    std::fs::create_dir_all(d.path().join("state/usage")).unwrap();
+    std::fs::write(d.path().join("state/usage/claude.json"), r#"{"schema":1,"updated_at":7,"windows":[{"kind":"five_hour","used_percent":38,"resets_at":100}]}"#).unwrap();
+    let out = Command::new(env!("CARGO_BIN_EXE_herdr-contr-feed"))
+        .arg("usage")
+        .env_clear()
+        .env("HOME", d.path().join("home"))
+        .env("CONTR_STATE_DIR", d.path().join("state"))
+        .env("CODEX_HOME", d.path().join("codex"))
+        .env("SHELL", "/usr/bin/false")
+        .output()
+        .unwrap();
+    let v: Vec<Value> = String::from_utf8(out.stdout).unwrap().lines().map(|l| serde_json::from_str(l).unwrap()).collect();
+    assert_eq!(v[1], serde_json::json!({"type": "usage", "plans": [{"plan": "claude", "windows": [{"kind": "five_hour", "used_percent": 38.0, "resets_at": 100}], "read_at": 7}]}));
+    assert_eq!(v.last().unwrap()["ok"], true);
 }
