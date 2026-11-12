@@ -77,8 +77,8 @@ export function inlineContent(md, repo = null) {
 
 // --- States from gh: "pr-open", "pr-draft", "pr-merged", "pr-closed", "issue-open", "issue-done",
 // "issue-notplanned". Open ones, and ones gh did not give, are read again after 60 s; closed and merged ones are kept.
-// The gap between words: a space, as estimate.js counts it (0.3 em).
-const SPACE_EM = 0.3;
+// The gap between words. Measured on screen (#74): a gap of 0.3 em drew 1.7 times a TextView space, so 0.17 em.
+const SPACE_EM = 0.17;
 const OPEN_MS = 60_000, MAX_GH = 3;
 const states = new Map();   // "owner/repo#n" -> { s, at }
 const asking = new Set();
@@ -170,11 +170,11 @@ export function inlinePiece(key, rowId, md, repo, t, width, k, h) {
     if (r.ref) {
       urls.add(r.href);
       const look = tokenLook(r.href, t);
-      return Link.new(`${key}-r${n++}`).href(r.href).child(h_flex().gap(2).items_center()
+      return Link.new(`${key}-r${n++}`).href(r.href).cursor_pointer().child(h_flex().gap(2).items_center()
         .child(svg(look.icon).size(Math.round(14 * k)).flex_none().text_color(look.color))
         .child(div().underline().child(r.text)));
     }
-    if (r.href) return Link.new(`${key}-l${n++}`).href(r.href).child(div().underline().child(r.text));
+    if (r.href) return Link.new(`${key}-l${n++}`).href(r.href).cursor_pointer().child(div().underline().child(r.text));
     if (r.code) return div().font_family("Menlo").text_size(14 * k).px(4).rounded(4).bg(t.raised).child(r.text);
     if (r.bold) return div().font_weight(700).child(r.text);
     return r.text;
