@@ -445,7 +445,7 @@ pub fn run(args: &[String]) -> i32 {
         Err(e) => stop(&[format!("herdr-app check did not run: {e}. The files are installed.")]),
         Ok(s) if !s.success() => stop(&["herdr-app check found a problem (see above). The files are installed.".into()]),
         Ok(_) => {
-            println!("Installed. In herdr-app run: layout.switch {{\"name\": \"herdr-contr-own\"}}");
+            println!("Installed. In herdr-app run: layout.switch {{\"name\": \"herdr-contr\"}}");
             0
         }
     }
