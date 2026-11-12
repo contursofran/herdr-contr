@@ -9,7 +9,7 @@ import { splitBlocks, tableCells } from "./blocks.js";
 import { ROW_PAD_Y, BUBBLE_PAD_Y, bubbleTextWidth, BUBBLE_GAP, IMAGES_LINE_H, CHIP_ROW, CHIP_GAP, OPEN_INDENT, CALL_H, CALLS_PAD,
   SEP_H, FOOTER_H, STATUS_H, CARD_ROW_H, OTHER_H } from "./metrics.js";
 
-export const READ_W = 760;  // the reading column's width at most
+export const READ_W = 1000; // the reading column's width at most
 export const GUTTER = 24;   // each side of the column
 
 const isWide = (c) => c >= 0x1100 && (c <= 0x115f || (c >= 0x2e80 && c <= 0xa4cf) || (c >= 0xac00 && c <= 0xd7a3) ||

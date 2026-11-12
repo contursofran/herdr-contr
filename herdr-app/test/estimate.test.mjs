@@ -198,3 +198,12 @@ test("a narrow table column with long inline code is guessed at least as drawn (
   assert.ok(guess >= drawn, `${guess} < ${drawn}`);
   assert.ok(guess - drawn < 22, `${guess} is a line or more over ${drawn}`);
 });
+
+// The reading column is at most 1000 px wide (#31), with 24 px gutters below that.
+test("columnWidth caps the column at 1000 px", async () => {
+  const { columnWidth, READ_W } = await import("../mods/herdr-contr/estimate.js");
+  assert.equal(READ_W, 1000);
+  assert.equal(columnWidth(1600), 1000);
+  assert.equal(columnWidth(1048), 1000);
+  assert.equal(columnWidth(900), 852);
+});
