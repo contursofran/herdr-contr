@@ -61,15 +61,19 @@ Left to right:
        pull and issue URLs) are links (`refs.js`); a click opens them in the browser. A bare "#51"
        takes the repository of the agent's folder (`git remote get-url origin`, read once); without
        one it stays text. Code, links, other URLs, words and colors such as "#fff" stay as written.
-       With **Inline PR icons** on (experimental, off by default; `inline.js`), a plain paragraph with
-       a reference is a disabled `Textarea` (no border, background or padding; chat text size, line
+       With **Inline PR icons** on (experimental, off by default; `inline.js`), a text block is cut at
+       its paragraphs and top-level list items (`splitPieces`; an item with a nested list stays whole).
+       Each piece with a reference is a disabled `Textarea` (no border, background or padding; chat text size, line
        height and color) whose references are tokens: GitHub's pull request or issue icon (Octicons,
        14 px) colored by state, and the reference underlined; a click opens it. `**` and backticks
        are dropped, a link shows its label. State from `gh api` (at most 3 at once; open ones and
        failures read again after 60 s, closed ones kept), `muted` until known. Theme colors:
        `pr_open`, `pr_draft`, `pr_merged`, `pr_closed`, `issue_open`, `issue_done`,
        `issue_notplanned`. The state is made, updated and released in the chat's timer, never while
-       it draws, so the first frame is the `TextView`. Its height is the estimate's for the paragraph;
+       it draws, so the first frame is the `TextView`. A list item's bullet or number is a 22 px
+       column outside the `Textarea`. The pieces without a reference between them stay one
+       `TextView`. Each part is as tall as `markdownRaw` counts it, with the gap above it as top
+       padding, so the row heights hold; a block with no piece drawn with icons is one `TextView`. Its height is the estimate's for the paragraph;
        when the icons would need one more line, the paragraph stays `TextView`.
      - Tool calls: a row of 28 px round chips ("Ran 3 commands", an icon per kind: terminal, doc,
        search, tool), each with ▾. A spinner while a call runs.
