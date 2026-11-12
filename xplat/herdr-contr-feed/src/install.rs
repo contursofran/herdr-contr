@@ -14,6 +14,14 @@ mod embedded {
 }
 pub use embedded::{FILES, KEYS, KNOWN};
 
+/// The mods that install puts in <home>/mods: herdr-contr, and our copies of Herdr's agents and tabs mods.
+pub const MODS: [&str; 3] = ["herdr-contr", "herdr-contr-agents", "herdr-contr-tabs"];
+
+/// Whether `rel` is a file in one of our mods.
+fn in_our_mod(rel: &str) -> bool {
+    MODS.iter().any(|m| rel.strip_prefix("mods/").and_then(|r| r.strip_prefix(m)).is_some_and(|r| r.starts_with('/')))
+}
+
 const HELP: &str = "\
 Installs the herdr-contr layout, mod, themes, keys and helper into a herdr-app home.
 Usage: herdr-contr-feed install [--home <herdr-app home>] [--helper <herdr-contr-feed>] [--remote <folder>] [--dry-run]
@@ -169,7 +177,7 @@ pub struct Sorted {
 /// A path a herdr-contr install owns: only these are ever replaced or removed as an older herdr-contr's.
 fn own_path(rel: &str) -> bool {
     !rel.split('/').any(|c| c == ".." || c.is_empty())
-        && (rel == "layouts/herdr-contr-own.json" || rel == "layouts/herdr-contr.json" || rel.starts_with("mods/herdr-contr/") || (rel.starts_with("themes/") && rel.matches('/').count() == 1))
+        && (rel == "layouts/herdr-contr-own.json" || rel == "layouts/herdr-contr.json" || in_our_mod(rel) || (rel.starts_with("themes/") && rel.matches('/').count() == 1))
 }
 
 /// Sorts what is in `home` against this version's `files`, the install.json of an earlier install (`mine`) and
@@ -198,30 +206,32 @@ pub fn sort_files(home: &Path, files: &BTreeMap<&str, &[u8]>, mine: &BTreeMap<St
             },
         }
     }
-    // Files in the person's mods/herdr-contr that this version does not have: an older herdr-contr's, or theirs.
-    let mod_dest = home.join("mods").join("herdr-contr");
-    if mod_dest.is_dir() {
-        let mut found = Vec::new();
-        walk_files(&mod_dest, &mut found);
-        for p in found {
-            let rel = rel_of(&p, home);
-            let n = p.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default();
-            // herdr-app writes jsconfig.json and *.d.ts at the mod's top level (see .gitignore).
-            let generated = p.parent() == Some(mod_dest.as_path()) && (n == "jsconfig.json" || n.ends_with(".d.ts"));
-            if files.contains_key(rel.as_str()) || mine.contains_key(&rel) || n == ".DS_Store" || generated {
-                continue;
-            }
-            match sha_file(&p).and_then(|h| known_as(&rel, &h)) {
-                Some(v) => {
-                    s.gone.insert(rel, v);
+    // Files in the person's copies of our mods that this version does not have: an older herdr-contr's, or theirs.
+    for m in MODS {
+        let mod_dest = home.join("mods").join(m);
+        if mod_dest.is_dir() {
+            let mut found = Vec::new();
+            walk_files(&mod_dest, &mut found);
+            for p in found {
+                let rel = rel_of(&p, home);
+                let n = p.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default();
+                // herdr-app writes jsconfig.json and *.d.ts at the mod's top level (see .gitignore).
+                let generated = p.parent() == Some(mod_dest.as_path()) && (n == "jsconfig.json" || n.ends_with(".d.ts"));
+                if files.contains_key(rel.as_str()) || mine.contains_key(&rel) || n == ".DS_Store" || generated {
+                    continue;
                 }
-                None => {
-                    s.clash.insert(rel);
+                match sha_file(&p).and_then(|h| known_as(&rel, &h)) {
+                    Some(v) => {
+                        s.gone.insert(rel, v);
+                    }
+                    None => {
+                        s.clash.insert(rel);
+                    }
                 }
             }
+        } else if mod_dest.exists() {
+            s.clash.insert(format!("mods/{m}"));
         }
-    } else if mod_dest.exists() {
-        s.clash.insert("mods/herdr-contr".to_string());
     }
     // A theme or layout of an older herdr-contr that this version dropped: removed only when unchanged.
     for (rel, sums) in known {
@@ -304,7 +314,6 @@ pub fn run(args: &[String]) -> i32 {
 
     let known = known_files(KNOWN);
     let Sorted { clash, older, gone } = sort_files(&home, &files, &mine, &known);
-    let mod_dest = home.join("mods").join("herdr-contr");
     if !clash.is_empty() {
         let mut lines = vec![format!("STOP: these are already in {} and were not installed by this script (or you changed them):", home.display())];
         lines.extend(clash.iter().map(|r| format!("  {r}")));
@@ -356,7 +365,7 @@ pub fn run(args: &[String]) -> i32 {
     for rel in files.keys().filter(|r| !r.starts_with("mods/")) {
         println!("  {rel}");
     }
-    println!("  mods/herdr-contr/... ({} files)", files.keys().filter(|r| r.starts_with("mods/")).count());
+    println!("  mods/herdr-contr*/... ({} files)", files.keys().filter(|r| r.starts_with("mods/")).count());
     for (rel, v) in &older {
         println!("    {rel}: older herdr-contr ({v}), replaced");
     }
@@ -395,7 +404,7 @@ pub fn run(args: &[String]) -> i32 {
         // Files an earlier install put there that this version no longer has, if still unchanged.
         for (rel, h) in &mine {
             let dest = home.join(rel);
-            let own = (rel.starts_with("mods/herdr-contr/") || rel.starts_with("themes/herdr-contr")) && !rel.split('/').any(|c| c == "..");
+            let own = (in_our_mod(rel) || rel.starts_with("themes/herdr-contr")) && !rel.split('/').any(|c| c == "..");
             if own && !files.contains_key(rel.as_str()) && dest.is_file() && sha_file(&dest).as_ref() == Some(h) {
                 fs::remove_file(&dest)?;
             }
@@ -436,7 +445,13 @@ pub fn run(args: &[String]) -> i32 {
     }
 
     let _ = std::io::stdout().flush();
-    let status = std::process::Command::new("herdr-app").arg("check").arg(&mod_dest).env("HERDR_APP_HOME", &home).status();
+    let mut status = Ok(std::process::ExitStatus::default());
+    for m in MODS {
+        status = std::process::Command::new("herdr-app").arg("check").arg(home.join("mods").join(m)).env("HERDR_APP_HOME", &home).status();
+        if !status.as_ref().is_ok_and(|s| s.success()) {
+            break;
+        }
+    }
     match status {
         Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
             println!("Installed, but herdr-app is not on PATH, so herdr-app check did not run.");

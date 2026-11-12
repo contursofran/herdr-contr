@@ -53,7 +53,7 @@
               },
               "min": 90,
               "content": {
-                "mod": "agents"
+                "mod": "herdr-contr-agents"
               }
             }
           ]
@@ -86,7 +86,7 @@
           },
           "window_drag": true,
           "content": {
-            "mod": "tabs"
+            "mod": "herdr-contr-tabs"
           }
         },
         {

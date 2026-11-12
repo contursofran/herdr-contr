@@ -36,11 +36,11 @@ export function lightsRoom() {
 }
 
 export const BAR_H = 56;
-// A layout with Herdr's own tab bar (a "tabs" block) needs no bar from this mod: the screens then
+// A layout with a tab bar block ("tabs": Herdr's tabs mod or our copy) needs no bar from this mod: the screens then
 // draw none and leave no room for one. The key commands and the screen sync still run.
 // The block over the tab's terminal that holds the Chat | Terminal switch (herdr-contr layout).
 export const VIEW_SWITCH = "view-switch";
-export const herdrTabBar = () => find(layout(), "tabs")?.content?.mod === "tabs";
+export const herdrTabBar = () => ["tabs", "herdr-contr-tabs"].includes(find(layout(), "tabs")?.content?.mod);
 export const barH = () => (herdrTabBar() ? 0 : BAR_H);
 
 // The tab being dragged (drag.js): one at a time, so every copy of the bar draws from it.

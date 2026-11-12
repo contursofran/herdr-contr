@@ -8,4 +8,9 @@ repository is that tree with no changes.
 Flockbook is licensed under the MIT License, Copyright (c) 2026 Minchen Lee.
 See LICENSE.
 
+The mods in herdr-app/mods/herdr-contr-agents and herdr-app/mods/herdr-contr-tabs
+are adapted from the agents and tabs mods that ship with the Herdr app,
+licensed under the Apache License, Version 2.0. The change: the working mark
+is a braille loader. Each changed file says so at its top.
+
 The software that the code uses is listed in THIRD_PARTY_NOTICES.md.
