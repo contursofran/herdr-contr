@@ -377,7 +377,7 @@ while a Claude Code, Codex or Grok Build agent works. No queue: `agent` is `""` 
 ```
 
 - Only when the screen shows it: Claude Code's note under its prompt box on work in the background ("1 shell
-  still running", "2 background tasks"). Read while the agent works or is idle (Claude Code only).
+  still running", "2 background tasks"). Read while the agent works, is idle or is done (Claude Code only).
 
 ### `model` (`model`)
 

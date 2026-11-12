@@ -149,10 +149,12 @@ export class ChatView {
     if (status === "working") { if (Date.now() - this.lastWork >= WORK_MS) cx.spawn((cx) => this.pollWorking(cx, agent.address)); }
     else {
       if (this.work) { this.work = null; cx.notify(); }
-      // Idle: one read when the agent goes idle, then every BACKGROUND_MS only while the last read had a note.
-      const wentIdle = status === "idle" && this.lastStatus !== "idle";
-      if (wentIdle || (status === "idle" && this.background && Date.now() - this.lastWork >= BACKGROUND_MS)) cx.spawn((cx) => this.pollWorking(cx, agent.address));
-      else if (status !== "idle" && this.background) { this.background = null; cx.notify(); }
+      // Idle or done (turn over, not seen yet): one read when the agent gets there, then every BACKGROUND_MS only
+      // while the last read had a note.
+      const rest = (x) => x === "idle" || x === "done";
+      const wentIdle = rest(status) && !rest(this.lastStatus);
+      if (wentIdle || (rest(status) && this.background && Date.now() - this.lastWork >= BACKGROUND_MS)) cx.spawn((cx) => this.pollWorking(cx, agent.address));
+      else if (!rest(status) && this.background) { this.background = null; cx.notify(); }
     }
     this.lastStatus = status;
     if (Date.now() - this.lastPoll >= (f?.echoes?.length ? CHECK_MS : POLL_MS)) return this.poll(cx);
@@ -173,7 +175,7 @@ export class ChatView {
       const bg = r.error ? null : r.lines.find((x) => x.type === "background")?.text || null;
       const was = this.work;
       const status = currentAgent()?.status;
-      if (address !== this.address || (status !== "working" && status !== "idle")) return;
+      if (address !== this.address || (status !== "working" && status !== "idle" && status !== "done")) return;
       if (bg !== (this.background?.text ?? null)) { this.background = bg ? { address, text: bg } : null; cx.notify(); }
       if (status !== "working") return;
       if (!l?.text) { if (was) { this.work = null; cx.notify(); } return; }

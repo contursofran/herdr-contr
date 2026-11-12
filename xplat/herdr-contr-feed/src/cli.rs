@@ -186,10 +186,10 @@ pub fn run(argv: &[String]) -> String {
                         return r.finish(true);
                     }
                 "working" => {
-                    // Background shells run also while the agent is idle: read the screen in both states.
+                    // Background shells run also while the agent is idle or done: read the screen then too.
                     let agent = found.pane.agent.as_ref().filter(|a| working::reads(&a.kind));
                     let works = agent.is_some_and(|a| a.status == herdr_core::AgentStatus::Working);
-                    let idle = agent.is_some_and(|a| a.status == herdr_core::AgentStatus::Idle);
+                    let idle = agent.is_some_and(|a| matches!(a.status, herdr_core::AgentStatus::Idle | herdr_core::AgentStatus::Done));
                     let screen = if works || idle { client.visible_text(&found.pane.id).ok() } else { None };
                     let w = screen.as_deref().filter(|_| works).and_then(working::claude);
                     r.out.emit_value(working::line(w.as_ref()));

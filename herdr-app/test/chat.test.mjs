@@ -578,6 +578,38 @@ test("Claude Code's background note shows while the agent is idle; it is read sl
   forgetCommands();
 });
 
+test("a done agent is read for its background note like an idle one, and the note stays (#61)", async () => {
+  forgetCommands();
+  let lines = [{ type: "working", text: "Brewing…", detail: "" }];
+  fake.exec = (_c, args) => {
+    if (args[0] === "version") return jl({ ...header, command: "version" }, { type: "version", commands: ["feed", "working"] }, end);
+    if (args[0] === "working") return jl({ ...header, command: "working" }, ...lines, end);
+    if (args[0] === "feed") return jl(header, logLine("c1"), { type: "splice", at: 0, count: 1 }, user("u1", "hi"), end);
+    return jl({ ...header, command: args[0] }, end);
+  };
+  fake.agents = [agent("t1", "working")];
+  const reads = () => log.exec.filter(([, a]) => a[0] === "working").length;
+  const cx = fakeCx(); const v = new ChatView(cx); await cx.settle(); v.width = 900;
+  await v.tick(cx); await cx.settle();
+  const bg = () => byId(v.render(cx), "background");
+  // The turn ends with a shell still running: one read on done.
+  lines = [{ type: "working", text: null, detail: null }, { type: "background", text: "1 shell still running" }];
+  fake.agents = [agent("t1", "done")];
+  const start = reads();
+  await v.tick(cx); await cx.settle();
+  assert.equal(reads(), start + 1, "one read when the agent is done");
+  assert.match(textOf(bg()), /1 shell still running/);
+  // Still done: read again every BACKGROUND_MS while the note shows, and the note is not cleared.
+  v.lastWork = 0; await v.tick(cx); await cx.settle();
+  assert.equal(reads(), start + 2);
+  assert.ok(bg());
+  // Done to idle is no new read by itself.
+  fake.agents = [agent("t1", "idle")]; lines = [lines[0]];
+  await v.tick(cx); await cx.settle();
+  assert.equal(reads(), start + 2);
+  forgetCommands();
+});
+
 test("the reply box is as wide as the chat's column", async () => {
   fake.exec = (_c, args) => jl(header, logLine("c1"), { type: "splice", at: 0, count: 1 }, user("u1", "hi"), end);
   const cx = fakeCx(); const v = new ChatView(cx); await cx.settle();
