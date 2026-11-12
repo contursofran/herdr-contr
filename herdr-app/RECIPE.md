@@ -57,6 +57,10 @@ Left to right:
        cannot change it). Code fences are 12 px rounded boxes (`raised`,
        1 px border, Menlo 13 px, 21 px lines: one selectable `TextView` paragraph, so a drag selects across lines; right-click a box: Copy code, the box as written). Tables are 12 px rounded frames: a `raised` header
        row, 1 px lines between rows, columns sized to their content.
+       In prose, pull request and issue references ("PR #51", "#51", "owner/repo#51", GitHub
+       pull and issue URLs) are links (`refs.js`); a click opens them in the browser. A bare "#51"
+       takes the repository of the agent's folder (`git remote get-url origin`, read once); without
+       one it stays text. Code, links, other URLs, words and colors such as "#fff" stay as written.
      - Tool calls: a row of 28 px round chips ("Ran 3 commands", an icon per kind: terminal, doc,
        search, tool), each with ▾. A spinner while a call runs.
      - A pending call: a 28 px chip "Running · <what>" with a spinner.

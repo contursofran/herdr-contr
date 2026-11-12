@@ -5,6 +5,7 @@ import { div } from "gpui-kit";
 import { v_flex, h_flex, TextView } from "gpui-base";
 import { colWidths, markdownHeight } from "./estimate.js";
 import { splitBlocks, tableCells } from "./blocks.js";
+import { linkRefs } from "./refs.js";
 
 export { splitBlocks, tableCells };
 
@@ -62,10 +63,11 @@ function table(id, b, t, width, k) {
 // width in px (tables need it). A text block's id is always md-<id>-<i>, one block or many: a message that
 // grows a code box while the agent writes keeps its first view (and the selection in it).
 // `k`: the chat's text size over the default 16 px (settings: text_size). At 1 nothing sets a size.
-export function markdownView(id, text, t, width, k = 1) {
+// `repo`: "owner/repo" for a bare "#51" (refs.js); PR and issue references in prose become links.
+export function markdownView(id, text, t, width, k = 1, repo = null) {
   const blocks = splitBlocks(text);
   const prose = (key, md) => {
-    const view = TextView.markdown(key, md).selectable(true);
+    const view = TextView.markdown(key, linkRefs(md, repo)).selectable(true);
     return k === 1 ? view : view.text_size(16 * k);
   };
   if (blocks.length === 1 && blocks[0].k === "md") return prose(`md-${id}-0`, blocks[0].text);
