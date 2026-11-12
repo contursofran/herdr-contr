@@ -112,7 +112,7 @@ fn installs_into_an_empty_home_puts_the_helper_in_place_and_runs_check() {
     assert_eq!(keys_of(&s.app), ours());
     assert!(s.app.join("mods/herdr-contr-agents/main.js").exists());
     assert!(s.app.join("mods/herdr-contr-tabs/win-close.svg").exists());
-    let checks: Vec<String> = ["herdr-contr", "herdr-contr-agents", "herdr-contr-tabs"].iter().map(|m| format!("{0} check {0}/mods/{m}", s.app_s())).collect();
+    let checks: Vec<String> = ["herdr-contr", "herdr-contr-agents", "herdr-contr-spaces", "herdr-contr-tabs"].iter().map(|m| format!("{0} check {0}/mods/{m}", s.app_s())).collect();
     assert_eq!(s.calls(), checks);
 }
 
@@ -130,7 +130,7 @@ fn installs_exactly_the_files_in_the_repo() {
             want.push(format!("themes/{n}"));
         }
     }
-    let git = Command::new("git").args(["ls-files", "mods/herdr-contr", "mods/herdr-contr-agents", "mods/herdr-contr-tabs"]).current_dir(mod_dir()).output().unwrap();
+    let git = Command::new("git").args(["ls-files", "mods/herdr-contr", "mods/herdr-contr-agents", "mods/herdr-contr-spaces", "mods/herdr-contr-tabs"]).current_dir(mod_dir()).output().unwrap();
     want.extend(String::from_utf8(git.stdout).unwrap().lines().map(String::from));
     want.sort();
     let have: Vec<String> = files.keys().cloned().collect();

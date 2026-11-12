@@ -5,6 +5,7 @@ export const log = { run: [], exec: [], notify: [], shared: [], overlays: [], or
 export function reset() { Object.assign(fake, { props: {}, terminals: [], spaces: [], agents: [], panes: [], focused: null, shared: {}, exec: null, layout: null, readText: null, writeText: null }); for (const k of Object.keys(log)) log[k] = []; }
 export const theme = () => new Proxy({}, { get: (_t, k) => (typeof k === "string" ? `#${k}` : undefined) });
 export const spaces = () => fake.spaces;
+export const machines = () => fake.machines ?? [];
 export const agents = () => fake.agents;
 export const panes = () => fake.panes;
 export const terminals = () => fake.terminals ?? [];

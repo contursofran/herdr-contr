@@ -14,8 +14,8 @@ mod embedded {
 }
 pub use embedded::{FILES, KEYS, KNOWN};
 
-/// The mods that install puts in <home>/mods: herdr-contr, and our copies of Herdr's agents and tabs mods.
-pub const MODS: [&str; 3] = ["herdr-contr", "herdr-contr-agents", "herdr-contr-tabs"];
+/// The mods that install puts in <home>/mods: herdr-contr, and our copies of Herdr's agents, spaces and tabs mods.
+pub const MODS: [&str; 4] = ["herdr-contr", "herdr-contr-agents", "herdr-contr-spaces", "herdr-contr-tabs"];
 
 /// Whether `rel` is a file in one of our mods.
 fn in_our_mod(rel: &str) -> bool {
