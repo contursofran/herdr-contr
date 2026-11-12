@@ -10,6 +10,8 @@
   "colors": {
     "canvas": "#ececec", "chrome": "#f5f5f5", "raised": "#ffffff", "hover": "#e2e2e2", "selected": "#d8d8d8",
     "border": "#d1d1d1", "muted": "#6e6e73", "dim": "#a1a1a6", "accent": "#007aff",
-    "working": "#007aff", "done": "#34c759", "blocked": "#ff9500"
+    "working": "#007aff", "done": "#34c759", "blocked": "#ff9500",
+    "pr_open": "#1a7f37", "pr_draft": "#59636e", "pr_merged": "#8250df", "pr_closed": "#d1242f",
+    "issue_open": "#1a7f37", "issue_done": "#8250df", "issue_notplanned": "#59636e"
   }
 }

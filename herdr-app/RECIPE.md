@@ -61,6 +61,16 @@ Left to right:
        pull and issue URLs) are links (`refs.js`); a click opens them in the browser. A bare "#51"
        takes the repository of the agent's folder (`git remote get-url origin`, read once); without
        one it stays text. Code, links, other URLs, words and colors such as "#fff" stay as written.
+       With **Inline PR icons** on (experimental, off by default; `inline.js`), a plain paragraph with
+       a reference is a disabled `Textarea` (no border, background or padding; chat text size, line
+       height and color) whose references are tokens: GitHub's pull request or issue icon (Octicons,
+       14 px) colored by state, and the reference underlined; a click opens it. `**` and backticks
+       are dropped, a link shows its label. State from `gh api` (at most 3 at once; open ones and
+       failures read again after 60 s, closed ones kept), `muted` until known. Theme colors:
+       `pr_open`, `pr_draft`, `pr_merged`, `pr_closed`, `issue_open`, `issue_done`,
+       `issue_notplanned`. The state is made, updated and released in the chat's timer, never while
+       it draws, so the first frame is the `TextView`. Its height is the estimate's for the paragraph;
+       when the icons would need one more line, the paragraph stays `TextView`.
      - Tool calls: a row of 28 px round chips ("Ran 3 commands", an icon per kind: terminal, doc,
        search, tool), each with ▾. A spinner while a call runs.
      - A pending call: a 28 px chip "Running · <what>" with a spinner.
@@ -105,7 +115,7 @@ Left to right:
      11.5 px `muted` headings, then one row per setting (the name in 13.5 px, a line on what it does in
      12 px muted, and on the right a two-choice switch: 26 px choices in a `chrome` frame, the chosen
      one `selected` and semibold), a `border` line under each row. **General**: CHAT, **Status row**
-     Show | Hide; OTHER MACHINES, **Helper on other machines** Ask | Never. **Phone page**: PHONE PAGE,
+     Show | Hide, **Inline PR icons (experimental)** Off | On; OTHER MACHINES, **Helper on other machines** Ask | Never. **Phone page**: PHONE PAGE,
      **Phone page** Off | On. It opens on General. A box with a `blocked`
      border above any section when config.json is not JSON.
      Phone page: the row "Read your agents on your phone, through Tailscale." with Off | On, then a status
@@ -169,6 +179,7 @@ drawn by Herdr's `frames`; every loader of the mod is this one); done is a check
   nothing until the file is fixed or removed (it is never overwritten). A change keeps the other keys,
   is written against the text just read (someone else's change is read again, not lost), and every
   view shows it at once. The file is read again each minute and when the dialog opens.
+  - **Inline PR icons (experimental)** On: icons before pull request and issue references in prose (see the chat).
   - **Status row** Hide: no tags (model, context, cost, folder) around the reply box (the branch beside the send button stays).
   - **Helper on other machines** Never: for a tab on another machine the chat says, in one line,
     "herdr-contr does not run its helper on other machines. To change it: herdr-contr settings, Helper

@@ -18,13 +18,15 @@ export const SETTINGS = [
     about: "The size of the messages, code and tables in the chat. ⌥⌘- and ⌥⌘= step it, ⌥⌘0 resets it; Herdr's zoom (⌘- and ⌘=) scales the whole window." },
   { key: "status_row", title: "Status row", choices: [["show", "Show", "show"], ["hide", "Hide", "hide"]],
     about: "The model, context, cost, folder and branch above the reply box." },
+  { key: "inline_icons", title: "Inline PR icons (experimental)", choices: [["off", "Off", "off"], ["on", "On", "on"]],
+    about: "A paragraph with a pull request or issue shows GitHub's icon before each one, colored by its state." },
   { key: "remote_helper", title: "Helper on other machines", choices: [["ask", "Ask", "ask"], ["never", "Never", "never"]],
     about: "For a tab on another machine, the chat asks before it installs the herdr-contr helper there. Never: it does not ask, and nothing runs there. To remove a helper that is already there, choose Ask first." },
 ];
 
 // The sidebar's sections; `parts`: [heading, setting keys] in order.
 export const SECTIONS = [
-  { id: "general", label: "General", icon: "sliders", parts: [["CHAT", ["text_size", "status_row"]], ["OTHER MACHINES", ["remote_helper"]]] },
+  { id: "general", label: "General", icon: "sliders", parts: [["CHAT", ["text_size", "status_row", "inline_icons"]], ["OTHER MACHINES", ["remote_helper"]]] },
   { id: "phone", label: "Phone page", icon: "phone" },
 ];
 

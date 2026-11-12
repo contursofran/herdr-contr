@@ -6,6 +6,8 @@ import { v_flex, h_flex, TextView } from "gpui-base";
 import { colWidths, markdownHeight } from "./estimate.js";
 import { splitBlocks, tableCells } from "./blocks.js";
 import { linkRefs } from "./refs.js";
+import { inlineParagraph } from "./inline.js";
+import { setting } from "./config.js";
 
 export { splitBlocks, tableCells };
 
@@ -66,7 +68,11 @@ function table(id, b, t, width, k) {
 // `repo`: "owner/repo" for a bare "#51" (refs.js); PR and issue references in prose become links.
 export function markdownView(id, text, t, width, k = 1, repo = null) {
   const blocks = splitBlocks(text);
+  // "Inline PR icons" on: a paragraph with a reference as a Textarea with icons (inline.js), when its state is made.
+  const inline = setting("inline_icons") === "on";
   const prose = (key, md) => {
+    const tokens = inline ? inlineParagraph(key, id, md, repo, t, width, k) : null;
+    if (tokens) return tokens;
     const view = TextView.markdown(key, linkRefs(md, repo)).selectable(true);
     return k === 1 ? view : view.text_size(16 * k);
   };
