@@ -200,7 +200,7 @@ drawn by Herdr's `frames`; every loader of the mod is this one); done is a check
     padding 8).
   - The ids `sidebar`, `screen`, `chat` and `tab` are what the mod switches.
 - **Layout** `layouts/herdr-contr.json`: the same `work` column and theme, but `sidebar` is
-  Herdr's own, as in Herdr's `main` layout (268 px, shown: the blocks `workspace-chrome`, `spaces`,
+  Herdr's own, as in Herdr's `main` layout (268 px, shown: the blocks `workspace-chrome`, `herdr-contr-spaces`,
   `herdr-contr-agents` and the `workspace-chrome` footer), with `traffic_lights: [12, 16]`. Between the lists and
   the footer is the mod's `usage` block (56 px, view `usage`): the same plan usage rows as the mod's own
   sidebar. It starts hidden; the mod shows it (`layout.show`) when a plan has data and hides it when none
@@ -221,6 +221,16 @@ drawn by Herdr's `frames`; every loader of the mod is this one); done is a check
   of the turning arc. A mod cannot import another mod, so each copy has its own `loader()`. The tabs
   copy keeps its window icons (`win-*.svg`); the icons of other Herdr mods (`workspace-chrome`,
   `pane`, `files`, `changes`) stay where Herdr installs them.
+- **Mod** `mods/herdr-contr-spaces/`: a copy of Herdr's `spaces` mod (Apache-2.0). The one change: the
+  space icon (18 px) is the project's favicon (`image()`, full color, 4 px corners), else a folder icon
+  (`workspace-chrome/folder.svg`, 15 px, `muted`), in place of the colored letter. Worktree rows keep
+  the branch icon. Only spaces on this computer look; a space on another machine shows the folder. The
+  look is one `exec` of `sh` in the space's folder (its first terminal's folder, else where it was
+  made), off the UI thread, on the 250 ms check the mod has already. Its result is kept per folder, so
+  a folder is looked at once, and again only when the space moves to a new folder. Files only, the first
+  found wins: `favicon.svg`, `favicon.png` in the folder, then in `public/`, `static/`, `app/`,
+  `src/app/`, `assets/`, `web/`; then `apple-touch-icon.png`, `icon.png`, `icon.svg` in the same folders.
+  No `.ico`: `image()` names SVG, PNG and JPEG, not ICO.
 - **Mod** `mods/herdr-contr/` (`mod.json`: `place: "none"`): one mod, one view per block, picked
   by `props.view`: `side`, `chat`, `needs`, `overview`, `top`; overlays use `settings` (the herdr-contr
   settings dialog), `termbar` (the terminal window's bar), `menu` (right-click menus) and `side` with `peek: true` (the floating sidebar).

@@ -37,7 +37,7 @@ fn main() {
     for p in names {
         files.push((format!("themes/{}", p.file_name().unwrap().to_string_lossy()), p));
     }
-    for m in ["herdr-contr", "herdr-contr-agents", "herdr-contr-tabs"] {
+    for m in ["herdr-contr", "herdr-contr-agents", "herdr-contr-spaces", "herdr-contr-tabs"] {
         walk(&base.join("mods").join(m), &base, &mut files);
     }
     files.sort();
