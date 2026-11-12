@@ -50,7 +50,7 @@ does not download; `install-isolated.sh` copies the sidecar in.
 | `answer` | `--terminal <addr> --request <id> --answers <json>` `[--cache <file>]` | `done` |
 | `send` | `--terminal <addr> --text <s>` `[--file <path>]…` `[--expect-kind <agent>]` `[--expect-path <log>]` `[--cache <file>]` | `done` (`changed` when the terminal now runs another agent or conversation than the expected one; nothing is sent. Its message says "new conversation" when the same agent process wrote the expected log, e.g. after `/clear`. With `--cache` the log is looked up again and written to the cache, so the next `feed` reads it) |
 | `queue` | `--terminal <addr>` `[--cache <file>]` (Rust sidecar only; `serve` and other machines) | `queued` |
-| `working` | `--terminal <addr>` `[--cache <file>]` (Rust sidecar only; read only) | `working` |
+| `working` | `--terminal <addr>` `[--cache <file>]` (Rust sidecar only; read only) | `working`, `background` |
 | `model` | `--terminal <addr>` `[--cache <file>]` (Rust sidecar only; read only) | `model` |
 | `commands` | `--terminal <addr>` `[--cache <file>]` (Rust sidecar only) | `commands` |
 | `usage` | — (Rust sidecar only; read only) | `usage` |
@@ -371,6 +371,13 @@ while a Claude Code, Codex or Grok Build agent works. No queue: `agent` is `""` 
 - The agent's working line on its screen, while the agent works (Claude Code only). Key hints such as
   "esc to interrupt" are left out of `detail`; `detail` can be empty.
 - None on screen, the agent is not working, or another agent kind: `text` and `detail` are `null`.
+
+```json
+{"type":"background","text":"1 shell still running"}
+```
+
+- Only when the screen shows it: Claude Code's note under its prompt box on work in the background ("1 shell
+  still running", "2 background tasks"). Read while the agent works, is idle or is done (Claude Code only).
 
 ### `model` (`model`)
 

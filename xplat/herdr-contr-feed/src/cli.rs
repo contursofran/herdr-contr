@@ -8,7 +8,7 @@
 //!   herdr-contr-feed approve --terminal <addr> --request <id> --allow|--deny [--cache <file>]
 //!   herdr-contr-feed answer --terminal <addr> --request <id> --answers <json> [--cache <file>]
 //!   herdr-contr-feed queue  --terminal <addr> [--cache <file>]   (the agent's own queue: one `queued` line; read only)
-//!   herdr-contr-feed working --terminal <addr> [--cache <file>]   (the agent's working line on screen; read only)
+//!   herdr-contr-feed working --terminal <addr> [--cache <file>]   (the agent's working and background lines on screen; read only)
 //!   herdr-contr-feed model  --terminal <addr> [--cache <file>]   (the agent's model and effort; read only)
 //!   herdr-contr-feed usage   (the Claude and Codex plan usage; read only)
 //!   herdr-contr-feed paste-image --dir <folder>   (copied files, else the clipboard's image as a PNG there; path null when none)
@@ -186,9 +186,16 @@ pub fn run(argv: &[String]) -> String {
                         return r.finish(true);
                     }
                 "working" => {
-                    let screen = found.pane.agent.as_ref().filter(|a| a.status == herdr_core::AgentStatus::Working && working::reads(&a.kind)).and_then(|_| client.visible_text(&found.pane.id).ok());
-                    let w = screen.as_deref().and_then(working::claude);
+                    // Background shells run also while the agent is idle or done: read the screen then too.
+                    let agent = found.pane.agent.as_ref().filter(|a| working::reads(&a.kind));
+                    let works = agent.is_some_and(|a| a.status == herdr_core::AgentStatus::Working);
+                    let idle = agent.is_some_and(|a| matches!(a.status, herdr_core::AgentStatus::Idle | herdr_core::AgentStatus::Done));
+                    let screen = if works || idle { client.visible_text(&found.pane.id).ok() } else { None };
+                    let w = screen.as_deref().filter(|_| works).and_then(working::claude);
                     r.out.emit_value(working::line(w.as_ref()));
+                    if let Some(b) = screen.as_deref().and_then(working::background) {
+                        r.out.emit_value(working::background_line(&b));
+                    }
                     return r.finish(true);
                 }
                 "model" => {

@@ -69,3 +69,33 @@ fn parse(line: &str) -> Option<Working> {
     }
     Some(Working { text: text.to_string(), detail })
 }
+
+/// The `background` line: Claude Code's note on work that runs in the background ("1 shell still running").
+pub fn background_line(text: &str) -> Value {
+    json!({"type": "background", "text": text})
+}
+
+/// Claude Code's background note under its prompt box: a " · " part such as "1 shell still running", "2 shells
+/// still running" or "1 background task", on a line below the box's last rule. None when the screen has no box.
+pub fn background(screen: &str) -> Option<String> {
+    let lines: Vec<&str> = screen.lines().collect();
+    let rule = lines.iter().rposition(|l| {
+        let t = l.trim();
+        t.chars().count() >= 10 && t.chars().all(|c| c == '─')
+    })?;
+    lines[rule + 1..].iter().find_map(|l| l.split(" · ").map(str::trim).find(|p| is_background(p)).map(str::to_string))
+}
+
+fn is_background(part: &str) -> bool {
+    let words: Vec<&str> = part.split_whitespace().collect();
+    if words.len() < 2 || words.len() > 5 || words[0].is_empty() || !words[0].chars().all(|c| c.is_ascii_digit()) {
+        return false;
+    }
+    let nouns = ["shell", "shells", "task", "tasks", "agent", "agents"];
+    let noun = words.iter().position(|w| nouns.contains(w));
+    match noun {
+        // "1 shell", "2 background tasks", "1 local agent", optionally followed by "still running" or "running".
+        Some(i) if i <= 2 => matches!(&words[i + 1..], [] | ["running"] | ["still", "running"]),
+        _ => false,
+    }
+}
