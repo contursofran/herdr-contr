@@ -140,6 +140,26 @@ pub fn items_at(range: &Range) -> Vec<ConversationItem> {
 }
 
 /// The model named by the newest assistant line, for logs with no status line.
+/// The tokens in the context after the newest main-thread Claude assistant message: its usage's input, cache write and
+/// cache read tokens. None without one.
+pub fn context_used(lines: &[String]) -> Option<i64> {
+    for l in lines.iter().rev().filter(|l| l.contains("\"usage\"")) {
+        let Ok(o) = serde_json::from_str::<Value>(l) else { continue };
+        if o.get("type").and_then(Value::as_str) != Some("assistant") || o.get("isSidechain").and_then(Value::as_bool) == Some(true) {
+            continue;
+        }
+        let Some(u) = o.get("message").and_then(|m| m.get("usage")) else { continue };
+        let n: i64 = ["input_tokens", "cache_creation_input_tokens", "cache_read_input_tokens"]
+            .iter()
+            .filter_map(|k| u.get(*k).and_then(Value::as_i64))
+            .sum();
+        if n > 0 {
+            return Some(n);
+        }
+    }
+    None
+}
+
 pub fn model(lines: &[String]) -> Option<String> {
     for l in lines.iter().rev().filter(|l| l.contains("\"model\"")) {
         let Ok(o) = serde_json::from_str::<Value>(l) else { continue };

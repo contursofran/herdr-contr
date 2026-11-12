@@ -241,6 +241,40 @@ fn status_tags() {
 }
 
 #[test]
+fn status_ctx_from_log() {
+    let dir = tempfile::tempdir().unwrap();
+    let settings = dir.path().join("settings.json");
+    // Another tool's status line: no herdr-contr record, so the log is the source.
+    std::fs::write(&settings, r#"{"statusLine":{"type":"command","command":"other-statusline"},"autoCompactWindow":250000}"#).unwrap();
+    let log = dir.path().join("sess-2.jsonl");
+    let usage = |id: &str, side: bool, n: i64| {
+        serde_json::json!({"type": "assistant", "uuid": id, "isSidechain": side, "sessionId": "sess-2", "timestamp": "2026-11-12T10:00:00Z",
+            "message": {"id": id, "role": "assistant", "model": "claude-test-1", "content": [{"type": "text", "text": "ok"}],
+                "usage": {"input_tokens": 3, "cache_creation_input_tokens": 2000, "cache_read_input_tokens": n, "output_tokens": 50}}})
+        .to_string()
+    };
+    let mut lines = turn();
+    lines.push(usage("m1", false, 50_000));
+    lines.push(usage("m2", false, 118_000));
+    lines.push(usage("m3", true, 5_000));
+    std::fs::write(&log, lines.join("\n") + "\n").unwrap();
+    assert_eq!(tail::context_used(&lines), Some(120_003), "modfeed tail: newest main-thread usage");
+    assert_eq!(tail::context_used(&turn()), None, "modfeed tail: no usage");
+    let mut o = JsonLines::new();
+    status::run("claude", Some(&log), &settings, &mut o, SystemTime::now());
+    let st = &o.lines[0];
+    assert!(st.contains(r#""source":"log""#) && st.contains(r#""text":"claude-test-1""#) && st.contains(r#""text":"ctx 120k / 250k""#) && st.contains(r#""percent":48"#), "modfeed status: ctx from the log ({st})");
+    std::fs::write(&settings, "{}").unwrap();
+    let mut o2 = JsonLines::new();
+    status::run("claude", Some(&log), &settings, &mut o2, SystemTime::now());
+    assert!(!o2.lines[0].contains("ctx"), "modfeed status: no limit, no window, no ctx tag ({})", o2.lines[0]);
+    std::fs::write(&settings, r#"{"autoCompactWindow":250000}"#).unwrap();
+    let mut o3 = JsonLines::new();
+    status::run("codex", Some(&log), &settings, &mut o3, SystemTime::now());
+    assert!(!o3.lines[0].contains("ctx"), "modfeed status: ctx from the log for claude only ({})", o3.lines[0]);
+}
+
+#[test]
 fn cache_times_read_back_exactly() {
     // A value CI read back one ulp off (as ...617) before serde_json's float_roundtrip.
     let dir = tempfile::tempdir().unwrap();

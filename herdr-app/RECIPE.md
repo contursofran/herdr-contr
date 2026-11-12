@@ -59,7 +59,8 @@ Left to right:
      - "Loading earlier messages" in a small capsule under the bar while older rows load.
    - **Reply box** under the chat, at most 800 px wide: a row of 22 px round tags (model, effort,
      context, cost, folder, branch, agent; a warning tag is orange; the context tag is "ctx 120k / 250k"
-     against Claude Code's `autoCompactWindow` when it is set, else "ctx 37%" of the model's window), then a 16 px rounded `raised`
+     against Claude Code's `autoCompactWindow` when it is set, else "ctx 37%" of the model's window; without the wrapper, the tokens come from the session log and
+     the tag shows only with `autoCompactWindow`), then a 16 px rounded `raised`
      box with a one-line text area ("Reply to the agent"), + to attach files on the left (macOS only), the
      branch, and a round 28 px send button (accent when there is text). File chips above the text.
    - **Card** between the chat and the reply box, at most 800 px, 14 px corners, `raised`, 14 px

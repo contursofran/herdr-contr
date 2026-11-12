@@ -10,3 +10,8 @@ Issue #30 (owner, 2026-11-12).
 - With both, the tag is `ctx 120k / 250k`; its percent and its warning (80%
   and up) are against the limit. Otherwise the tag is `ctx 37%` as before.
 - The mod does not change: it shows the helper's text.
+- No herdr-contr status line record (the owner's status line is another
+  tool's): the tokens come from the session log, the newest main-thread
+  assistant message's usage (input, cache write and cache read tokens). The
+  log does not give the model's window, so without `autoCompactWindow` there
+  is no ctx tag. Claude only.

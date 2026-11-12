@@ -393,16 +393,8 @@ impl ClaudeStatusInfo {
         if let Some(e) = &self.effort {
             out.push(StatusTag::plain(StatusTagKind::Effort, e, &format!("Effort {e}"), None, false));
         }
-        if let Some((used, limit)) = self.context_used.zip(compact_limit.filter(|l| *l > 0)) {
-            let p = (used as f64 * 100.0 / limit as f64).round().clamp(0.0, 100.0) as i64;
-            let (u, l) = (kilo(used), kilo(limit));
-            out.push(StatusTag::plain(
-                StatusTagKind::Context,
-                &format!("ctx {u} / {l}"),
-                &format!("Context {u} of {l} tokens before auto-compact"),
-                Some(p),
-                p >= StatusTag::WARN_PERCENT,
-            ));
+        if let Some(t) = self.context_used.zip(compact_limit).and_then(|(u, l)| StatusTag::context_against(u, l)) {
+            out.push(t);
         } else if let Some(p) = self.context_percent {
             out.push(StatusTag::plain(
                 StatusTagKind::Context,
@@ -417,6 +409,25 @@ impl ClaudeStatusInfo {
             out.push(StatusTag::plain(StatusTagKind::Cost, &format!("{d} est."), &format!("Session cost about {d}, an estimate"), None, false));
         }
         out
+    }
+}
+
+impl StatusTag {
+    /// The context tag for `used` tokens against the auto-compact `limit`: "ctx 120k / 250k", its percent and its
+    /// warning against the limit. None when the limit is not positive.
+    pub fn context_against(used: i64, limit: i64) -> Option<StatusTag> {
+        if limit <= 0 {
+            return None;
+        }
+        let p = (used as f64 * 100.0 / limit as f64).round().clamp(0.0, 100.0) as i64;
+        let (u, l) = (kilo(used), kilo(limit));
+        Some(StatusTag::plain(
+            StatusTagKind::Context,
+            &format!("ctx {u} / {l}"),
+            &format!("Context {u} of {l} tokens before auto-compact"),
+            Some(p),
+            p >= StatusTag::WARN_PERCENT,
+        ))
     }
 }
 

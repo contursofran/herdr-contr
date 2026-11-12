@@ -4,7 +4,7 @@
 
 use crate::protocol::JsonLines;
 use crate::tail;
-use herdr_core::statusline::StatusLineFolder;
+use herdr_core::statusline::{StatusLineFolder, StatusTag};
 use serde::Serialize;
 use serde_json::Value;
 use std::collections::HashMap;
@@ -124,6 +124,15 @@ pub fn run(agent: &str, log: Option<&Path>, settings: &Path, out: &mut JsonLines
                 if let Some(m) = tail::model(&r.lines) {
                     tags = vec![Tag { kind: "model".into(), text: m, percent: None, warn: false }];
                     source = "log";
+                }
+                // No status line record: the context from the log's usage, against the auto-compact limit. The
+                // model's window is not in the log, so without the setting there is no context tag.
+                if agent == "claude" {
+                    let t = tail::context_used(&r.lines).zip(compact_limit(settings)).and_then(|(u, l)| StatusTag::context_against(u, l));
+                    if let Some(t) = t {
+                        tags.push(Tag { kind: t.kind.raw().into(), text: t.text, percent: t.percent, warn: t.warn });
+                        source = "log";
+                    }
                 }
             }
         }
