@@ -8,7 +8,7 @@ import { currentAgent, machineOf, icon, SPIN_MS, FADE, shownScreen, watchEdge, n
 import { Appear } from "./motion.js";
 import { now, record, flush, loadTiming } from "./timing.js";
 import * as sidecar from "./sidecar.js";
-import { emptyFeed, applyFeed, applyOlder, olderFrom } from "./feedstate.js";
+import { emptyFeed, applyFeed, applyOlder, olderFrom, addEcho, dropEcho, settleEchoes, shownRows } from "./feedstate.js";
 import { GUTTER, columnWidth, rowHeight } from "./estimate.js";
 import { ROW_PAD_Y, BUBBLE_PAD_X, BUBBLE_PAD_Y, BUBBLE_GAP, IMAGES_FS, bubbleWidth, bubbleTextWidth, CHIP_H, CHIP_PAD_Y, CHIP_GAP, OPEN_INDENT,
   CALL_H, SEP_H, FOOTER_H, STATUS_H, CARD_ROW_H, OTHER_H } from "./metrics.js";
@@ -25,6 +25,8 @@ import { HelperUI, isRemoteProblem } from "./helpercard.js";
 
 export const POLL_MS = 2000;
 const CHECK_MS = 400;
+// A sent message waits dimmed until the agent's log has it.
+const ECHO_OPACITY = 0.55;
 // Older rows load by themselves while all rows fit on screen (with FILL_PX to spare), at most AUTO_OLDER
 // times a chat is opened: a log whose last 2 MB is only tool output can hold no rows for a long way back.
 const AUTO_OLDER = 5, FILL_PX = 400;
@@ -85,6 +87,17 @@ export class ChatView {
     this.helper = new HelperUI();
     this.refresh = (cx) => { this.lastPoll = 0; return this.poll(cx); };
     this.composer.onNewConversation = (_address, cx) => this.refresh(cx);
+    // A sent message shows at once; the feed is read again when the send is done, and fast while it waits.
+    this.composer.onSent = (address, text, cx) => {
+      const f = this.feeds.get(address);
+      if (!f) return null;
+      const echo = addEcho(f, text);
+      if (f === this.feed()) { this.follow = true; this.toNewest(); }
+      cx.notify();
+      return echo;
+    };
+    this.composer.onSendFailed = (address, echo, cx) => { const f = this.feeds.get(address); if (f && echo && dropEcho(f, echo)) cx.notify(); };
+    this.composer.onSendDone = (address, cx) => { if (address === this.address) return this.refresh(cx); };
     this.cards.canFocus = () => this.composer?.empty !== false;
     this.switchTo(currentAgent()?.address ?? null);
     cx.spawn((cx) => this.poll(cx));
@@ -114,7 +127,9 @@ export class ChatView {
     const agent = currentAgent();
     cx.spawn((cx) => this.cards.poll(cx, this.address, wanted(agent, this.feed()?.rows)));
     if (this.wantOlder) { this.wantOlder = false; cx.spawn((cx) => this.loadOlder(cx)); }
-    if (Date.now() - this.lastPoll >= POLL_MS) return this.poll(cx);
+    const f = this.feed();
+    if (f && settleEchoes(f)) cx.notify();
+    if (Date.now() - this.lastPoll >= (f?.echoes?.length ? CHECK_MS : POLL_MS)) return this.poll(cx);
   }
 
   // The first row is on screen and the log goes back further: read the 2 MB before and put it on
@@ -147,9 +162,10 @@ export class ChatView {
       const answer = await sidecar.feed(f.address, f.cursor);
       const t1 = now();
       const at = applyFeed(f, answer);
+      const settled = settleEchoes(f);
       record("feed.exec", t1 - t0);
       record("feed.apply", now() - t1, at >= 0 ? 1 : 0);
-      if (at >= 0 && f === this.feed()) {
+      if ((at >= 0 || settled) && f === this.feed()) {
         if (this.follow) this.toNewest();
         cx.notify();
       }
@@ -157,7 +173,7 @@ export class ChatView {
   }
 
   toNewest() {
-    const n = this.feed()?.rows.length ?? 0;
+    const f = this.feed(), n = f ? shownRows(f).length : 0;
     if (n) this.scroll.scroll_to_item(n - 1, "top");
   }
 
@@ -178,7 +194,7 @@ export class ChatView {
     switch (row.k) {
       case "user":
         if (row.from != null) return this.agentNote(row, t, md);
-        return h_flex().w_full().justify_end().py(ROW_PAD_Y)
+        return h_flex().w_full().justify_end().py(ROW_PAD_Y).when(Boolean(row.echo), (el) => el.opacity(ECHO_OPACITY))
           .child(v_flex().max_w(bubbleWidth(this.colWidth())).px(BUBBLE_PAD_X).py(BUBBLE_PAD_Y).gap(BUBBLE_GAP).rounded(16).bg(t.raised).text_color(t.foreground)
             .child(md(row.text, bubbleTextWidth(this.colWidth())))
             .when(Boolean(row.images), (el) => el.child(div().text_size(IMAGES_FS).text_color(t.muted).child(row.images === 1 ? "1 image" : `${row.images} images`))));
@@ -304,7 +320,7 @@ export class ChatView {
   }
 
   list(t, f) {
-    const rows = f.rows, n = rows.length;
+    const rows = shownRows(f), n = rows.length;
     // The first row starts below the bar; the rest scroll up under it.
     const sizes = rows.map((r, i) => this.height(r) + (i === 0 ? barH() : 0));
     const box = v_flex().relative().flex_1().min_h(0)
@@ -358,9 +374,9 @@ export class ChatView {
     const f = this.feed();
     let main;
     if (!f) main = this.center(t, "No agent to show. Start one with +.");
-    else if (f.error && !f.rows.length) main = this.problem(t, f.error);
-    else if (!f.loaded) main = this.center(t, "Loading…");
-    else if (!f.rows.length) main = this.center(t, f.path ? "No messages yet." : "No conversation yet. Send the first message.");
+    else if (f.error && !shownRows(f).length) main = this.problem(t, f.error);
+    else if (!f.loaded && !shownRows(f).length) main = this.center(t, "Loading…");
+    else if (!shownRows(f).length) main = this.center(t, f.path ? "No messages yet." : "No conversation yet. Send the first message.");
     else main = this.list(t, f);
     const stop = (_e, cx) => cx.stop_propagation();
     return watchEdge(v_flex().id("root").relative().size_full().min_w(0).bg(t.background))

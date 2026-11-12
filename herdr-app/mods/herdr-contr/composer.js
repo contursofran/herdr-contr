@@ -377,12 +377,14 @@ export class Composer {
     // The list shows and the name is not whole yet: Enter completes it (a part of a name would run another command).
     const s = text !== this.slashClosed ? this.slashFor(text) : null;
     if (s && !s.items.some((c) => c.name === s.query)) return this.complete(s, s.items[s.pick], cx);
-    const files = b.files;
+    const files = b.files, sent = withFiles(text, files);
     this.sending = true; this.note = null;
     b.setText(""); b.files = [];
+    const echo = this.onSent?.(a, sent, cx) ?? null;
     cx.notify();
+    let ok = false;
     try {
-      const r = await sidecar.send(a, withFiles(text, files), files, this.seen?.(a) ?? null);
+      const r = await sidecar.send(a, sent, files, this.seen?.(a) ?? null);
       const done = r.lines.find((l) => l.type === "done");
       const moved = sidecar.agentChanged(done), fresh = sidecar.newConversation(done);
       // Only "sent" and "unconfirmed" (it may still arrive) mean the text went out; any other result did not send.
@@ -392,10 +394,16 @@ export class Composer {
         else if (this.address !== a) this.drafts.set(a, { text, files });
         this.note = { text: fresh ? sidecar.NEW_CONVERSATION : moved ? sidecar.AGENT_CHANGED : (r.error?.message ?? done?.message) || "The message was not sent.", bad: true };
         if (fresh) this.onNewConversation?.(a, cx);
-      } else if (done.result === "unconfirmed") {
-        this.note = { text: "Sent. The agent did not confirm it yet.", bad: false };
+      } else {
+        ok = true;
+        if (done.result === "unconfirmed") this.note = { text: "Sent. The agent did not confirm it yet.", bad: false };
       }
-    } finally { this.sending = false; cx.notify(); }
+    } finally {
+      this.sending = false;
+      if (!ok) this.onSendFailed?.(a, echo, cx);
+      cx.notify();
+    }
+    if (ok) await this.onSendDone?.(a, cx);
   }
 
   render(agent, t) {

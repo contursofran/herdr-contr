@@ -62,3 +62,36 @@ export function applyFeed(state, answer) {
   join(state);
   return hadError && changedAt === -1 ? 0 : changedAt;
 }
+
+// A message sent from the composer shows at once, dimmed, as an echo at the end of the rows. It goes away when
+// the agent's log has a user row with the same text, when the send fails, or after ECHO_MS.
+export const ECHO_MS = 120000;
+const norm = (s) => (s || "").replace(/\s+/g, " ").trim();
+const logged = (state, text) => state.tail.filter((r) => r.k === "user" && r.from == null && norm(r.text) === norm(text)).length;
+
+// Adds an echo of `text` and returns it. `seen` counts the same text already in the log, so a repeat waits for its own row.
+export function addEcho(state, text, at = Date.now()) {
+  const echoes = state.echoes ?? [];
+  const echo = { id: `echo-${at}-${echoes.length}`, k: "user", text, echo: true, at, seen: logged(state, text) + echoes.filter((e) => norm(e.text) === norm(text)).length };
+  state.echoes = echoes.concat(echo);
+  return echo;
+}
+
+export function dropEcho(state, echo) {
+  const before = state.echoes?.length ?? 0;
+  state.echoes = (state.echoes ?? []).filter((e) => e !== echo);
+  return state.echoes.length !== before;
+}
+
+// Drops the echoes the log has now, and the old ones. Returns true when one went away.
+export function settleEchoes(state, at = Date.now()) {
+  const before = state.echoes?.length ?? 0;
+  if (!before) return false;
+  state.echoes = state.echoes.filter((e) => at - e.at < ECHO_MS && logged(state, e.text) <= e.seen);
+  return state.echoes.length !== before;
+}
+
+// The rows the chat draws: the feed's rows, then the echoes that wait.
+export function shownRows(state) {
+  return state.echoes?.length ? state.rows.concat(state.echoes) : state.rows;
+}
