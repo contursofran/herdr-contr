@@ -33,6 +33,10 @@ export const SPRING = { response: 320, damping: 0.82 };
 // Whether the sidebar shows. layout() gives the file, not the live tree, so the mod keeps its own
 // copy: read once from the app's saved layout state, then set by toggleSidebar().
 export const KEY_SIDEBAR = "flockbook.sidebar";
+// The layout with Herdr's own sidebar (spaces, agents) in the column "sidebar". There the mod's side view
+// does not show, so the edge peek is off, and the sidebar shows unless the saved state hides it.
+export const HERDR_LAYOUT = "flockbook-herdr";
+export const herdrSidebar = () => shared("layout") === HERDR_LAYOUT;
 export const sidebarShown = () => shared(KEY_SIDEBAR) === true;
 export function toggleSidebar() {
   const show = !sidebarShown();
@@ -54,7 +58,7 @@ export function noteWindowHeight(size) {
   if (h > 0 && shared(KEY_WIN_H) !== h) setShared(KEY_WIN_H, h);
 }
 export function peekAtEdge(e) {
-  if (sidebarShown() || shared(KEY_PEEK) || (e?.position?.x ?? 99) > EDGE_PX) return;
+  if (herdrSidebar() || sidebarShown() || shared(KEY_PEEK) || (e?.position?.x ?? 99) > EDGE_PX) return;
   // A window, not a popup: a popup sizes to its content and ignores the height. The panel closes
   // itself when the pointer leaves it, and stops presses so they don't drag it.
   const id = openOverlay({ mod: "flockbook", props: { view: "side", peek: true }, kind: "window", frame: "none",
@@ -77,9 +81,10 @@ export const watchEdge = (el) => el.on_mouse_move((e) => peekAtEdge(e));
 
 export async function loadSidebar() {
   if (shared(KEY_SIDEBAR) !== undefined) return;
-  let hidden = true;
+  const herdr = herdrSidebar();
+  let hidden = !herdr;
   try {
-    const text = await readTextFile(`${appHome()}/layouts/.state/flockbook.json`);
+    const text = await readTextFile(`${appHome()}/layouts/.state/${herdr ? HERDR_LAYOUT : "flockbook"}.json`);
     const v = text ? JSON.parse(text)?.nodes?.sidebar?.hidden : undefined;
     if (typeof v === "boolean") hidden = v;
   } catch { /* no saved state: the file's default */ }

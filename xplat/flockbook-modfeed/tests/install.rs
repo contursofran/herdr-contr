@@ -118,7 +118,7 @@ fn installs_exactly_the_files_in_the_repo() {
     assert_eq!(r.status.code(), Some(0), "{}", both(&r));
     let marker: Value = serde_json::from_str(&read(s.app.join("flockbook/install.json"))).unwrap();
     let files = marker["files"].as_object().unwrap();
-    let mut want = vec!["layouts/flockbook.json".to_string()];
+    let mut want = vec!["layouts/flockbook-herdr.json".to_string(), "layouts/flockbook.json".to_string()];
     for e in fs::read_dir(mod_dir().join("themes")).unwrap() {
         let n = e.unwrap().file_name().into_string().unwrap();
         if n.ends_with(".json") {

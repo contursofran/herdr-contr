@@ -35,7 +35,7 @@ as Herdr draws it, for now.
 
 | Path | Holds |
 |---|---|
-| `herdr-app/layouts`, `herdr-app/themes`, `herdr-app/keys.json` | the layout, the themes and the keys that the mod installs |
+| `herdr-app/layouts`, `herdr-app/themes`, `herdr-app/keys.json` | the layouts (`flockbook`, and `flockbook-herdr` with Herdr's sidebar), the themes and the keys that the mod installs |
 | `herdr-app/mods/flockbook` | the mod: one file for each screen or part |
 | `herdr-app/test` | the mod's tests, with a stub of Herdr's UI in `test/stub` |
 | `herdr-app/RECIPE.md` | each part of the mod in words: sizes, colors, behavior |

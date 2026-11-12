@@ -15,7 +15,7 @@ case "$dest" in
 esac
 [ -n "$real" ] && [ "$dest" = "$real" ] && { echo "STOP: $dest is the real herdr-app home" >&2; exit 1; }
 mkdir -p "$dest/layouts" "$dest/mods"
-cp "$here/layouts/flockbook.json" "$dest/layouts/flockbook.json"
+cp "$here"/layouts/*.json "$dest/layouts/"
 mkdir -p "$dest/themes"
 cp "$here"/themes/*.json "$dest/themes/"
 # Keys: our sections replace the same sections in the home's keys.json; other sections stay.

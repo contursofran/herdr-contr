@@ -14,6 +14,7 @@ version comes close or leaves the feature out.
 | Path | What it is |
 |---|---|
 | `layouts/flockbook.json` | The window: a hidden sidebar and a stack of screens (chat, Needs you, Overview, the tab's panes). Each screen draws the top bar. |
+| `layouts/flockbook-herdr.json` | The same stack of screens, with Herdr's own sidebar (spaces, agents) on the left. |
 | `mods/flockbook/` | One mod with several views. Each layout block picks one with `props.view`: `top`, `side`, `chat`, `needs`, `overview`; popups use `termbar` and `menu`. |
 | `themes/` | Flockbook and Flockbook Mac themes, dark and light. |
 | `test/` | Node tests with fake `gpui-kit`, `gpui-base` and `herdr` modules. |
