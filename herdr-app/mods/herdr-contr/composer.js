@@ -407,7 +407,7 @@ export class Composer {
   }
 
   // `width`: the chat's column, so the box lines up with the messages.
-  render(agent, t, width = 800, work = null) {
+  render(agent, t, width = 800, work = null, background = null) {
     const tags = tagsFor(agent, agent ? this.status.get(agent.address) : null);
     const branch = tags.find((x) => x.kind === "branch");
     const b = this.box(agent);
@@ -459,13 +459,16 @@ export class Composer {
       .key_context(PASTE_CONTEXT)
       .on_action(PASTE_ACTION, (_e, cx) => { const text = cx.read_from_clipboard?.(); cx.spawn((cx) => this.paste(cx, text)); })
       // Above the box: the agent's working line on the left (#47), the context tag and the pill on the right (#40).
-      .when(Boolean(work) || (showTags && Boolean(ctxTag)) || Boolean(pill), (el) => el.child(h_flex().id("tags-row").w_full().max_w(width).gap(5).items_center()
-        .child(work
-          ? h_flex().id("working").flex_1().min_w(0).gap(8).items_center().text_size(12.5)
+      // Claude Code's background note ("1 shell still running", #61) follows it, muted; it truncates first.
+      .when(Boolean(work) || Boolean(background) || (showTags && Boolean(ctxTag)) || Boolean(pill), (el) => el.child(h_flex().id("tags-row").w_full().max_w(width).gap(5).items_center()
+        .child(h_flex().flex_1().min_w(0).gap(12).items_center()
+          .when(Boolean(work), (r) => r.child(h_flex().id("working").min_w(0).gap(8).items_center().text_size(12.5)
             .child(loader(12).flex_none().text_color(t.working))
             .child(div().flex_none().text_color(t.foreground).child(work.text))
-            .when(Boolean(work.detail), (w) => w.child(div().min_w(0).truncate().text_color(t.muted).child(`(${work.detail})`)))
-          : div().flex_1())
+            .when(Boolean(work.detail), (w) => w.child(div().min_w(0).truncate().text_color(t.muted).child(`(${work.detail})`)))))
+          .when(Boolean(background), (r) => r.child(h_flex().id("background").flex_1().min_w(0).gap(6).items_center().text_size(12).text_color(t.muted)
+            .child(loader(10).flex_none())
+            .child(div().min_w(0).truncate().child(background.text)))))
         .when(showTags && Boolean(ctxTag), (r) => r.child(div().id("ctx-tag").flex_none().child(tag(ctxTag))))
         .when(Boolean(pill), (r) => r.child(pill))))
       .when(Boolean(s), (el) => el.child(v_flex().id("slash").w_full().max_w(width).p(4).gap(0).rounded(12).bg(t.raised)

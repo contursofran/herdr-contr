@@ -531,13 +531,50 @@ test("while the agent works, its working line is above the input, not in the fee
   const asked = log.exec.filter(([, a]) => a[0] === "working").length;
   v.lastWork = 0; await v.tick(cx); await cx.settle(); 
   assert.equal(work(), null);
-  assert.equal(log.exec.filter(([, a]) => a[0] === "working").length, asked);
+  assert.equal(log.exec.filter(([, a]) => a[0] === "working").length, asked + 1, "one read when the agent goes idle (#61)");
+  // Idle with no background note: not asked again.
+  v.lastWork = 0; await v.tick(cx); await cx.settle();
+  assert.equal(log.exec.filter(([, a]) => a[0] === "working").length, asked + 1);
   // An older helper without the command: never asked.
   forgetCommands(); version = ["feed"]; fake.agents = [agent("t1", "working")];
   const before = log.exec.filter(([, a]) => a[0] === "working").length;
   v.lastWork = 0; await v.tick(cx); await cx.settle(); 
   assert.equal(work(), null);
   assert.equal(log.exec.filter(([, a]) => a[0] === "working").length, before);
+  forgetCommands();
+});
+
+test("Claude Code's background note shows while the agent is idle; it is read slowly and only while it shows (#61)", async () => {
+  forgetCommands();
+  let lines = [{ type: "working", text: null, detail: null }, { type: "background", text: "1 shell still running" }];
+  fake.exec = (_c, args) => {
+    if (args[0] === "version") return jl({ ...header, command: "version" }, { type: "version", commands: ["feed", "working"] }, end);
+    if (args[0] === "working") return jl({ ...header, command: "working" }, ...lines, end);
+    if (args[0] === "feed") return jl(header, logLine("c1"), { type: "splice", at: 0, count: 1 }, user("u1", "hi"), end);
+    return jl({ ...header, command: args[0] }, end);
+  };
+  fake.agents = [agent("t1", "idle")];
+  const reads = () => log.exec.filter(([, a]) => a[0] === "working").length;
+  const cx = fakeCx(); const v = new ChatView(cx); await cx.settle(); v.width = 900;
+  const start = reads();
+  await v.tick(cx); await cx.settle();
+  const bg = () => byId(v.render(cx), "background");
+  assert.match(textOf(bg()), /1 shell still running/);
+  assert.equal(reads(), start + 1, "one read when the agent is shown idle");
+  // Not again before BACKGROUND_MS.
+  await v.tick(cx); await cx.settle();
+  assert.equal(reads(), start + 1);
+  // After it: read again while the note shows.
+  lines = [lines[0], { type: "background", text: "2 shells still running" }]; v.lastWork = 0;
+  await v.tick(cx); await cx.settle();
+  assert.equal(reads(), start + 2);
+  assert.match(textOf(bg()), /2 shells still running/);
+  // The note goes: it is not drawn, and the reads stop.
+  lines = [lines[0]]; v.lastWork = 0;
+  await v.tick(cx); await cx.settle();
+  assert.equal(bg(), null);
+  v.lastWork = 0; await v.tick(cx); await cx.settle();
+  assert.equal(reads(), start + 3, "no reads while nothing runs");
   forgetCommands();
 });
 

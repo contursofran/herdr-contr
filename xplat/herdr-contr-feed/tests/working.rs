@@ -41,3 +41,33 @@ fn the_line_for_the_mod() {
     assert_eq!(l["type"], "working"); assert_eq!(l["text"], "Improvising…"); assert_eq!(l["detail"], "1m 16s");
     assert!(working::line(None)["text"].is_null());
 }
+
+/// A Claude Code screen with a note under its prompt box (the footer's " · " parts).
+fn footer(note: &str) -> String {
+    let rule = "─".repeat(60);
+    ["⏺ The server runs in the background.", "", &rule, "❯ ", &rule, &format!("  ⏵⏵ auto mode on (shift+tab to cycle) · {note}")].join("\n")
+}
+
+#[test]
+fn reads_the_background_note_under_the_box() {
+    assert_eq!(working::background(&footer("1 shell still running")).as_deref(), Some("1 shell still running"));
+    assert_eq!(working::background(&footer("2 shells still running")).as_deref(), Some("2 shells still running"));
+    assert_eq!(working::background(&footer("1 background task")).as_deref(), Some("1 background task"));
+    assert_eq!(working::background(&footer("3 background tasks · ? for shortcuts")).as_deref(), Some("3 background tasks"));
+}
+
+#[test]
+fn no_background_note_without_one() {
+    assert_eq!(working::background(&screen("✶ Improvising… (3s)")), None);
+    // The same words above the box are the agent's text, not the note.
+    let rule = "─".repeat(60);
+    let text = ["⏺ Now 1 shell still running", "", &rule, "❯ ", &rule, "  ? for shortcuts"].join("\n");
+    assert_eq!(working::background(&text), None);
+    assert_eq!(working::background(&footer("12 files changed")), None);
+    assert_eq!(working::background("no box at all · 1 shell still running"), None);
+}
+
+#[test]
+fn the_background_line() {
+    assert_eq!(working::background_line("1 shell still running"), serde_json::json!({"type": "background", "text": "1 shell still running"}));
+}
