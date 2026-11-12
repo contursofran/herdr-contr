@@ -488,7 +488,7 @@ test("a sent message shows at once, dimmed, and the chat reads the feed again an
   assert.equal(b.input.value(), "Nope");
 });
 
-test("while the agent works, its working line is the last row; it goes when the agent stops or the helper has none", async () => {
+test("while the agent works, its working line is above the input, not in the feed; it goes when the agent stops or the helper has none", async () => {
   forgetCommands();
   let line = { type: "working", text: "Improvising…", detail: "1m 16s · ↓ 6.0k tokens · thought for 1s" }, version = ["feed", "working"];
   fake.exec = (_c, args) => {
@@ -499,31 +499,31 @@ test("while the agent works, its working line is the last row; it goes when the 
   };
   const cx = fakeCx(); const v = new ChatView(cx); await cx.settle(); v.width = 900;
   await v.tick(cx); await cx.settle();
-  v.render(cx);
-  assert.equal(lastList._args.n, 2);
-  assert.match(textOf(lastList._args.render({ start: 1, end: 2 })[0]), /Improvising….*\(1m 16s · ↓ 6\.0k tokens · thought for 1s\)/);
+  const work = () => byId(v.render(cx), "working");
+  assert.match(textOf(work()), /Improvising….*\(1m 16s · ↓ 6\.0k tokens · thought for 1s\)/);
   // Read again after WORK_MS: the new time shows.
   line = { ...line, detail: "1m 17s" }; v.lastWork = 0;
-  await v.tick(cx); await cx.settle(); v.render(cx);
-  assert.match(textOf(lastList._args.render({ start: 1, end: 2 })[0]), /\(1m 17s\)/);
+  await v.tick(cx); await cx.settle();
+  assert.match(textOf(work()), /\(1m 17s\)/);
+  assert.equal(lastList._args.n, 1, "the feed has no working row (#47)");
   // No line on screen: the row goes.
   line = { type: "working", text: null, detail: null }; v.lastWork = 0;
-  await v.tick(cx); await cx.settle(); v.render(cx);
-  assert.equal(lastList._args.n, 1);
+  await v.tick(cx); await cx.settle(); 
+  assert.equal(work(), null);
   // The agent stops: no row, and the helper is not asked.
   line = { type: "working", text: "Brewing…", detail: "" }; v.lastWork = 0;
-  await v.tick(cx); await cx.settle(); v.render(cx);
-  assert.equal(lastList._args.n, 2);
+  await v.tick(cx); await cx.settle(); 
+  assert.ok(work());
   fake.agents = [agent("t1", "idle")];
   const asked = log.exec.filter(([, a]) => a[0] === "working").length;
-  v.lastWork = 0; await v.tick(cx); await cx.settle(); v.render(cx);
-  assert.equal(lastList._args.n, 1);
+  v.lastWork = 0; await v.tick(cx); await cx.settle(); 
+  assert.equal(work(), null);
   assert.equal(log.exec.filter(([, a]) => a[0] === "working").length, asked);
   // An older helper without the command: never asked.
   forgetCommands(); version = ["feed"]; fake.agents = [agent("t1", "working")];
   const before = log.exec.filter(([, a]) => a[0] === "working").length;
-  v.lastWork = 0; await v.tick(cx); await cx.settle(); v.render(cx);
-  assert.equal(lastList._args.n, 1);
+  v.lastWork = 0; await v.tick(cx); await cx.settle(); 
+  assert.equal(work(), null);
   assert.equal(log.exec.filter(([, a]) => a[0] === "working").length, before);
   forgetCommands();
 });
