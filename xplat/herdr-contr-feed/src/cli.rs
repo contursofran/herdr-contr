@@ -9,6 +9,7 @@
 //!   herdr-contr-feed answer --terminal <addr> --request <id> --answers <json> [--cache <file>]
 //!   herdr-contr-feed queue  --terminal <addr> [--cache <file>]   (the agent's own queue: one `queued` line; read only)
 //!   herdr-contr-feed working --terminal <addr> [--cache <file>]   (the agent's working line on screen; read only)
+//!   herdr-contr-feed usage   (the Claude and Codex plan usage; read only)
 //!   herdr-contr-feed paste-image --dir <folder>   (copied files, else the clipboard's image as a PNG there; path null when none)
 //!   herdr-contr-feed send   --terminal <addr> --text <s> [--file <path>]... [--expect-kind <k>] [--expect-path <log>]
 //!   herdr-contr-feed helper install --machine <m> --sha256 <hex>   (the helper on another machine; after the user's yes)
@@ -20,7 +21,7 @@
 //! A terminal `m/tN` on another machine: the command runs there, in the helper there (`remote`). Rust only.
 
 use crate::protocol::{JsonLines, PROTOCOL_VERSION, SIDECAR_VERSION};
-use crate::{cards, config, feed, locate, paste, phone, queue, remote, status, update, working};
+use crate::{cards, config, feed, locate, paste, phone, queue, remote, status, update, usage, working};
 use herdr_core::hc::{HcClient, HcSession};
 use herdr_core::PaneScreen;
 use herdr_core::resolver::SessionResolver;
@@ -59,7 +60,11 @@ pub fn run(argv: &[String]) -> String {
     r.out.emit_value(json!({"type": "header", "protocol": PROTOCOL_VERSION, "sidecar": SIDECAR_VERSION, "cmd": cmd}));
     match cmd.as_str() {
         "version" => {
-            r.out.emit_value(json!({"type": "version", "commands": ["version", "feed", "status", "card", "approve", "answer", "send", "paste-image", "helper", "queue", "phone", "commands", "working"], "release": update::release()}));
+            r.out.emit_value(json!({"type": "version", "commands": ["version", "feed", "status", "card", "approve", "answer", "send", "paste-image", "helper", "queue", "phone", "commands", "working", "usage"], "release": update::release()}));
+            r.finish(true)
+        }
+        "usage" => {
+            r.out.emit_value(usage::line(&usage::read(&usage::Sources::from_process())));
             r.finish(true)
         }
         "paste-image" => {

@@ -19,4 +19,5 @@ pub mod status;
 pub mod tail;
 pub mod phone;
 pub mod update;
+pub mod usage;
 pub mod working;

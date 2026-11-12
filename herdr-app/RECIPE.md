@@ -34,7 +34,13 @@ Left to right:
      shows where it goes, the row dims, and the release moves it there. A move under 4 px is a
      click. Leaving the list, another mouse button or a press elsewhere cancels. The same in the
      floating sidebar. The tab drag in the top bar and this one share `drag.js`.
-   - At the bottom: a **herdr-contr** row (the herdr-contr settings dialog), and **Settings**.
+   - At the bottom, the plan usage: one 24 px row per plan with data, Claude then Codex (11.5 px,
+     `muted`). The 22 px column has an 18 x 4 px meter (`border` track, `muted` fill) of the most used
+     window; then the name; then each window in Menlo 10.5 px, `dim`: "5h 38% 2h · wk 12% 3d" (kind,
+     whole percent used, time to its reset). A window past its reset shows 0%. The text clips at the
+     right. The helper's `usage` command reads it: when the sidebar opens and every 5 minutes, off the
+     UI thread, one read for the docked and the floating sidebar. A plan with no data has no row.
+   - Then a **herdr-contr** row (the herdr-contr settings dialog), and **Settings**.
 2. **Work area**: a stack of four screens. The bar floats over the first three.
    - **Top bar** (56 px, over the content, no background of its own). The sidebar button (28 px,
      round, with a `chrome` backing) sits right of the window buttons while the sidebar is hidden.
