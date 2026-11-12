@@ -66,6 +66,15 @@ test("status is read for the shown agent and drawn as tags", async () => {
   assert.equal(byId(el, "working"), null, "no working line while it does not work");
   const w = c.render(fake.agents[0], new Proxy({}, { get: (_t, k) => `#${k}` }), 800, { text: "Brewing…", detail: "3s" });
   assert.match(textOf(byId(w, "working")), /Brewing….*\(3s\)/);
+  assert.equal(byId(el, "background"), null, "no background note without one");
+  const th = new Proxy({}, { get: (_t, k) => `#${k}` });
+  const both = c.render(fake.agents[0], th, 800, { text: "Brewing…", detail: "3s" }, { text: "1 shell still running" });
+  const row = textOf(byId(both, "tags-row"));
+  assert.ok(row.indexOf("Brewing…") < row.indexOf("1 shell still running") && row.indexOf("1 shell still running") < row.indexOf("ctx 84%"), "working, then background, then ctx (#61)");
+  assert.equal(byId(both, "background")._a.text_color, "#muted");
+  const alone = c.render(fake.agents[0], th, 800, null, { text: "2 background tasks" });
+  assert.equal(byId(alone, "working"), null);
+  assert.match(textOf(byId(alone, "background")), /2 background tasks/);
   assert.doesNotMatch(textOf(byId(el, "tags")), /ctx/, "the context is on the right (#40)");
   assert.equal(textOf(byId(el, "ctx-tag")), "ctx 84%");
   const warn = byId(el, "ctx-tag").kids[0];

@@ -78,7 +78,9 @@ Left to right:
      - A round 34 px ↓ button at the bottom center while you read older messages.
      - "Loading earlier messages" in a small capsule under the bar while older rows load.
    - **Reply box** under the chat, at most 800 px wide. Above the box: while the agent works, its
-     working line on the left (12 px braille loader, the text, the detail in `muted`), and on the right the
+     working line on the left (12 px braille loader, the text, the detail in `muted`), then Claude Code's
+     background note ("1 shell still running": a 10 px braille loader and the text in `muted`, also while the
+     agent is idle; it truncates first), and on the right the
      context tag and the Orchestrating pill. Below the box: a row of 22 px round tags (model, effort,
      cost, folder, agent; not the branch, which is in the box). A warning tag is an outline: `blocked` border, `foreground` text, no fill; the context tag is "ctx 120k / 250k"
      against Claude Code's `autoCompactWindow` when it is set, else "ctx 37%" of the model's window; without the wrapper, the tokens come from the session log and
