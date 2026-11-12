@@ -452,11 +452,14 @@ export class Composer {
           .child("Orchestrate")
         : null;
     const showTags = setting("status_row") !== "hide";
+    const ctxTag = tags.find((x) => x.kind === "context");
     return v_flex().id("composer").w_full().px(16).pb(14).pt(6).gap(6).items_center()
       .key_context(PASTE_CONTEXT)
       .on_action(PASTE_ACTION, (_e, cx) => { const text = cx.read_from_clipboard?.(); cx.spawn((cx) => this.paste(cx, text)); })
+      // The context tag sits on the right, next to the pill (#40); the other tags stay on the left.
       .when(showTags || Boolean(pill), (el) => el.child(h_flex().id("tags-row").w_full().max_w(width).gap(5).items_center()
-        .child(showTags ? h_flex().id("tags").flex_1().min_w(0).gap(5).items_center().overflow_x_scroll().children(tags.map(tag)) : div().flex_1())
+        .child(showTags ? h_flex().id("tags").flex_1().min_w(0).gap(5).items_center().overflow_x_scroll().children(tags.filter((x) => x.kind !== "context").map(tag)) : div().flex_1())
+        .when(showTags && Boolean(ctxTag), (r) => r.child(div().id("ctx-tag").flex_none().child(tag(ctxTag))))
         .when(Boolean(pill), (r) => r.child(pill))))
       .when(Boolean(s), (el) => el.child(v_flex().id("slash").w_full().max_w(width).p(4).gap(0).rounded(12).bg(t.raised)
         .border(1).border_color(t.border).shadow_sm().on_scroll_wheel((e, cx) => this.slashWheel(e, cx))

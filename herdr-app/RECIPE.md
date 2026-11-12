@@ -117,6 +117,7 @@ Left to right:
    - **Tab panes**: a split tab, or a tab with a shell, shows its own panes (a 56 px top bar
      above them, 8 px padding, 6 px gaps, 8 px corners, 1 px border, `muted` border on focus).
 
+The context tag sits at the right end of that row, just before the orchestration pill (#40).
 Orchestration: at the right end of the row above the reply box, an "Orchestrating" pill
 (`selected` fill, `working` dot, "· N workers" in `muted`) when the agent's terminal has the hc
 label `contr.orchestrating` or live child terminals; else, for Claude Code, an "Orchestrate"
