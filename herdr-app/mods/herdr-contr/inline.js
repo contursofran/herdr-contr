@@ -1,11 +1,10 @@
-// "Inline PR icons (experimental)" (#57), off by default: a prose paragraph with a pull request or issue
-// reference is drawn as a disabled Textarea whose references are tokens: GitHub's icon, colored by the
-// state gh gives, and the reference underlined. A click opens it. TextView cannot draw icons or colors.
-// A TextareaState may not be made while a view draws: render asks for one (want), and inlineTick
-// (the chat's timer) makes it, updates its text, releases it when its row leaves the feed, and reads
-// the states from gh.
+// "Inline PR icons (experimental)" (#57), off by default: a prose paragraph or list item with a pull request
+// or issue reference is drawn from plain elements: a wrapping row with one child for each word, each
+// reference a Link with GitHub's icon, colored by the state gh gives, and the reference underlined. A
+// Link opens its URL with no handler. The chat's list renderer refuses handlers and state (#70), so there
+// are none here. inlineTick (the chat's timer) reads the states from gh for the URLs that render drew.
 import { div, svg } from "gpui-kit";
-import { h_flex, Textarea, TextareaState } from "gpui-base";
+import { h_flex, Link } from "gpui-base";
 import { exec } from "herdr";
 import { linkRefs } from "./refs.js";
 import { icon } from "./state.js";
@@ -20,7 +19,47 @@ export function isParagraph(md) {
   return lines.every((l) => l.trim() && !/^\s*(#{1,6}\s|[-*+]\s|\d+[.)]\s|>|\||([-*_=])(\s*\2){2,}\s*$)/.test(l));
 }
 
-// The paragraph as Textarea content: "**" and backticks dropped, [label](url) as its label, each
+// The paragraph as styled runs: { text, bold?, code?, href?, ref? } (ref: href is a pull request or
+// issue). "**" toggles bold; a code span keeps its text as written. null when it has no reference.
+export function inlineRuns(md, repo = null) {
+  const src = linkRefs(String(md).replace(/\n/g, " "), repo);
+  const runs = [];
+  let i = 0, bold = false, any = false;
+  const text = (s) => { if (s) runs.push(bold ? { text: s, bold } : { text: s }); };
+  for (let m; (m = LINK.exec(src));) {
+    text(src.slice(i, m.index)); i = LINK.lastIndex;
+    if (m[0] === "**") { bold = !bold; continue; }
+    if (m[1] != null) {
+      const ref = REF_URL.test(m[2]); any ||= ref;
+      runs.push(ref ? { text: m[1], href: m[2], ref } : { text: m[1], href: m[2] });
+      continue;
+    }
+    // A backtick run: the code span up to the same run of backticks, else the backticks as text.
+    const close = src.indexOf(m[0], i);
+    if (close < 0) { text(m[0]); continue; }
+    runs.push({ text: src.slice(i, close).replace(/\[([^\]\n]*)\]\([^)\n]*\)/g, "$1"), code: true });
+    i = LINK.lastIndex = close + m[0].length;
+  }
+  text(src.slice(i));
+  return any ? runs : null;
+}
+// The runs cut into words: each word a list of runs with no space between them, so the punctuation
+// after a reference ("PR #51," or "(#51)") stays with it. Links and code spans are not cut.
+export function inlineWords(runs) {
+  const words = [];
+  let cur = [];
+  const end = () => { if (cur.length) words.push(cur); cur = []; };
+  for (const r of runs ?? []) {
+    if (r.href || r.code) { cur.push(r); continue; }
+    r.text.split(/(\s+)/).forEach((part, j) => {
+      if (j % 2) end(); else if (part) cur.push({ ...r, text: part });
+    });
+  }
+  end();
+  return words;
+}
+
+// The paragraph as content: "**" and backticks dropped, [label](url) as its label, each
 // reference a token (id: its URL). null when it has no reference.
 export function inlineContent(md, repo = null) {
   const src = linkRefs(String(md).replace(/\n/g, " "), repo);
@@ -38,6 +77,8 @@ export function inlineContent(md, repo = null) {
 
 // --- States from gh: "pr-open", "pr-draft", "pr-merged", "pr-closed", "issue-open", "issue-done",
 // "issue-notplanned". Open ones, and ones gh did not give, are read again after 60 s; closed and merged ones are kept.
+// The gap between words: a space, as estimate.js counts it (0.3 em).
+const SPACE_EM = 0.3;
 const OPEN_MS = 60_000, MAX_GH = 3;
 const states = new Map();   // "owner/repo#n" -> { s, at }
 const asking = new Set();
@@ -83,38 +124,19 @@ async function fetchStates(urls, now) {
   return got.some(Boolean);
 }
 
-// --- The Textarea states, by key "<row id>-<block index>".
-const views = new Map();     // key -> { row, state, text, content }
-const wanted = new Map();    // key -> { row, text, content }: asked for while drawing
+// --- The reference URLs that render drew, by row id: a plain Map, no Herdr state (render may not make any).
+const drawn = new Map();     // row id -> Set of URLs
 
-function want(key, row, text, content) { wanted.set(key, { row, text, content }); }
-
-// Makes, updates and releases the states; reads gh. `rowIds`: the ids of the rows in the shown feed.
-// Run from a timer or event, never from render. true when the chat should draw again.
+// Reads the gh states of the references drawn in the shown rows. `rowIds`: the ids of the rows in the
+// shown feed; rows that left it are forgotten. Run from a timer or event, never from render.
+// true when the chat should draw again.
 export async function inlineTick(rowIds, now = Date.now()) {
-  let changed = false;
-  for (const [key, w] of wanted) {
-    const v = views.get(key);
-    if (!v) {
-      const state = TextareaState.new({ value: w.content.text });
-      state.set_soft_wrap?.(true);
-      state.set_value(w.content);
-      views.set(key, { row: w.row, state, text: w.text, content: w.content });
-      changed = true;
-    } else if (v.text !== w.text) {
-      v.state.set_value(w.content); v.text = w.text; v.content = w.content; changed = true;
-    }
-  }
-  wanted.clear();
-  for (const [key, v] of views) {
-    if (!rowIds.has(v.row)) { v.state.release?.(); views.delete(key); changed = true; }
-  }
-  const urls = [...views.values()].flatMap((v) => v.content.tokens.map((t) => t.token.id));
-  if (await fetchStates(urls, now)) changed = true;
-  return changed;
+  for (const row of drawn.keys()) if (!rowIds.has(row)) drawn.delete(row);
+  const urls = [...drawn.values()].flatMap((u) => [...u]);
+  return fetchStates(urls, now);
 }
-export function forgetInline() { for (const v of views.values()) v.state.release?.(); views.clear(); wanted.clear(); states.clear(); asking.clear(); }
-export const inlineViews = () => views;
+export function forgetInline() { drawn.clear(); states.clear(); asking.clear(); }
+export const inlineDrawn = () => drawn;
 
 // The theme token and icon of a state; neutral (muted) until known.
 const COLOR = { "pr-open": "pr_open", "pr-draft": "pr_draft", "pr-merged": "pr_merged", "pr-closed": "pr_closed",
@@ -125,7 +147,7 @@ export function tokenLook(url, t) {
   return { icon: icon(pr ? "pull-request" : "issue"), color: (s && t[COLOR[s]]) || t.muted };
 }
 
-// The paragraph drawn with icons, or null (no reference, or its state is not made yet: TextView then).
+// The paragraph drawn with icons, or null (no reference: TextView then).
 // Its height is the estimate's for the same block (estimate.js), so the row heights hold; when the icons
 // would need one more line, it is null too.
 export function inlineParagraph(key, rowId, md, repo, t, width, k = 1) {
@@ -134,24 +156,34 @@ export function inlineParagraph(key, rowId, md, repo, t, width, k = 1) {
 }
 // One paragraph or list item's text (no marker) drawn with icons in `h` px, the estimate's height for it;
 // null as above. mdblocks.js gives `width` and `h` for a list item from its indented width.
+// Plain elements only: a wrapping row with one child for each word, and a Link for each reference.
 export function inlinePiece(key, rowId, md, repo, t, width, k, h) {
   const content = inlineContent(md, repo);
   if (!content) return null;
-  want(key, rowId, md, content);
-  const v = views.get(key);
-  if (!v) return null;
   const fs = FS * k;
   // The icons would need one more line than the estimate counts: TextView, so the row heights hold.
   if (inlineLines(content, width, k) * lineHeight(fs) > h + 0.5) return null;
-  return Textarea.new(v.state).id(key).disabled(true).w_full().h(h)
-    .border(0).bg(t.transparent ?? "#00000000").p(0).text_size(fs).line_height(lineHeight(fs)).text_color(t.foreground)
-    .token((tok) => {
-      const look = tokenLook(tok.token.id, t);
-      return h_flex().gap(2).items_center()
+  const words = inlineWords(inlineRuns(md, repo));
+  const urls = new Set();
+  let n = 0;
+  const seg = (r) => {
+    if (r.ref) {
+      urls.add(r.href);
+      const look = tokenLook(r.href, t);
+      return Link.new(`${key}-r${n++}`).href(r.href).child(h_flex().gap(2).items_center()
         .child(svg(look.icon).size(Math.round(14 * k)).flex_none().text_color(look.color))
-        .child(div().underline().child(tok.token.text));
-    })
-    .on_token_click((e, cx) => cx.open_url(e.token.id));
+        .child(div().underline().child(r.text)));
+    }
+    if (r.href) return Link.new(`${key}-l${n++}`).href(r.href).child(div().underline().child(r.text));
+    if (r.code) return div().font_family("Menlo").text_size(14 * k).px(4).rounded(4).bg(t.raised).child(r.text);
+    if (r.bold) return div().font_weight(700).child(r.text);
+    return r.text;
+  };
+  const row = h_flex().flex_wrap().items_center().gap_x(fs * SPACE_EM).w_full().h(h)
+    .text_size(fs).line_height(lineHeight(fs)).text_color(t.foreground)
+    .children(words.map((w) => w.length === 1 ? seg(w[0]) : h_flex().flex_none().items_center().children(w.map(seg))));
+  drawn.set(rowId, new Set([...(drawn.get(rowId) ?? []), ...urls]));
+  return row;
 }
 // The paragraph's height as estimate.js counts it (markdownHeight: lines joined, "**" dropped).
 export function paragraphHeight(md, width, k = 1) {

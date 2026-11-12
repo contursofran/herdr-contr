@@ -147,3 +147,19 @@ test("text view ids stay the same when the message grows a code box (a redraw ke
   assert.equal(grown[0], "md-r1-0", "the first text keeps its id when a code box comes after it");
   assert.equal(new Set(grown).size, grown.length, "ids are unique in the message");
 });
+
+test("inline PR icons that throw: the TextView is drawn and the error is logged once per text (#70)", async () => {
+  const { fake, theme } = await import("./stub/herdr.mjs");
+  const { KEY_CONFIG } = await import("../mods/herdr-contr/config.js");
+  fake.shared[KEY_CONFIG] = { file: { inline_icons: "on" }, bad: false };
+  const base = theme();
+  const bad = new Proxy({}, { get: (_t, k) => { if (k === "muted" || k === "foreground") throw new Error("boom"); return base[k]; } });
+  const errs = [], was = console.error;
+  console.error = (...a) => errs.push(a);
+  try {
+    const a = markdownView("x", "See PR #51 now", bad, 600, 1, "o/r");
+    markdownView("x", "See PR #51 now", bad, 600, 1, "o/r");
+    assert.equal(a.tag, "md");
+    assert.equal(errs.length, 1, "once per text");
+  } finally { console.error = was; delete fake.shared[KEY_CONFIG]; }
+});
