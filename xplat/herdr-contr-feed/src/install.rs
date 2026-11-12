@@ -14,7 +14,6 @@ mod embedded {
 }
 pub use embedded::{FILES, KEYS, KNOWN};
 
-const RELEASES: &str = "https://github.com/minchenlee/flockbook/releases";
 const HELP: &str = "\
 Installs the herdr-contr layout, mod, themes, keys and helper into a herdr-app home.
 Usage: herdr-contr-feed install [--home <herdr-app home>] [--helper <herdr-contr-feed>] [--remote <folder>] [--dry-run]
@@ -432,7 +431,8 @@ pub fn run(args: &[String]) -> i32 {
         let me = std::env::current_exe().map(|p| p.display().to_string()).unwrap_or_else(|_| "herdr-contr-feed".into());
         println!("The helper herdr-contr-feed is not installed; the chat stays empty without it.");
         println!("This program is one: run this again with --helper {me}");
-        println!("or get it from {RELEASES} (herdr-contr-<version>.zip, bin/herdr-contr-feed).");
+        println!("or build one in this repository: cargo build --release --manifest-path xplat/Cargo.toml -p herdr-contr-feed,");
+        println!("then run: xplat/target/release/herdr-contr-feed install --helper xplat/target/release/herdr-contr-feed");
     }
 
     let _ = std::io::stdout().flush();

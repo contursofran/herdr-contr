@@ -338,7 +338,9 @@ fn without_helper_and_none_in_place_it_says_where_to_get_one() {
     let s = sandbox();
     let r = s.run(&["--home", s.app_s()]);
     assert_eq!(r.status.code(), Some(0), "{}", both(&r));
-    assert!(out(&r).contains("github.com/minchenlee/flockbook/releases"));
+    assert!(out(&r).contains("cargo build --release --manifest-path xplat/Cargo.toml -p herdr-contr-feed"));
+    assert!(out(&r).contains("install --helper xplat/target/release/herdr-contr-feed"));
+    assert!(!out(&r).to_lowercase().contains("flockbook"));
 }
 
 #[test]

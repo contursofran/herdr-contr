@@ -291,7 +291,7 @@ export class ChatView {
       core: "herdr-core did not answer. Trying again.",
       locate: "This agent's conversation was not found yet.",
       read: "This agent's conversation could not be read.",
-      "no-sidecar": "The herdr-contr helper is missing. Get it from github.com/minchenlee/flockbook/releases.",
+      "no-sidecar": "The herdr-contr helper is missing. Build it: cargo build --release -p herdr-contr-feed (in xplat), then herdr-contr-feed install --helper <it>.",
       protocol: "The herdr-contr helper does not match this version. Install both again.",
     }[err.code] ?? "The conversation could not be loaded.";
     return v_flex().size_full().items_center().justify_center().gap(6).px(32)

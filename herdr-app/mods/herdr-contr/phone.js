@@ -10,7 +10,7 @@ import { icon } from "./state.js";
 import * as sidecar from "./sidecar.js";
 
 export const KEY_PHONE = "herdr-contr.phone";   // { line, error, at }: the helper's last phone line, and an error
-const GUIDE = "https://github.com/minchenlee/flockbook/blob/main/xplat/herdr-contr-feed/SERVE.md";
+const GUIDE = "https://github.com/contursofran/herdr-contr/blob/main/xplat/herdr-contr-feed/SERVE.md";
 const FRESH_MS = 10_000;
 
 const phone = () => shared(KEY_PHONE) ?? null;

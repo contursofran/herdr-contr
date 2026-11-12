@@ -276,7 +276,7 @@ test("guide, no Tailscale: step 1 says why, links Get Tailscale and the full gui
   let opened = null;
   byId(one, "phone-get-tailscale")._h.on_click({}, { ...fakeCx(), open_url: (u) => { opened = u; } });
   assert.equal(opened, "https://tailscale.com/download");
-  assert.equal(textOf(byId(one, "phone-guide")), "https://github.com/minchenlee/flockbook/blob/main/xplat/herdr-contr-feed/SERVE.md");
+  assert.equal(textOf(byId(one, "phone-guide")), "https://github.com/contursofran/herdr-contr/blob/main/xplat/herdr-contr-feed/SERVE.md");
   assert.ok(byId(one, "phone-guide-copy"));
   assert.doesNotMatch(textOf(s), /Guide: SERVE\.md/, "not a bare file name");
   assert.equal(byId(s, "phone-login-row"), null);
