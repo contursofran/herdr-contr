@@ -5,7 +5,7 @@ import { textOf, byId, calls, lastList } from "./stub/ui.mjs";
 import { fakeCx } from "./fake-cx.mjs";
 import { agent, space } from "./fixtures.mjs";
 import { ChatView, chipIcon, oneLine } from "../mods/herdr-contr/chat.js";
-import { parseAnswer } from "../mods/herdr-contr/sidecar.js";
+import { parseAnswer, forgetCommands } from "../mods/herdr-contr/sidecar.js";
 import { emptyFeed, applyFeed, applyOlder, olderFrom, addEcho, dropEcho, settleEchoes, shownRows, ECHO_MS } from "../mods/herdr-contr/feedstate.js";
 import { wrapLines, markdownHeight, rowHeight, LH } from "../mods/herdr-contr/estimate.js";
 
@@ -486,4 +486,44 @@ test("a sent message shows at once, dimmed, and the chat reads the feed again an
   await v.composer.submit(cx); await cx.settle();
   assert.equal(v.feed().echoes.length, 0);
   assert.equal(b.input.value(), "Nope");
+});
+
+test("while the agent works, its working line is the last row; it goes when the agent stops or the helper has none", async () => {
+  forgetCommands();
+  let line = { type: "working", text: "Improvising…", detail: "1m 16s · ↓ 6.0k tokens · thought for 1s" }, version = ["feed", "working"];
+  fake.exec = (_c, args) => {
+    if (args[0] === "version") return jl({ ...header, command: "version" }, { type: "version", commands: version }, end);
+    if (args[0] === "working") return jl({ ...header, command: "working" }, line, end);
+    if (args[0] === "feed") return jl(header, logLine("c1"), { type: "splice", at: 0, count: 1 }, user("u1", "hi"), end);
+    return jl({ ...header, command: args[0] }, end);
+  };
+  const cx = fakeCx(); const v = new ChatView(cx); await cx.settle(); v.width = 900;
+  await v.tick(cx); await cx.settle();
+  v.render(cx);
+  assert.equal(lastList._args.n, 2);
+  assert.match(textOf(lastList._args.render({ start: 1, end: 2 })[0]), /Improvising….*\(1m 16s · ↓ 6\.0k tokens · thought for 1s\)/);
+  // Read again after WORK_MS: the new time shows.
+  line = { ...line, detail: "1m 17s" }; v.lastWork = 0;
+  await v.tick(cx); await cx.settle(); v.render(cx);
+  assert.match(textOf(lastList._args.render({ start: 1, end: 2 })[0]), /\(1m 17s\)/);
+  // No line on screen: the row goes.
+  line = { type: "working", text: null, detail: null }; v.lastWork = 0;
+  await v.tick(cx); await cx.settle(); v.render(cx);
+  assert.equal(lastList._args.n, 1);
+  // The agent stops: no row, and the helper is not asked.
+  line = { type: "working", text: "Brewing…", detail: "" }; v.lastWork = 0;
+  await v.tick(cx); await cx.settle(); v.render(cx);
+  assert.equal(lastList._args.n, 2);
+  fake.agents = [agent("t1", "idle")];
+  const asked = log.exec.filter(([, a]) => a[0] === "working").length;
+  v.lastWork = 0; await v.tick(cx); await cx.settle(); v.render(cx);
+  assert.equal(lastList._args.n, 1);
+  assert.equal(log.exec.filter(([, a]) => a[0] === "working").length, asked);
+  // An older helper without the command: never asked.
+  forgetCommands(); version = ["feed"]; fake.agents = [agent("t1", "working")];
+  const before = log.exec.filter(([, a]) => a[0] === "working").length;
+  v.lastWork = 0; await v.tick(cx); await cx.settle(); v.render(cx);
+  assert.equal(lastList._args.n, 1);
+  assert.equal(log.exec.filter(([, a]) => a[0] === "working").length, before);
+  forgetCommands();
 });

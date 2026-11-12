@@ -261,7 +261,7 @@ export function rowHeight(row, width, open = false, k = 1, zoom = 1) {
     }
     case "sep": return SEP_H;
     case "footer": return FOOTER_H;
-    case "status": return STATUS_H;
+    case "status": case "working": return STATUS_H;
     case "perm": case "question": return CARD_ROW_H;
     default: return OTHER_H;
   }
