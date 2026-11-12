@@ -51,6 +51,7 @@ does not download; `install-isolated.sh` copies the sidecar in.
 | `send` | `--terminal <addr> --text <s>` `[--file <path>]…` `[--expect-kind <agent>]` `[--expect-path <log>]` `[--cache <file>]` | `done` (`changed` when the terminal now runs another agent or conversation than the expected one; nothing is sent. Its message says "new conversation" when the same agent process wrote the expected log, e.g. after `/clear`. With `--cache` the log is looked up again and written to the cache, so the next `feed` reads it) |
 | `queue` | `--terminal <addr>` `[--cache <file>]` (Rust sidecar only; `serve` and other machines) | `queued` |
 | `working` | `--terminal <addr>` `[--cache <file>]` (Rust sidecar only; read only) | `working` |
+| `model` | `--terminal <addr>` `[--cache <file>]` (Rust sidecar only; read only) | `model` |
 | `commands` | `--terminal <addr>` `[--cache <file>]` (Rust sidecar only) | `commands` |
 | `usage` | — (Rust sidecar only; read only) | `usage` |
 | `helper install` | `--machine <m> --sha256 <hex> [--cache <file>]` | `installed` |
@@ -162,7 +163,7 @@ Targets: `x86_64-unknown-linux-musl`, `aarch64-unknown-linux-musl`, `universal-a
 ### `version`
 
 ```json
-{"commands":["version","feed","status","card","approve","answer","send","paste-image","helper","queue","phone","commands","working","usage"],"release":"0.9.0","type":"version"}
+{"commands":["version","feed","status","card","approve","answer","send","paste-image","helper","queue","phone","commands","working","model","usage"],"release":"0.9.0","type":"version"}
 ```
 
 `commands`: the commands this sidecar has. The mod hides actions whose command is missing.
@@ -369,6 +370,19 @@ while a Claude Code, Codex or Grok Build agent works. No queue: `agent` is `""` 
 - The agent's working line on its screen, while the agent works (Claude Code only). Key hints such as
   "esc to interrupt" are left out of `detail`; `detail` can be empty.
 - None on screen, the agent is not working, or another agent kind: `text` and `detail` are `null`.
+
+### `model` (`model`)
+
+```json
+{"type":"model","agent":"claude","model":"claude-opus-5-5","effort":"low"}
+```
+
+- The agent's model and effort, for the sidebar's agent rows. Read only. A part that is not known is `null`.
+- `model`: the newest model that the session log names.
+- `effort`, the first source that has it. Claude Code: herdr-contr's status line record, then `--effort <level>`
+  on the agent's command line (the pane's processes and their children), then `effortLevel` in Claude Code's
+  settings. Codex: the newest `turn_context` in the rollout, then `-c model_reasoning_effort=<level>` on the
+  command line, then `model_reasoning_effort` in `config.toml`. Other agents: `null`.
 
 ### `usage` (`usage`)
 

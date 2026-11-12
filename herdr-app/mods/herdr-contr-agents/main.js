@@ -1,15 +1,45 @@
 // Adapted from Herdr's agents mod (Apache-2.0); changes: braille loader for the working mark.
+// Also: each row shows the agent's model and effort ("Opus 5.5 · low"), from herdr-contr's helper.
 // Agents in grouped or priority views; parents take their most urgent sub-agent's place.
 
 import { View, div, image, svg } from "gpui-kit";
 import { v_flex, h_flex } from "gpui-base";
-import { agents, terminals, panes, focused, spaces, run, theme, shared, setShared, setAgentOrder, openOverlay, closeOverlay, props, window, layout } from "herdr";
+import { exec, appHome, agents, terminals, panes, focused, spaces, run, theme, shared, setShared, setAgentOrder, openOverlay, closeOverlay, props, window, layout } from "herdr";
 
 // The braille loader, as herdr-contr's loader() in mods/herdr-contr/state.js (a mod cannot import another mod).
 const BRAILLE = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"];
 const BRAILLE_MS = 80;
 const loader = (size) => div().flex_none().w(size).h(size).flex().items_center().justify_center()
   .font_family("Menlo").text_size(size).line_height(1).frames(BRAILLE, BRAILLE_MS).child(BRAILLE[0]);
+
+// The agent's model and effort, from herdr-contr's helper (its `model` command; docs/protocol.md). A mod cannot
+// import another mod, so this is a small copy of herdr-contr's sidecar call.
+const helper = (cmd, args) => exec(`${appHome()}/herdr-contr/bin/herdr-contr-feed`, [cmd, ...args, "--home", appHome()])
+  .then((r) => String(r?.stdout ?? "").split("\n").map((l) => { try { return JSON.parse(l); } catch { return null; } }).filter(Boolean), () => []);
+let hasModel = null;
+const helperHasModel = () => (hasModel ??= helper("version", []).then((ls) => {
+  const v = ls.find((l) => l.type === "version");
+  if (!v) hasModel = null; // Ask again next time.
+  return Boolean(v?.commands?.includes("model"));
+}));
+
+// For tests: forget the helper's answer.
+export const forgetHelper = () => { hasModel = null; };
+
+const CLAUDE = /^claude-(?:(\d+)-(\d+)-)?([a-z]+)(?:-(\d+)(?:-(\d{1,2}))?)?(?:-\d{8})?$/;
+// "claude-opus-5-5" -> "Opus 5.5", "gpt-6" -> "GPT-6", with the effort after a dot. Unknown parts are left out.
+export function modelText(model, effort) {
+  let m = (model ?? "").trim();
+  const c = m.match(CLAUDE);
+  if (c) {
+    const ver = c[1] ? `${c[1]}.${c[2]}` : c[4] ? (c[5] ? `${c[4]}.${c[5]}` : c[4]) : "";
+    m = [c[3][0].toUpperCase() + c[3].slice(1), ver].filter(Boolean).join(" ");
+  } else if (/^gpt-/i.test(m)) m = `GPT-${m.split("-")[1]}`;
+  else if (/^(opus|sonnet|haiku|fable)$/i.test(m)) m = m[0].toUpperCase() + m.slice(1).toLowerCase();
+  return [m, (effort ?? "").trim()].filter(Boolean).join(" \u00b7 ");
+}
+// A terminal is asked again when its status changed, and not more often than this.
+const MODEL_MS = 15000;
 
 function find(node, id) {
   if (node?.id === id) return node;
@@ -92,6 +122,26 @@ export default class Agents extends View {
     if (!this.pendingPins.length) localStorage.removeItem("pins");
     this.migratingPins = new Set();
     cx.timer.every(30000, (cx) => cx.notify());
+  }
+
+  // Asks the helper for the agent's model when the terminal is new or its status changed (a turn can change the
+  // model or effort), at most once in MODEL_MS. No timer: nothing runs while the agents are idle.
+  pollModel(cx, address, status, now = Date.now()) {
+    const m = (this.models ??= {})[address] ?? (this.models[address] = { text: "", status: undefined, at: 0, busy: false });
+    if (m.busy || m.status === status || (m.at && now - m.at < MODEL_MS)) return;
+    m.busy = true; m.status = status; m.at = now;
+    helperHasModel().then(async (has) => {
+      if (!has) return;
+      const l = (await helper("model", ["--terminal", address])).find((x) => x.type === "model");
+      if (!l) return;
+      const text = modelText(l.model, l.effort);
+      if (text !== m.text) { m.text = text; cx?.notify?.(); }
+    }).finally(() => { m.busy = false; });
+  }
+
+  modelOf(cx, address, status) {
+    this.pollModel(cx, address, status);
+    return this.models[address].text;
   }
 
   // Stamps agents whose state changed. Done and idle count as one: looking at a
@@ -181,11 +231,13 @@ export default class Agents extends View {
     });
   }
 
-  subRow(t, s, shown, compact) {
+  subRow(t, s, shown, compact, cx) {
     const k = s.t;
     const st = kidStatus(k, this.listed);
     const pic = icon(k.program, 14, t.foreground);
     const on = k.address === shown;
+    // A sub-agent without a pane has no terminal for the helper to read.
+    const model = this.listed.has(k.address) ? this.modelOf(cx, k.address, st) : "";
     return h_flex()
       .id(`sub-${k.address}`)
       .pl(39)
@@ -203,7 +255,8 @@ export default class Agents extends View {
         .when(Boolean(l), el => el.border_l(1.5).border_color(t.input))
         .when(l === "└" || l === "├", el => el.border_b(1.5).rounded_bl(6))))
       .when(Boolean(pic), el => el.child(div().mr(8).child(pic)))
-      .child(div().flex_1().truncate().text_color(on ? t.foreground : t.muted).child(k.name || k.template || k.program?.name || k.address))
+      .child(div().flex_1().min_w(0).truncate().text_color(on ? t.foreground : t.muted).child(k.name || k.template || k.program?.name || k.address))
+      .when(Boolean(model), el => el.child(div().flex_none().ml(6).mr(6).text_size(11).text_color(t.muted).child(model)))
       .child(this.status(t, { status: st }, compact));
   }
 
@@ -249,7 +302,7 @@ export default class Agents extends View {
       const subs = collapsed ? [] : this.tree(all, a.address);
       const r = row(a, i, subs);
       if (this.folded.has(a.address)) return [r];
-      return [r, ...subs.map((s) => this.subRow(t, s, shown, byPriority))];
+      return [r, ...subs.map((s) => this.subRow(t, s, shown, byPriority, cx))];
     };
 
     // The fold chevron; folded, the count too, colored by the most urgent one.
@@ -338,6 +391,7 @@ export default class Agents extends View {
       // Under a space header the space goes without saying; an automatic tab number says nothing.
       // Without a space header above (priority, pinned) the row names its space.
       const full = byPriority || isPinned;
+      const model = this.modelOf(cx, a.address, a.status);
       const name = full ? a.space_name || label(a) : more ?? (/^\d+$/.test(label(a)) ? a.program?.name || label(a) : label(a));
       return h_flex()
         .id(`ag-${a.address}`)
@@ -364,7 +418,8 @@ export default class Agents extends View {
           })).child(pic)))
         .child(h_flex().flex_1().min_w(0).gap(5).items_center()
           .child(div().min_w(0).max_w(full && more ? 120 : 200).truncate().text_color(idle ? t.muted : t.foreground).child(name))
-          .when(full && Boolean(more), el => el.child(div().flex_1().min_w(0).truncate().text_color(t.dim).child(`\u00b7 ${more}`))))
+          .when(full && Boolean(more), el => el.child(div().flex_1().min_w(0).truncate().text_color(t.dim).child(`\u00b7 ${more}`)))
+          .when(Boolean(model), el => el.child(div().flex_none().text_size(11).text_color(t.muted).child(model))))
         .when(Boolean(machine), el => el.child(div().text_size(10).text_color(t.dim).child(machine)))
         .when(subs.length > 0, el => el.child(fold(a, subs)))
         .when(this.hovered === a.address, el => el.child(pin))

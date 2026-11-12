@@ -224,6 +224,10 @@ drawn by Herdr's `frames`; every loader of the mod is this one); done is a check
   of the turning arc. A mod cannot import another mod, so each copy has its own `loader()`. The tabs
   copy keeps its window icons (`win-*.svg`); the icons of other Herdr mods (`workspace-chrome`,
   `pane`, `files`, `changes`) stay where Herdr installs them.
+  The agents copy also shows each agent's model and effort after the name ("Opus 5.5 · low",
+  "GPT-6 · high"; 11 px, `muted`, never truncated: the name truncates first). It comes from the
+  helper's `model` command (docs/protocol.md), asked only when the helper has it, when a terminal first
+  shows and when its status changes (at most once in 15 s; no timer). Unknown parts are left out.
 - **Mod** `mods/herdr-contr-spaces/`: a copy of Herdr's `spaces` mod (Apache-2.0). The one change: the
   space icon (18 px) is the project's favicon (`image()`, full color, 4 px corners), else a folder icon
   (`workspace-chrome/folder.svg`, 15 px, `muted`), in place of the colored letter. Worktree rows keep
