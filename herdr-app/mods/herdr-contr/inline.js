@@ -1,6 +1,6 @@
 // "Inline PR icons (experimental)" (#57), off by default: a prose paragraph or list item with a pull request
 // or issue reference is drawn from plain elements: a wrapping row with one child for each word, each
-// reference a Link with GitHub's icon, colored by the state gh gives, and the reference underlined. A
+// reference a Link with GitHub's icon, colored by the state gh gives, and the reference, in a pill. A
 // Link opens its URL with no handler. The chat's list renderer refuses handlers and state (#70), so there
 // are none here. inlineTick (the chat's timer) reads the states from gh for the URLs that render drew.
 import { div, svg } from "gpui-kit";
@@ -170,9 +170,12 @@ export function inlinePiece(key, rowId, md, repo, t, width, k, h) {
     if (r.ref) {
       urls.add(r.href);
       const look = tokenLook(r.href, t);
-      return Link.new(`${key}-r${n++}`).href(r.href).cursor_pointer().child(h_flex().gap(2).items_center()
-        .child(svg(look.icon).size(Math.round(14 * k)).flex_none().text_color(look.color))
-        .child(div().underline().child(r.text)));
+      // A pill (#76): the icon and the text in a rounded box, a little smaller than the prose so it fits in the line.
+      return Link.new(`${key}-r${n++}`).href(r.href).cursor_pointer().child(h_flex().gap(4).items_center().flex_none()
+        .px(6).rounded(999).bg(t.raised).border(1).border_color(t.border)
+        .text_size(fs * 0.875).line_height(1.35)
+        .child(svg(look.icon).size(Math.round(13 * k)).flex_none().text_color(look.color))
+        .child(div().child(r.text)));
     }
     if (r.href) return Link.new(`${key}-l${n++}`).href(r.href).cursor_pointer().child(div().underline().child(r.text));
     if (r.code) return div().font_family("Menlo").text_size(14 * k).px(4).rounded(4).bg(t.raised).child(r.text);
@@ -190,9 +193,9 @@ export function paragraphHeight(md, width, k = 1) {
   const fs = FS * k;
   return proseLines(String(md).split("\n").map((l) => l.trim()).join(" ").replace(/\*\*/g, ""), width, fs, k) * lineHeight(fs);
 }
-// Lines the drawn paragraph takes: each token is its text and an icon (14 px and a 2 px gap: about "MI" wide).
+// Lines the drawn paragraph takes: each token is its text and an icon (14 px and a 2 px gap: in a pill with a border and padding: about "MIM" wide).
 export function inlineLines(content, width, k = 1) {
   let s = content.text;
-  for (const tk of [...content.tokens].reverse()) s = s.slice(0, tk.range.start) + "MI" + s.slice(tk.range.start);
+  for (const tk of [...content.tokens].reverse()) s = s.slice(0, tk.range.start) + "MIM" + s.slice(tk.range.start);
   return proseLines(s, width, FS * k, k);
 }

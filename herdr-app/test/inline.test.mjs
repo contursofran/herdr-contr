@@ -77,6 +77,9 @@ test("on: drawn from plain elements, no handler and no state; a Link for each re
   assert.deepEqual(links.map((l) => l._a.href), [PR, "https://x.y"]);
   assert.equal(new Set(links.map((l) => l._a.id)).size, 2, "unique ids");
   assert.equal(kidsOf(links[0], (e) => e.tag === "svg").length, 1);
+  const pill = kidsOf(links[0], (e) => e._a.rounded === 999)[0];
+  assert.ok(pill && pill._a.border === 1 && pill._a.bg === theme().raised, "a reference is a pill");
+  assert.equal(kidsOf(links[0], (e) => "underline" in e._a).length, 0, "no underline in a pill");
   // "PR #51," together in one no-wrap child, bold.
   const ref = el.kids.find((k) => typeof k === "object" && k.tag === "h");
   assert.equal(ref._a.flex_none, undefined); assert.ok("flex_none" in ref._a);
