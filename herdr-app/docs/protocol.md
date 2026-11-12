@@ -320,7 +320,7 @@ approval is the `card` command's job.
 | Field | Meaning |
 |---|---|
 | `source` | `statusline` (herdr-contr's status line wrapper is on), `log` (only the model, from the log), `none`. |
-| `tags[]` | `kind` (`model`, `effort`, `context`, `cost`, `own`), `text`, `percent` (context only), `warn` (context 80% or more). |
+| `tags[]` | `kind` (`model`, `effort`, `context`, `cost`, `own`), `text`, `percent` (context only), `warn` (context 80% or more). With `autoCompactWindow` in Claude Code's settings and the tokens known, the context `text` is `ctx 120k / 250k`, and `percent` and `warn` are against that limit. With source `log`, the context tag comes from the log's newest assistant usage, only when `autoCompactWindow` is set. |
 
 The mod adds the cwd, the branch and the agent name from herdr-app's own `panes()` data.
 
