@@ -9,6 +9,7 @@
 //!   herdr-contr-feed answer --terminal <addr> --request <id> --answers <json> [--cache <file>]
 //!   herdr-contr-feed queue  --terminal <addr> [--cache <file>]   (the agent's own queue: one `queued` line; read only)
 //!   herdr-contr-feed working --terminal <addr> [--cache <file>]   (the agent's working line on screen; read only)
+//!   herdr-contr-feed model  --terminal <addr> [--cache <file>]   (the agent's model and effort; read only)
 //!   herdr-contr-feed usage   (the Claude and Codex plan usage; read only)
 //!   herdr-contr-feed paste-image --dir <folder>   (copied files, else the clipboard's image as a PNG there; path null when none)
 //!   herdr-contr-feed send   --terminal <addr> --text <s> [--file <path>]... [--expect-kind <k>] [--expect-path <log>]
@@ -21,7 +22,7 @@
 //! A terminal `m/tN` on another machine: the command runs there, in the helper there (`remote`). Rust only.
 
 use crate::protocol::{JsonLines, PROTOCOL_VERSION, SIDECAR_VERSION};
-use crate::{cards, config, feed, locate, paste, phone, queue, remote, status, update, usage, working};
+use crate::{agentmodel, cards, config, feed, locate, paste, phone, queue, remote, status, update, usage, working};
 use herdr_core::hc::{HcClient, HcSession};
 use herdr_core::PaneScreen;
 use herdr_core::resolver::SessionResolver;
@@ -60,7 +61,7 @@ pub fn run(argv: &[String]) -> String {
     r.out.emit_value(json!({"type": "header", "protocol": PROTOCOL_VERSION, "sidecar": SIDECAR_VERSION, "cmd": cmd}));
     match cmd.as_str() {
         "version" => {
-            r.out.emit_value(json!({"type": "version", "commands": ["version", "feed", "status", "card", "approve", "answer", "send", "paste-image", "helper", "queue", "phone", "commands", "working", "usage"], "release": update::release()}));
+            r.out.emit_value(json!({"type": "version", "commands": ["version", "feed", "status", "card", "approve", "answer", "send", "paste-image", "helper", "queue", "phone", "commands", "working", "model", "usage"], "release": update::release()}));
             r.finish(true)
         }
         "usage" => {
@@ -129,7 +130,7 @@ pub fn run(argv: &[String]) -> String {
                 Err((code, message)) => r.fail(code, &message),
             }
         }
-        "feed" | "status" | "card" | "approve" | "answer" | "send" | "queue" | "commands" | "working" => {
+        "feed" | "status" | "card" | "approve" | "answer" | "send" | "queue" | "commands" | "working" | "model" => {
             let Some(terminal) = opt("--terminal") else { return r.fail("usage", &format!("{cmd} needs --terminal <addr>")) };
             let cache_path = opt("--cache").map(PathBuf::from);
             let cache_url = cache_path.as_deref();
@@ -188,6 +189,16 @@ pub fn run(argv: &[String]) -> String {
                     let screen = found.pane.agent.as_ref().filter(|a| a.status == herdr_core::AgentStatus::Working && working::reads(&a.kind)).and_then(|_| client.visible_text(&found.pane.id).ok());
                     let w = screen.as_deref().and_then(working::claude);
                     r.out.emit_value(working::line(w.as_ref()));
+                    return r.finish(true);
+                }
+                "model" => {
+                    let env = herdr_core::hc::session::process_env();
+                    let home = herdr_core::hc::session::home_dir(&env);
+                    let codex = env.get("CODEX_HOME").filter(|d| !d.is_empty()).cloned().unwrap_or_else(|| home + "/.codex");
+                    // The process list only when the faster sources cannot answer it.
+                    let procs = if found.pane.process_ids.is_empty() { vec![] } else { agentmodel::pane_procs(&herdr_core::resolver::processes(), &found.pane.process_ids) };
+                    let s = agentmodel::Sources { log, claude_settings: &status::default_settings(&env), codex_config: &PathBuf::from(codex + "/config.toml"), procs: &procs };
+                    r.out.emit_value(agentmodel::line(&kind, &agentmodel::read(&kind, &s, SystemTime::now())));
                     return r.finish(true);
                 }
                 "card" => {
@@ -250,7 +261,7 @@ pub fn run(argv: &[String]) -> String {
             }
         }
         // The Swift sidecar's text (parity): `queue` is serve's own, not offered to the mod.
-        _ => r.fail("usage", "commands: version, feed, status, card, approve, answer, send, working"),
+        _ => r.fail("usage", "commands: version, feed, status, card, approve, answer, send, working, model"),
     }
 }
 
