@@ -12,9 +12,10 @@ import { emptyFeed, applyFeed, applyOlder, olderFrom, addEcho, dropEcho, settleE
 import { GUTTER, columnWidth, rowHeight } from "./estimate.js";
 import { ROW_PAD_Y, BUBBLE_PAD_X, BUBBLE_PAD_Y, BUBBLE_GAP, IMAGES_FS, bubbleWidth, bubbleTextWidth, CHIP_H, CHIP_PAD_Y, CHIP_GAP, OPEN_INDENT,
   CALL_H, SEP_H, FOOTER_H, STATUS_H, CARD_ROW_H, OTHER_H } from "./metrics.js";
-import { Composer } from "./composer.js";
+import { Composer, paneOf } from "./composer.js";
 import { switchStrip } from "./viewswitch.js";
 import { markdownView, codeBlockAt } from "./mdblocks.js";
+import { repoFor } from "./refs.js";
 import { textScale } from "./config.js";
 
 // Herdr's zoom: line heights round in zoomed px (estimate.js lineHeight).
@@ -108,6 +109,12 @@ export class ChatView {
     cx.spawn(async () => { if (await loadTiming()) cx.timer.every(1000, () => flush()); });
   }
 
+  // The GitHub repository of the shown agent's folder, for "#51" links; null until git has answered.
+  repo() {
+    const cwd = this.address ? paneOf(this.address)?.cwd : null;
+    return repoFor(cwd, machineOf(this.address));
+  }
+
   feed() { return this.address ? this.feeds.get(this.address) : null; }
 
   // Every chat opens at its newest message, also one read before.
@@ -126,6 +133,8 @@ export class ChatView {
     if (screen === "chat" && this.screen !== "chat") { this.follow = true; this.toNewest(); cx.notify(); }
     this.screen = screen;
     if (this.helper.changed()) cx.notify();
+    const repo = this.repo();
+    if (repo !== this.shownRepo) { this.shownRepo = repo; cx.notify(); }
     cx.spawn((cx) => this.composer.pollStatus(cx));
     const agent = currentAgent();
     cx.spawn((cx) => this.cards.poll(cx, this.address, wanted(agent, this.feed()?.rows)));
@@ -217,7 +226,7 @@ export class ChatView {
 
   // A row's content, without the list's fixed height. No handlers: list rows cannot have any.
   body(row, t) {
-    const md = (text, w = this.colWidth()) => markdownView(row.id, text || "", t, w, textScale());
+    const md = (text, w = this.colWidth()) => markdownView(row.id, text || "", t, w, textScale(), this.repo());
     switch (row.k) {
       case "user":
         if (row.from != null) return this.agentNote(row, t, md);
