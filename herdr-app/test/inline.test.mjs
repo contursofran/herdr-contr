@@ -70,7 +70,7 @@ test("on: drawn from plain elements, no handler and no state; a Link for each re
   const el = markdownView("r1", "I merged **PR #51,** `x` and [d](https://x.y) today", theme(), 600, 1, "o/r");
   assert.ok(isRow(el), "the wrapping row");
   assert.equal(made.textarea, before, "no state made while drawing");
-  assert.equal(el._a.gap_x, 16 * 0.17);
+  assert.equal(el._a.gap_x, 16 * 0.22);
   assert.equal(el._a.text_color, theme().foreground);
   assert.equal(el.kids[0], "I", "a plain word is a string child");
   const links = kidsOf(el, (e) => e.tag === "link");

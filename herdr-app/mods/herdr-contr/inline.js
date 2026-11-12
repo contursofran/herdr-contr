@@ -77,8 +77,8 @@ export function inlineContent(md, repo = null) {
 
 // --- States from gh: "pr-open", "pr-draft", "pr-merged", "pr-closed", "issue-open", "issue-done",
 // "issue-notplanned". Open ones, and ones gh did not give, are read again after 60 s; closed and merged ones are kept.
-// The gap between words. Measured on screen (#74): a gap of 0.3 em drew 1.7 times a TextView space, so 0.17 em.
-const SPACE_EM = 0.17;
+// The gap between words. Measured on screen (#74, #78): 0.3 em drew 1.7 times a TextView space, 0.17 em half of one.
+const SPACE_EM = 0.22;
 const OPEN_MS = 60_000, MAX_GH = 3;
 const states = new Map();   // "owner/repo#n" -> { s, at }
 const asking = new Set();
