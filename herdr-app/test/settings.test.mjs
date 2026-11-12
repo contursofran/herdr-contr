@@ -1,50 +1,41 @@
-// Flockbook settings (<appHome>/flockbook/config.json), the Flockbook settings dialog, and the update line.
+// herdr-contr settings (<appHome>/herdr-contr/config.json), the herdr-contr settings dialog.
 import { test, beforeEach } from "node:test";
 import assert from "node:assert/strict";
 import { fake, log, reset } from "./stub/herdr.mjs";
 import { textOf, byId } from "./stub/ui.mjs";
 import { fakeCx } from "./fake-cx.mjs";
 import { agent, space } from "./fixtures.mjs";
-import { setting, loadConfig, setSetting, configBad, pollUpdate, updateShown, textScale, DEFAULTS, KEY_CONFIG } from "../mods/flockbook/config.js";
-import { SettingsView } from "../mods/flockbook/settings.js";
-import { SideView } from "../mods/flockbook/side.js";
-import { Composer } from "../mods/flockbook/composer.js";
-import { ChatView } from "../mods/flockbook/chat.js";
-import { command, TopView } from "../mods/flockbook/top.js";
-import { toggleSidebar, peekAtEdge, KEY_SCREEN, shownScreen } from "../mods/flockbook/state.js";
-import { SETTINGS } from "../mods/flockbook/settings.js";
-import { tabItems, act } from "../mods/flockbook/menu.js";
+import { setting, loadConfig, setSetting, configBad, textScale, DEFAULTS, KEY_CONFIG } from "../mods/herdr-contr/config.js";
+import { SettingsView } from "../mods/herdr-contr/settings.js";
+import { SideView } from "../mods/herdr-contr/side.js";
+import { Composer } from "../mods/herdr-contr/composer.js";
+import { ChatView } from "../mods/herdr-contr/chat.js";
+import { command, TopView } from "../mods/herdr-contr/top.js";
+import { toggleSidebar, peekAtEdge, KEY_SCREEN, shownScreen } from "../mods/herdr-contr/state.js";
+import { SETTINGS } from "../mods/herdr-contr/settings.js";
+import { tabItems, act } from "../mods/herdr-contr/menu.js";
 import { shared } from "herdr";
-import * as sidecar from "../mods/flockbook/sidecar.js";
+import * as sidecar from "../mods/herdr-contr/sidecar.js";
 
 const HOME = "/home/test/.config/herdr-app";
-const CONFIG = `${HOME}/flockbook/config.json`;
+const CONFIG = `${HOME}/herdr-contr/config.json`;
 const jl = (...lines) => ({ code: 0, stdout: lines.map((l) => JSON.stringify(l)).join("\n") + "\n", stderr: "" });
 const header = (cmd) => ({ type: "header", protocol: 1, sidecar: "0.1.0", cmd });
 const end = (ok = true) => ({ type: "end", ok });
-const ONE_LINE = "curl -fsSL https://github.com/minchenlee/flockbook/releases/latest/download/install.sh | sh";
-const update = (state, latest = "0.9.0") => ({ type: "update", state, current: "0.8.0", latest, command: ONE_LINE });
 const t = new Proxy({}, { get: (_t, k) => `#${k}` });
 
 // A config.json that the fake file system keeps: writes land in `file`, and a write against a stale
 // snapshot is refused, as herdr does.
-let file, answer;
+let file;
 beforeEach(() => {
-  reset(); file = null; answer = update("newer");
+  reset(); file = null;
   fake.readText = (p) => (p === CONFIG ? file : null);
   fake.writeText = (p, text, expected) => {
     if (p !== CONFIG) return null;
     if (expected !== file) throw new Error("stale");
     file = text; return null;
   };
-  fake.exec = (_c, args) => {
-    if (args[0] === "update-check") {
-      const i = args.indexOf("--dismiss");
-      if (i >= 0) answer = update("dismissed", args[i + 1]);
-      return jl(header("update-check"), answer, end());
-    }
-    return jl(header(args[0]), end());
-  };
+  fake.exec = (_c, args) => jl(header(args[0]), end());
   fake.spaces = [space("sp1")];
   fake.agents = [agent("t1", "idle")];
 });
@@ -54,30 +45,30 @@ const press = (el) => el._h.on_click({}, fakeCx());
 
 test("no config.json: every setting is its default, and nothing is written", async () => {
   await loadConfig();
-  assert.deepEqual(DEFAULTS, { check_updates: true, status_row: "show", remote_helper: "ask", phone_read_only: false, text_size: "default" });
+  assert.deepEqual(DEFAULTS, { status_row: "show", remote_helper: "ask", phone_read_only: false, text_size: "default" });
   for (const [k, v] of Object.entries(DEFAULTS)) assert.equal(setting(k), v, k);
   assert.equal(configBad(), false);
-  assert.equal(log.writes.length, 0, "opening Flockbook never creates the file");
+  assert.equal(log.writes.length, 0, "opening herdr-contr never creates the file");
 });
 
 test("a partial file, or a value that is not one of the choices, is the default for that key", async () => {
-  file = JSON.stringify({ status_row: "hide", remote_helper: "always", check_updates: "no" });
+  file = JSON.stringify({ status_row: "hide", remote_helper: "always", text_size: "huge" });
   await loadConfig();
   assert.equal(setting("status_row"), "hide");
   assert.equal(setting("remote_helper"), "ask");
-  assert.equal(setting("check_updates"), true);
+  assert.equal(setting("text_size"), "default");
 });
 
 test("a config.json that is not JSON: defaults, a warning, and the file is left alone", async () => {
-  file = "{ check_updates: false";
+  file = "{ status_row: hide";
   const v = new SettingsView(fakeCx());
   await loadConfig();
   assert.equal(configBad(), true);
-  assert.equal(setting("check_updates"), true);
+  assert.equal(setting("status_row"), "show");
   const el = v.render(fakeCx());
   assert.match(textOf(byId(el, "set-bad")), /could not be read/);
-  assert.equal(await setSetting("check_updates", false), false);
-  assert.equal(file, "{ check_updates: false", "a file the person broke is theirs to fix");
+  assert.equal(await setSetting("status_row", "hide"), false);
+  assert.equal(file, "{ status_row: hide", "a file the person broke is theirs to fix");
 });
 
 test("text size: three choices under Chat; Large writes the file and scales the chat to 18 px", async () => {
@@ -133,7 +124,7 @@ test("the screen: three settings, each with its two choices, reachable with the 
   await loadConfig();
   const v = new SettingsView(fakeCx());
   const stops = [];
-  for (const [sec, k, a, b] of [["updates", "check_updates", "on", "off"], ["general", "status_row", "show", "hide"], ["general", "remote_helper", "ask", "never"]]) {
+  for (const [sec, k, a, b] of [["general", "status_row", "show", "hide"], ["general", "remote_helper", "ask", "never"]]) {
     v.section = sec;
     const el = v.render(fakeCx());
     assert.match(textOf(el), new RegExp(SETTINGS.find((s) => s.key === k).title));
@@ -146,26 +137,26 @@ test("the screen: three settings, each with its two choices, reachable with the 
     }
   }
   assert.deepEqual([...stops].sort((x, y) => x - y), stops, "Tab goes top to bottom");
-  // Space on Off.
-  v.section = "updates";
-  const o = opt(v.render(fakeCx()), "check_updates", "off");
+  // Space on Hide.
+  v.section = "general";
+  const o = opt(v.render(fakeCx()), "status_row", "hide");
   const cx = fakeCx();
   o._h.on_key_down({ key: "space", modifiers: {} }, cx);
   await new Promise((r) => setTimeout(r, 5));
-  assert.equal(JSON.parse(file).check_updates, false);
+  assert.equal(JSON.parse(file).status_row, "hide");
 });
 
 // Laid out as Herdr's own Settings: sections in a sidebar on the left, the chosen one filled; on the right
 // UPPERCASE headings, and rows with the title and one line about it on the left, the control on the right.
-const NAV = [["general", "General"], ["phone", "Phone page"], ["updates", "Updates"]];
+const NAV = [["general", "General"], ["phone", "Phone page"]];
 const nodes = (el) => { const all = []; (function walk(n) { if (!n || typeof n !== "object") return; all.push(n); (n.kids ?? []).forEach(walk); })(el); return all; };
 
-test("settings layout: a sidebar with General, Phone page and Updates; General is chosen first", async () => {
+test("settings layout: a sidebar with General and Phone page, and no Updates; General is chosen first", async () => {
   await loadConfig();
   const el = new SettingsView(fakeCx()).render(fakeCx());
   const side = byId(el, "set-nav");
   assert.ok(side, "a sidebar");
-  assert.match(textOf(side), /^Flockbook/);
+  assert.match(textOf(side), /^herdr-contr/);
   const stops = [];
   for (const [id, label] of NAV) {
     const r = byId(side, `set-nav-${id}`);
@@ -175,7 +166,8 @@ test("settings layout: a sidebar with General, Phone page and Updates; General i
     assert.equal(r._a.bg, id === "general" ? "#selected" : undefined, `${id}: only the chosen row is filled`);
     assert.equal(typeof r._a.tab_index, "number"); stops.push(r._a.tab_index);
   }
-  assert.deepEqual(stops, [1, 2, 3], "the sidebar comes first with Tab");
+  assert.equal(byId(side, "set-nav-updates"), null, "no update check");
+  assert.deepEqual(stops, [1, 2], "the sidebar comes first with Tab");
   const pane = byId(el, "settings-root");
   assert.ok(byId(pane, "set-status_row") && byId(pane, "set-remote_helper"));
   assert.equal(byId(pane, "set-phone"), null);
@@ -189,43 +181,42 @@ test("settings layout: a click, Enter or Space on a section shows it; every sett
   const where = {};
   for (const [id] of NAV) {
     const cx = fakeCx();
-    if (id === "updates") byId(v.render(cx), `set-nav-${id}`)._h.on_key_down({ key: "enter", modifiers: {} }, cx);
+    if (id === "phone") byId(v.render(cx), `set-nav-${id}`)._h.on_key_down({ key: "enter", modifiers: {} }, cx);
     else byId(v.render(cx), `set-nav-${id}`)._h.on_click({}, cx);
     assert.equal(v.section, id);
     const el = v.render(fakeCx());
     assert.equal(byId(el, `set-nav-${id}`)._a.bg, "#selected");
     for (const key of [...SETTINGS.map((s) => s.key), "phone"]) if (byId(byId(el, "settings-root"), `set-${key}`)) (where[key] ??= []).push(id);
   }
-  assert.deepEqual(where, { text_size: ["general"], status_row: ["general"], remote_helper: ["general"], phone: ["phone"], check_updates: ["updates"] });
+  assert.deepEqual(where, { text_size: ["general"], status_row: ["general"], remote_helper: ["general"], phone: ["phone"] });
 });
 
 test("settings layout: a row is the title and its line on the left, the control on the right", async () => {
   await loadConfig();
-  const v = new SettingsView(fakeCx()); v.section = "updates";
-  const row = byId(v.render(fakeCx()), "set-check_updates");
+  const v = new SettingsView(fakeCx());
+  const row = byId(v.render(fakeCx()), "set-status_row");
   assert.equal(row.tag, "h");
   const [text, control] = row.kids;
-  assert.match(textOf(text), /^Check for updates .*api\.github\.com/);
-  assert.ok(byId(control, "set-check_updates-on") && byId(control, "set-check_updates-off"));
-  assert.ok(nodes(byId(v.render(fakeCx()), "settings-root")).some((n) => n.kids?.[0] === "UPDATES"));
+  assert.match(textOf(text), /^Status row /);
+  assert.ok(byId(control, "set-status_row-show") && byId(control, "set-status_row-hide"));
 });
 
-// The Flockbook settings: a dialog over the window, as Herdr's own Settings (dimmed behind it; Esc or a
+// The herdr-contr settings: a dialog over the window, as Herdr's own Settings (dimmed behind it; Esc or a
 // click beside it closes it). Not a screen of the stack.
 const settingsDialogs = () => log.overlays.filter((o) => o.props?.view === "settings");
 function assertDialog(o) {
-  assert.equal(o.mod, "flockbook");
+  assert.equal(o.mod, "herdr-contr");
   assert.equal(o.kind, "dialog", "centered, dims the window, Esc and a click beside it close it");
   assert.equal(o.frame, undefined, "Herdr's frame: rounded corners, shadow, background");
   assert.ok(!o.modal, "a click beside it closes it");
 }
 
-test("the sidebar has a Flockbook row above Settings; it and the key command open the settings dialog", () => {
+test("the sidebar has a herdr-contr row above Settings; it and the key command open the settings dialog", () => {
   const el = new SideView(fakeCx()).render(fakeCx());
   const ids = el.kids.map((k) => k?._a?.id);
-  const at = ids.indexOf("side-flockbook");
+  const at = ids.indexOf("side-herdr-contr");
   assert.ok(at > 0 && at < ids.indexOf("side-settings"), ids.join(","));
-  press(byId(el, "side-flockbook"));
+  press(byId(el, "side-herdr-contr"));
   assert.equal(settingsDialogs().length, 1);
   assertDialog(settingsDialogs()[0]);
   assert.ok(!log.run.some(([n, a]) => n === "layout.select" && a?.child === "settings"), "the screen behind stays");
@@ -236,7 +227,7 @@ test("the sidebar has a Flockbook row above Settings; it and the key command ope
 });
 
 test("the settings dialog: a close button; once closed (Esc, a click beside it, the button) it opens again", () => {
-  press(byId(new SideView(fakeCx()).render(fakeCx()), "side-flockbook"));
+  press(byId(new SideView(fakeCx()).render(fakeCx()), "side-herdr-contr"));
   fake.props = { view: "settings", overlay: "o1" };
   const v = new SettingsView(fakeCx());
   const el = v.render(fakeCx());
@@ -249,7 +240,7 @@ test("the settings dialog: a close button; once closed (Esc, a click beside it, 
   assert.deepEqual(log.closed, ["o1"], "nothing open to replace");
   // Esc or a click beside it: Herdr closes it and the view's close runs; the next opens fresh.
   new SettingsView(fakeCx()).close(fakeCx());
-  press(byId(new SideView(fakeCx()).render(fakeCx()), "side-flockbook"));
+  press(byId(new SideView(fakeCx()).render(fakeCx()), "side-herdr-contr"));
   assert.equal(settingsDialogs().length, 3);
   assert.deepEqual(log.closed, ["o1"]);
 });
@@ -259,19 +250,16 @@ test("a screen saved as the old settings screen shows the chat", () => {
   assert.equal(shownScreen(), "chat");
 });
 
-test("update check off: a newer Flockbook is never asked for or offered, even with Check for updates on", async () => {
-  file = JSON.stringify({ check_updates: true });
+test("no update check: no setting, no dot, no line, and the helper is not asked", async () => {
   await loadConfig();
-  assert.equal(await pollUpdate(), null);
-  assert.equal(log.exec.filter(([, a]) => a[0] === "update-check").length, 0, "the helper is not asked");
-  // A line left from an older run is not shown either.
-  fake.shared["flockbook.update"] = update("newer");
-  assert.equal(updateShown(), null);
-  fake.shared["flockbook.sidebar"] = false;
+  assert.equal(SETTINGS.some((x) => x.key === "check_updates"), false);
+  assert.equal("check_updates" in DEFAULTS, false);
+  fake.shared["herdr-contr.sidebar"] = false;
   assert.equal(byId(byId(new TopView(fakeCx()).render(fakeCx()), "sidebar"), "update-dot"), null);
+  fake.shared["herdr-contr.sidebar"] = true;
   assert.equal(byId(new SideView(fakeCx()).render(fakeCx()), "update-line"), null);
-  const sv = new SettingsView(fakeCx()); sv.section = "updates";
-  assert.doesNotMatch(textOf(sv.render(fakeCx())), /install\.sh/);
+  assert.equal(sidecar.updateCheck, undefined);
+  assert.equal(log.exec.filter(([, a]) => a[0] === "update-check").length, 0);
 });
 
 test("status row: Show by default, Hide leaves out the chips above the reply box", async () => {
@@ -289,7 +277,6 @@ test("every sidecar call names this app's home, so the helper reads the same con
   await sidecar.feed("t1");
   await sidecar.installHelper("box", "00");
   await sidecar.send("t1", "--home");
-  await sidecar.updateCheck();
   for (const [, a] of log.exec) {
     const i = a.lastIndexOf("--home");
     assert.ok(i > 0 && a[i + 1] === HOME, a.join(" "));
@@ -303,12 +290,12 @@ test("every sidecar call names this app's home, so the helper reads the same con
 test("helper on other machines, Never: the chat says it is off in one plain line, no install card", async () => {
   fake.spaces = [space("sp1", { machine: "box" })];
   fake.agents = [agent("box/t7", "idle")];
-  const OFF = "Flockbook does not run its helper on other machines. To change it: Flockbook settings, Helper on other machines: Ask.";
+  const OFF = "herdr-contr does not run its helper on other machines. To change it: herdr-contr settings, Helper on other machines: Ask.";
   fake.exec = (_c, args) => jl(header(args[0]), { type: "error", code: "remote-off", message: OFF }, end(false));
   const cx = fakeCx(); const v = new ChatView(cx); await cx.settle(); v.width = 900;
   const text = textOf(v.render(cx));
-  assert.match(text, /Flockbook does not run its helper on other machines/);
-  assert.match(text, /Flockbook settings/);
+  assert.match(text, /herdr-contr does not run its helper on other machines/);
+  assert.match(text, /herdr-contr settings/);
   assert.doesNotMatch(text, /Install/);
   assert.ok(!log.exec.some(([, a]) => a[0] === "helper"));
 });
@@ -324,7 +311,7 @@ test("helper on other machines, Never: the tab menu has no Remove helper", async
   assert.ok(!items.some((i) => i?.act === "remove-helper"));
   // It says how to remove it instead, and takes you there.
   const hint = items.find((i) => i?.act === "settings");
-  assert.match(hint.label, /choose Ask in Flockbook settings first/);
+  assert.match(hint.label, /choose Ask in herdr-contr settings first/);
   act(hint);
   assert.equal(log.overlays.at(-1)?.props?.view, "settings", "the settings dialog");
   assertDialog(log.overlays.at(-1));
@@ -334,13 +321,4 @@ test("the words: Status row names cost; Never says how to remove a helper", () =
   const about = Object.fromEntries(SETTINGS.map((s) => [s.key, s.about]));
   assert.match(about.status_row, /model, context, cost, folder and branch/);
   assert.match(about.remote_helper, /To remove a helper that is already there, choose Ask first\./);
-});
-
-test("a release that comes out while the sidebar is open gets no dot when it is hidden later", async () => {
-  await loadConfig();
-  fake.shared["flockbook.sidebar"] = true;
-  await pollUpdate();
-  new SideView(fakeCx()).render(fakeCx());
-  fake.shared["flockbook.sidebar"] = false;
-  assert.equal(byId(byId(new TopView(fakeCx()).render(fakeCx()), "sidebar"), "update-dot"), null);
 });

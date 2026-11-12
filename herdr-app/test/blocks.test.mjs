@@ -1,7 +1,7 @@
 // The one block parser (blocks.js) that the drawing and the row height estimate share: fences as in CommonMark.
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { splitBlocks } from "../mods/flockbook/blocks.js";
+import { splitBlocks } from "../mods/herdr-contr/blocks.js";
 
 const codes = (text) => splitBlocks(text).filter((b) => b.k === "code").map((b) => [b.lang, b.text]);
 

@@ -1,9 +1,9 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { splitBlocks, tableCells } from "../mods/flockbook/mdblocks.js";
-import { markdownView } from "../mods/flockbook/mdblocks.js";
+import { splitBlocks, tableCells } from "../mods/herdr-contr/mdblocks.js";
+import { markdownView } from "../mods/herdr-contr/mdblocks.js";
 import { textOf } from "./stub/ui.mjs";
-import { colWidths, markdownHeight } from "../mods/flockbook/estimate.js";
+import { colWidths, markdownHeight } from "../mods/herdr-contr/estimate.js";
 
 test("code fences and tables come out as their own blocks; the rest stays markdown", () => {
   const text = "Intro **bold**\n\n```js\nconst a = 1;\n  b();\n```\nMiddle\n\n| Name | Size |\n|:--|--:|\n| `a` | 1 |\n| b | 22 |\n\nEnd";
@@ -105,7 +105,7 @@ test("code box text: CRLF lines lose the CR; a line ending in a backslash keeps 
 });
 
 test("Copy text is the block as written: normal spaces and tabs, no no-break spaces", async () => {
-  const { codeCopyText } = await import("../mods/flockbook/mdblocks.js");
+  const { codeCopyText } = await import("../mods/herdr-contr/mdblocks.js");
   const b = splitBlocks("```\n  two\n\tone tab\r\n\nend\n```")[0];
   assert.equal(codeCopyText(b), "  two\n\tone tab\n\nend");
   assert.ok(!codeCopyText(b).includes(" "));
@@ -117,7 +117,7 @@ test("a code line is guessed as tall as a TextView line at 13 px (21 px), not sh
 });
 
 test("codeBlockAt finds the code box under a point: several boxes, a box at the top and at the bottom", async () => {
-  const { codeBlockAt } = await import("../mods/flockbook/mdblocks.js");
+  const { codeBlockAt } = await import("../mods/herdr-contr/mdblocks.js");
   const W = 700;
   const before = "Intro line.\n\n";
   const text = `${before}\`\`\`sh\n  first\n\`\`\`\nMiddle words here.\n\n\`\`\`\nsecond\n\tline\n\`\`\`\nEnd.`;

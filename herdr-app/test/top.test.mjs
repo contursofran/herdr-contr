@@ -4,8 +4,8 @@ import { fake, log, reset } from "./stub/herdr.mjs";
 import { textOf, byId } from "./stub/ui.mjs";
 import { fakeCx } from "./fake-cx.mjs";
 import { agent, space } from "./fixtures.mjs";
-import { TopView } from "../mods/flockbook/top.js";
-import { KEY_AGENT } from "../mods/flockbook/state.js";
+import { TopView } from "../mods/herdr-contr/top.js";
+import { KEY_AGENT } from "../mods/herdr-contr/state.js";
 
 const tab = (id, index, extra = {}) => ({ id, index, name: String(index), named: false, active: false, status: null, panes: 1, zoomed: false, settled: false, settled_at: null, changed_at: null, working_since: null, ...extra });
 
@@ -81,7 +81,7 @@ test("the sidebar button shows and hides the sidebar; with it open the button li
   assert.deepEqual(log.run.at(-1), ["layout.show", { id: "sidebar" }]);
   el = new TopView(fakeCx()).render(fakeCx());
   assert.equal(byId(el, "sidebar"), null, "open: no button in the bar");
-  const { SideView } = await import("../mods/flockbook/side.js");
+  const { SideView } = await import("../mods/herdr-contr/side.js");
   byId(new SideView(fakeCx()).render(fakeCx()), "side-toggle")._h.on_click({}, fakeCx());
   assert.deepEqual(log.run.at(-1), ["layout.hide", { id: "sidebar" }]);
   byId(el, "new")._h.on_click({}, fakeCx());
@@ -89,9 +89,9 @@ test("the sidebar button shows and hides the sidebar; with it open the button li
 });
 
 test("the sidebar state starts from the app's saved layout state", async () => {
-  const { loadSidebar, sidebarShown } = await import("../mods/flockbook/state.js");
+  const { loadSidebar, sidebarShown } = await import("../mods/herdr-contr/state.js");
   const h = await import("./stub/herdr.mjs");
-  fake.readText = (p) => (p.endsWith("/layouts/.state/flockbook.json") ? JSON.stringify({ nodes: { sidebar: { hidden: false } } }) : null);
+  fake.readText = (p) => (p.endsWith("/layouts/.state/herdr-contr-own.json") ? JSON.stringify({ nodes: { sidebar: { hidden: false } } }) : null);
   await loadSidebar();
   assert.equal(sidebarShown(), true);
   fake.readText = null;
@@ -114,7 +114,7 @@ test("only the shown tab has a close button; it closes that tab without selectin
 });
 
 test("the chat shows an agent of the shown tab, none for a shell tab", async () => {
-  const { currentAgent } = await import("../mods/flockbook/state.js");
+  const { currentAgent } = await import("../mods/herdr-contr/state.js");
   fake.shared[KEY_AGENT] = "t2";
   assert.equal(currentAgent().address, "t1", "a pick in another tab is ignored");
   fake.spaces[0].tabs.forEach((x) => { x.active = x.id === "tb-sh"; });
@@ -125,10 +125,10 @@ test("Terminal opens the agent's own terminal in a window with a Close bar", asy
   const el = new TopView(fakeCx()).render(fakeCx());
   byId(el, "terminal")._h.on_click({}, fakeCx());
   const o = log.overlays.at(-1);
-  assert.equal(o.kind, "window"); assert.equal(o.key, "flockbook-terminal");
+  assert.equal(o.kind, "window"); assert.equal(o.key, "herdr-contr-terminal");
   assert.deepEqual(o.layout.children[1].content, { terminal: "t1" });
   assert.deepEqual(o.layout.children[0].content.props, { view: "termbar", terminal: "t1", name: "api" });
-  const { TermBar } = await import("../mods/flockbook/termbar.js");
+  const { TermBar } = await import("../mods/herdr-contr/termbar.js");
   fake.props = { view: "termbar", name: "api", overlay: "o9" };
   const bar = new TermBar(fakeCx()).render(fakeCx());
   assert.match(textOf(bar), /api.*Terminal/);
@@ -140,15 +140,15 @@ test("Terminal opens the agent's own terminal in a window with a Close bar", asy
 test("ctrl-` / Terminal toggles: a second press closes the window; Close forgets it", async () => {
   const el = new TopView(fakeCx()).render(fakeCx());
   byId(el, "terminal")._h.on_click({}, fakeCx());
-  assert.equal(log.overlays.length, 1); assert.equal(fake.shared["flockbook.terminal"], "o1");
+  assert.equal(log.overlays.length, 1); assert.equal(fake.shared["herdr-contr.terminal"], "o1");
   byId(el, "terminal")._h.on_click({}, fakeCx());
   assert.equal(log.overlays.length, 1, "not opened again"); assert.deepEqual(log.closed, ["o1"]);
-  assert.equal(fake.shared["flockbook.terminal"], null);
+  assert.equal(fake.shared["herdr-contr.terminal"], null);
   byId(el, "terminal")._h.on_click({}, fakeCx());
-  const { TermBar } = await import("../mods/flockbook/termbar.js");
+  const { TermBar } = await import("../mods/herdr-contr/termbar.js");
   fake.props = { view: "termbar", name: "api", overlay: "o1" };
   byId(new TermBar(fakeCx()).render(fakeCx()), "term-close")._h.on_click({}, fakeCx());
-  assert.equal(fake.shared["flockbook.terminal"], null);
+  assert.equal(fake.shared["herdr-contr.terminal"], null);
 });
 
 test("a shell tab: no Terminal button", () => {
@@ -265,10 +265,10 @@ test("a drag released on the bar's edge drops at the last place shown", () => {
 });
 
 test("the spinner: one turn per 900 ms (Herdr draws about 30 frames a second: 13 degrees a frame), a short arc over a faint ring", async () => {
-  const { SPIN_MS } = await import("../mods/flockbook/state.js");
+  const { SPIN_MS } = await import("../mods/herdr-contr/state.js");
   const { readFileSync } = await import("node:fs");
   assert.ok(SPIN_MS >= 900 && SPIN_MS <= 1000, String(SPIN_MS));
-  const svg = readFileSync(new URL("../mods/flockbook/icons/spinner.svg", import.meta.url), "utf8");
+  const svg = readFileSync(new URL("../mods/herdr-contr/icons/spinner.svg", import.meta.url), "utf8");
   // The ring: a full circle, faint, that does not seem to move while the arc turns.
   const ring = /<circle[^>]*r="([\d.]+)"[^>]*stroke-opacity="([\d.]+)"/.exec(svg);
   assert.ok(ring && Number(ring[2]) <= 0.4, "a faint full ring");

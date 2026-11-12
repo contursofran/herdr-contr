@@ -4,8 +4,8 @@ import { fake, log, reset } from "./stub/herdr.mjs";
 import { textOf, byId } from "./stub/ui.mjs";
 import { fakeCx } from "./fake-cx.mjs";
 import { agent, space } from "./fixtures.mjs";
-import { Cards, wanted, answersFor } from "../mods/flockbook/cards.js";
-import { NeedsView } from "../mods/flockbook/needs.js";
+import { Cards, wanted, answersFor } from "../mods/herdr-contr/cards.js";
+import { NeedsView } from "../mods/herdr-contr/needs.js";
 
 const jl = (...lines) => ({ code: 0, stdout: lines.map((l) => JSON.stringify(l)).join("\n") + "\n", stderr: "" });
 const header = (command) => ({ type: "header", protocol: 1, sidecar: "0.1.0", command });
@@ -141,7 +141,7 @@ test("Needs you shows the picked agent's card", async () => {
 
 test("no view makes input state while it draws (herdr-app refuses it)", async () => {
   const { made } = await import("./stub/ui.mjs");
-  const { ChatView } = await import("../mods/flockbook/chat.js");
+  const { ChatView } = await import("../mods/herdr-contr/chat.js");
   cardNow = { ...question };
   fake.exec = (_c, args) => args[0] === "card" ? jl(header("card"), cardNow, end)
     : args[0] === "feed" ? jl(header("feed"), { type: "log", agent: "claude", path: "/l", start: 0, size: 1, cursor: "c" }, { type: "splice", at: 0, count: 1 }, { type: "row", id: "u1", k: "user", text: "hi" }, end)
@@ -151,7 +151,7 @@ test("no view makes input state while it draws (herdr-app refuses it)", async ()
   await chat.tick(cx); needs.tick(cx); await cx.settle();
   const before = made.textarea;
   chat.render(cx); needs.render(cx);
-  fake.shared["flockbook.agent"] = "t2"; await chat.tick(cx); await cx.settle();
+  fake.shared["herdr-contr.agent"] = "t2"; await chat.tick(cx); await cx.settle();
   chat.render(cx); needs.render(cx);
   assert.equal(made.textarea, before);
 });
@@ -237,10 +237,10 @@ test("an approval already answered and still on screen: buttons off, 1 and 2 do 
   fake.message = undefined; fake.result = undefined;
 });
 
-test("an agent Flockbook cannot tell apart: the card shows the sidecar's reason, not 'another agent'", async () => {
+test("an agent herdr-contr cannot tell apart: the card shows the sidecar's reason, not 'another agent'", async () => {
   const cx = fakeCx(); const c = new Cards();
   await c.poll(cx, "t1", true);
-  fake.result = "no-identity"; fake.message = "Flockbook cannot tell this agent from another program in this terminal, so it sends nothing. Use the terminal.";
+  fake.result = "no-identity"; fake.message = "herdr-contr cannot tell this agent from another program in this terminal, so it sends nothing. Use the terminal.";
   byId(c.view("t1", T), "card-allow")._h.on_click({}, cx); await cx.settle();
   const note = textOf(byId(c.view("t1", T), "card-note"));
   assert.match(note, /cannot tell this agent/);

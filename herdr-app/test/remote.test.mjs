@@ -5,17 +5,17 @@ import { fake, log, reset } from "./stub/herdr.mjs";
 import { textOf, byId } from "./stub/ui.mjs";
 import { fakeCx } from "./fake-cx.mjs";
 import { agent, space } from "./fixtures.mjs";
-import { ChatView } from "../mods/flockbook/chat.js";
-import { tabItems, act } from "../mods/flockbook/menu.js";
-import { machineOf, KEY_REMOVE } from "../mods/flockbook/state.js";
+import { ChatView } from "../mods/herdr-contr/chat.js";
+import { tabItems, act } from "../mods/herdr-contr/menu.js";
+import { machineOf, KEY_REMOVE } from "../mods/herdr-contr/state.js";
 
 const jl = (...lines) => ({ code: 0, stdout: lines.map((l) => JSON.stringify(l)).join("\n") + "\n", stderr: "" });
 const header = (command) => ({ type: "header", protocol: 1, sidecar: "0.1.0", command });
 const end = (ok = true) => ({ type: "end", ok });
 const SHA = "7ac5" + "0".repeat(56) + "beef";
-const install = (extra = {}) => ({ machine: "box", target: "x86_64-unknown-linux-musl", path: "~/.local/share/flockbook/helper/0.1.0/flockbook-modfeed",
+const install = (extra = {}) => ({ machine: "box", target: "x86_64-unknown-linux-musl", path: "~/.local/share/herdr-contr/helper/0.1.0/herdr-contr-feed",
   bytes: 4371392, sha256: SHA, source: "release", ...extra });
-const missing = (inst = install()) => ({ type: "error", code: "remote_helper_missing", message: "box has no Flockbook helper yet, so the chat cannot read its agents.", install: inst });
+const missing = (inst = install()) => ({ type: "error", code: "remote_helper_missing", message: "box has no herdr-contr helper yet, so the chat cannot read its agents.", install: inst });
 
 let there, calls;
 beforeEach(() => {
@@ -25,7 +25,7 @@ beforeEach(() => {
   fake.exec = (_c, args) => {
     calls.push(args);
     if (args[0] === "helper" && args[1] === "install") { there = true; return jl(header("helper"), { type: "installed", machine: "box", path: install().path, bytes: 4371392, sha256: SHA, source: "release", parts: 1 }, end()); }
-    if (args[0] === "helper" && args[1] === "remove") { there = false; return jl(header("helper"), { type: "removed", machine: "box", path: "~/.local/share/flockbook/helper" }, end()); }
+    if (args[0] === "helper" && args[1] === "remove") { there = false; return jl(header("helper"), { type: "removed", machine: "box", path: "~/.local/share/herdr-contr/helper" }, end()); }
     if (args[0] === "feed" && !there) return jl(header("feed"), fake.why ?? missing(), end(false));
     if (args[0] === "feed") return jl(header("feed"), { type: "log", agent: "claude", path: "/l.jsonl", start: 0, size: 1, cursor: "c1" }, { type: "splice", at: 0, count: 1 }, { type: "row", id: "u1", k: "user", text: "hello from box", ts: 1 }, end());
     return jl(header(args[0]), end());
@@ -46,8 +46,8 @@ test("no helper there: a card says which machine, where, how big and the checksu
   const { cx, v } = await open();
   const el = v.render(cx);
   const text = textOf(el);
-  assert.match(text, /Install the Flockbook helper on box\?/);
-  assert.match(text, /~\/\.local\/share\/flockbook\/helper\/0\.1\.0\/flockbook-modfeed/);
+  assert.match(text, /Install the herdr-contr helper on box\?/);
+  assert.match(text, /~\/\.local\/share\/herdr-contr\/helper\/0\.1\.0\/herdr-contr-feed/);
   assert.match(text, /4\.4 MB/);
   assert.match(text, /x86_64-unknown-linux-musl/);
   assert.match(text, new RegExp(SHA), "the full sha256 is on the card");
@@ -64,7 +64,7 @@ test("Install puts the helper there with the card's checksum, then the chat load
   byId(v.render(cx), "helper-install")._h.on_click({}, cx);
   assert.match(textOf(v.render(cx)), /Installing on box/);
   await cx.settle();
-  assert.deepEqual(calls.find((a) => a[0] === "helper"), ["helper", "install", "--machine", "box", "--sha256", SHA, "--cache", "/home/test/.config/herdr-app/flockbook/cache.json", "--home", "/home/test/.config/herdr-app"]);
+  assert.deepEqual(calls.find((a) => a[0] === "helper"), ["helper", "install", "--machine", "box", "--sha256", SHA, "--cache", "/home/test/.config/herdr-app/herdr-contr/cache.json", "--home", "/home/test/.config/herdr-app"]);
   await v.tick(cx); await cx.settle();
   v.render(cx);
   assert.equal(v.feed().rows[0]?.text, "hello from box");
@@ -105,13 +105,13 @@ test("another version there: the card says it replaces it", async () => {
   const { cx, v } = await open();
   const text = textOf(v.render(cx));
   assert.match(text, /another version \(0\.0\.9\)/);
-  assert.match(text, /Install the Flockbook helper on box\?/);
+  assert.match(text, /Install the herdr-contr helper on box\?/);
 });
 
 test("no helper for that platform, Windows, a bad address, a failed call: clear words, no card", async () => {
   const show = async (why) => { fake.why = why; const { cx, v } = await open(); const el = v.render(cx); return { text: textOf(el), card: byId(el, "helper-install") }; };
   let r = await show(missing(null));
-  assert.match(r.text, /This Flockbook has no helper for that machine/); assert.equal(r.card, null);
+  assert.match(r.text, /This herdr-contr has no helper for that machine/); assert.equal(r.card, null);
   r = await show({ type: "error", code: "remote_helper_unsupported", message: "box runs Windows" });
   assert.match(r.text, /cannot run on box yet/); assert.equal(r.card, null);
   r = await show({ type: "error", code: "bad_terminal", message: "x" });
@@ -132,10 +132,10 @@ test("a remote tab's menu offers Remove helper; the chat asks before it removes"
   assert.equal(fake.shared[KEY_REMOVE], "box");
   await v.tick(cx); await cx.settle();
   let el = v.render(cx);
-  assert.match(textOf(el), /Remove the Flockbook helper from box\?/);
+  assert.match(textOf(el), /Remove the herdr-contr helper from box\?/);
   assert.ok(!calls.some((a) => a[0] === "helper"), "nothing removed before a press");
   byId(el, "helper-remove")._h.on_click({}, cx); await cx.settle();
-  assert.deepEqual(calls.find((a) => a[0] === "helper"), ["helper", "remove", "--machine", "box", "--cache", "/home/test/.config/herdr-app/flockbook/cache.json", "--home", "/home/test/.config/herdr-app"]);
+  assert.deepEqual(calls.find((a) => a[0] === "helper"), ["helper", "remove", "--machine", "box", "--cache", "/home/test/.config/herdr-app/herdr-contr/cache.json", "--home", "/home/test/.config/herdr-app"]);
   assert.equal(fake.shared[KEY_REMOVE], null);
   // Cancel: nothing is removed.
   calls.length = 0; act(item); await v.tick(cx); await cx.settle();

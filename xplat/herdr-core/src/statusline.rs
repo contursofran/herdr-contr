@@ -1,5 +1,5 @@
-//! Claude Code's status line as Flockbook keeps it (Swift: the reading side of `StatusLine.swift`). Claude Code runs
-//! Flockbook's wrapper as its statusLine command; the wrapper saves the JSON input and the owner's command's output
+//! Claude Code's status line as herdr-contr keeps it (Swift: the reading side of `StatusLine.swift`). Claude Code runs
+//! herdr-contr's wrapper as its statusLine command; the wrapper saves the JSON input and the owner's command's output
 //! per session (`StatusLineFolder`). This reads a session's record and turns it into the row's tags. The wrapper
 //! itself (`StatusLineWrapper`) and the settings switch (`ClaudeStatusLineSetting`) are not ported.
 

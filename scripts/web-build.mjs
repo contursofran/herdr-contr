@@ -1,4 +1,4 @@
-// Builds the phone PWA (web/) into xplat/flockbook-modfeed/web/, which the helper embeds, so the Rust build never
+// Builds the phone PWA (web/) into xplat/herdr-contr-feed/web/, which the helper embeds, so the Rust build never
 // needs Node.
 //   node scripts/web-build.mjs          type-check (deno), strip types (Node's built-in), write the files
 //   node scripts/web-build.mjs --check  fail when the files are not what the sources give
@@ -29,18 +29,18 @@ for (const f of sources) {
 }
 
 const names = Object.keys(files).sort();
-// The same files for the Rust helper (`flockbook-modfeed serve` embeds this folder with rust-embed).
-const rustDir = join(root, "xplat/flockbook-modfeed/web");
+// The same files for the Rust helper (`herdr-contr-feed serve` embeds this folder with rust-embed).
+const rustDir = join(root, "xplat/herdr-contr-feed/web");
 const rustSame = () => existsSync(rustDir)
   && readdirSync(rustDir).sort().join("\n") === names.join("\n")
   && names.every((n) => readFileSync(join(rustDir, n)).equals(files[n]));
 
 if (check) {
   const rust = rustSame();
-  console.log(rust ? `web-build: up to date (${names.length} files)` : "web-build: xplat/flockbook-modfeed/web/ stale; run node scripts/web-build.mjs");
+  console.log(rust ? `web-build: up to date (${names.length} files)` : "web-build: xplat/herdr-contr-feed/web/ stale; run node scripts/web-build.mjs");
   process.exit(rust ? 0 : 1);
 }
 rmSync(rustDir, { recursive: true, force: true });
 mkdirSync(rustDir, { recursive: true });
 for (const n of names) writeFileSync(join(rustDir, n), files[n]);
-console.log(`web-build: wrote ${names.length} files (${names.join(", ")}) to xplat/flockbook-modfeed/web/`);
+console.log(`web-build: wrote ${names.length} files (${names.join(", ")}) to xplat/herdr-contr-feed/web/`);

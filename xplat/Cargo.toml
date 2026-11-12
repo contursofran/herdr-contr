@@ -1,6 +1,6 @@
 [workspace]
 resolver = "2"
-members = ["herdr-core", "flockbook-modfeed"]
+members = ["herdr-core", "herdr-contr-feed"]
 
 [workspace.package]
 edition = "2021"
@@ -15,6 +15,6 @@ serde_json = { version = "1", features = ["float_roundtrip"] }
 debug = "line-tables-only"
 
 # The helper is copied to other machines (hc file.write, 8 MB a call): no symbols or line tables in it.
-[profile.release.package.flockbook-modfeed]
+[profile.release.package.herdr-contr-feed]
 strip = true
 debug = false

@@ -1,6 +1,6 @@
 {
-  "name": "Flockbook",
-  "short_name": "Flockbook",
+  "name": "herdr-contr",
+  "short_name": "herdr-contr",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",

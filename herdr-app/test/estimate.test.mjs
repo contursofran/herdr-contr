@@ -4,7 +4,7 @@
 // a full-width character 16 px wide, inline code Menlo 8.4 px a character plus 4 px padding each side.
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { markdownHeight, rowHeight, lineHeight } from "../mods/flockbook/estimate.js";
+import { markdownHeight, rowHeight, lineHeight } from "../mods/herdr-contr/estimate.js";
 
 const W = 748;
 const LINE = 26, GAP = 10, ITEM_GAP = 4;

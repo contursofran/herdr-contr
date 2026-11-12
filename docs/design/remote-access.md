@@ -29,10 +29,10 @@ Conclusion: the socket carries status, screens and input. The conversation, the 
 ## 3. Option 0: SSH socket forward (deferred to the Linux remote block)
 
 ```
-ssh -N -L ~/.flockbook/remote/devbox.sock:/home/me/.config/herdr/herdr.sock me@devbox
+ssh -N -L ~/.herdr-contr/remote/devbox.sock:/home/me/.config/herdr/herdr.sock me@devbox
 ```
 
-The Mac app then connects with a new launch option, for example `--socket ~/.flockbook/remote/devbox.sock`.
+The Mac app then connects with a new launch option, for example `--socket ~/.herdr-contr/remote/devbox.sock`.
 
 What works: sidebar, status, the "Needs you" list, notifications, the approval card and question card **from the screen** (the screen fallback in `ApprovalNotice` was made for a log-less Claude; it also covers this case), composer input.
 
@@ -93,7 +93,7 @@ Rules:
 
 Recommendation:
 - **Mac hub = Swift, inside the app**, built first (phase 2), because the app already holds the store, the logs and the approval rules. It uses `Network.framework` (`NWListener` with TLS and WebSocket); no new dependency.
-- **Linux hub = Rust**, a new crate `xplat/flockbook-hub` on top of `herdr-core`, built later (phase 5). It runs headless (`flockbook-hub --session <name>`), as a user service. Same protocol, same message types.
+- **Linux hub = Rust**, a new crate `xplat/herdr-contr-hub` on top of `herdr-core`, built later (phase 5). It runs headless (`herdr-contr-hub --session <name>`), as a user service. Same protocol, same message types.
 - Keep the two in step with **shared protocol fixtures**: JSON files of every message type, checked by HerdrKitChecks and by `cargo test`.
 
 Risk: two implementations of the same rules. Mitigation: the fixtures, and the hub rules stay thin (they call the parsers both sides already have).
@@ -105,7 +105,7 @@ Risk: two implementations of the same rules. Mitigation: the fixtures, and the h
 - Tailscale already encrypts and authenticates devices. TLS + token still apply: a tailnet can hold other people's devices (shared nodes), and defense in depth is cheap here.
 - **Mac hub, as built (phase 2):**
   - Bind: one address of this Mac, chosen in Settings > Remote access (default: the first Tailscale address, with the note that it is the safe choice; a LAN address is marked "less safe", with the warning above). Never all addresses (`0.0.0.0`, `::` are refused, not only off by default). Public addresses are refused. Every address except loopback needs TLS.
-  - Certificate: self-signed P-256, made once with the system `/usr/bin/openssl` and kept in `Application Support/Flockbook/hub/tls` (mode 600 files in a mode 700 folder). It is imported in memory only, never into a keychain. A new certificate changes the fingerprint, so devices pair again.
+  - Certificate: self-signed P-256, made once with the system `/usr/bin/openssl` and kept in `Application Support/herdr-contr/hub/tls` (mode 600 files in a mode 700 folder). It is imported in memory only, never into a keychain. A new certificate changes the fingerprint, so devices pair again.
   - The `tailscale cert` folder (a cert/key pair dropped into `<hub>/tailscale/`) is removed: Tailscale Serve (below) gives the same real certificate, renews it, and needs no files.
 - **Tailscale Serve mode (recommended, the default mode):**
   - The hub listens on `127.0.0.1:7481` only, plain HTTP. `tailscale serve --bg --https=7480 http://127.0.0.1:7481` makes Tailscale end HTTPS at `https://<machine>.<tailnet>.ts.net:7480` for the tailnet only, with its own certificate. Port 7480 is our own, so the page is its own origin and another app's Serve config (often on 443, path `/`) is not touched. Direct mode moved to port 7482 so the two cannot clash on the Tailscale address.
@@ -118,7 +118,7 @@ Risk: two implementations of the same rules. Mitigation: the fixtures, and the h
 
 ## 6. Pairing and auth
 
-1. On the hub machine: Settings > Remote access > "Pair a device" (Mac), or `flockbook-hub pair` (Linux). It shows a QR code and a 6-word code.
+1. On the hub machine: Settings > Remote access > "Pair a device" (Mac), or `herdr-contr-hub pair` (Linux). It shows a QR code and a 6-word code.
 2. The QR holds: hub URL, certificate fingerprint, a one-time pairing secret (valid 5 minutes, single use).
 3. The client opens the URL, sends the secret, and gets a **device token** (random 256-bit). The hub stores only a hash of it, with a device name and the date. (Mac hub: a JSON file, mode 600, in Application Support. A hash is not a secret; the Keychain would ask again after every rebuild of an ad-hoc signed app.)
 4. Every WebSocket opens with the device token. The hub lists paired devices and can revoke one.
@@ -145,13 +145,13 @@ Input to an agent pane is remote code execution: an agent with tool access runs 
 | One peer burns the pairing offer | 3 wrong tries per source, 20 in all |
 | Logs contain secrets (code, keys, tokens) | Read access is sensitive too: pairing is required even for `read`; nothing is cached on the phone beyond the open session (no offline store of conversations in v1) |
 | The hub is a new process with your file access | Hub reads logs only; it writes only re-encoded images into its own cache folder (above); it runs as the user, not root |
-| Hub left on by mistake | Off by default; a visible "Remote access on" state in the Mac app and in `flockbook-hub status`; optional auto-off after N days |
+| Hub left on by mistake | Off by default; a visible "Remote access on" state in the Mac app and in `herdr-contr-hub status`; optional auto-off after N days |
 
 Defaults: hub off; when on, new devices are `read`; the app-wide "Allow input" setting still applies on top of the device level.
 
 **Agent version bumps.** The exact-rendering check (`QuestionAdapter.codexExact`) holds Codex 0.162.1's picker as captured live: the head "Question k/n", the "None of the above" row and its description, the "› Add notes" field, the two key lines. When a new Codex version changes any of them, every remote answer to a Codex question refuses (nothing sent; the user answers on the Mac) until the template and its fixtures (`ChecksHubReview7`) are updated from a new live capture. On each Codex update: capture the picker in a test session (closed notes, empty notes, typed notes, a long wrapped description), run the checks, then a live answer from the hub. The same holds for Claude Code's template (`QuestionAdapter.claudeExact`, `claudeReviewExact`, fixtures in `ChecksClaudeHook`, captured from 2.1.296): on each Claude Code update, capture single, multiSelect, Other (empty, typed), Submit and the review screen, run the checks, then a live answer from the hub with a test settings file.
 
-**Claude questions from the phone (option B, opt-in).** Claude Code writes AskUserQuestion to its log late (live: without a hook only after the answer; with a PreToolUse hook the call line may come while the picker is open, without a result), so the hub takes the question from a hook. Settings > Agents > "Answer Claude questions from the phone" (shown while Remote access is on) shows the exact entry and changes `~/.claude/settings.json` only on the owner's click: Install backs the file up next to it (`settings.json.flockbook-<time>.bak`), adds one `PreToolUse` entry (matcher `AskUserQuestion`, our script, timeout 5) and keeps every other key (the file is written back sorted and pretty-printed); twice = once; a file that is not plain JSON or a `hooks` of another shape is refused untouched. Uninstall removes only our entry. The script (in the app's Application Support) writes the hook's stdin JSON (at most 256 KB; the app reads only session_id, tool_use_id, tool_input) to a temp file and renames it into the app's records folder, mode 600; it prints nothing and always exits 0, so it never blocks or changes the call. The app reads the newest records, ignores and removes those over a day old. Binding: newest record of the agent's herdr session; no result for that call in the log; the screen is its exact rendering. A local process that writes a fake record gains nothing: a key goes only when the screen is that record's exact rendering, so the key does what the record's question says. Claude sessions started before Install do not have the hook; their questions stay "answer on the Mac".
+**Claude questions from the phone (option B, opt-in).** Claude Code writes AskUserQuestion to its log late (live: without a hook only after the answer; with a PreToolUse hook the call line may come while the picker is open, without a result), so the hub takes the question from a hook. Settings > Agents > "Answer Claude questions from the phone" (shown while Remote access is on) shows the exact entry and changes `~/.claude/settings.json` only on the owner's click: Install backs the file up next to it (`settings.json.herdr-contr-<time>.bak`), adds one `PreToolUse` entry (matcher `AskUserQuestion`, our script, timeout 5) and keeps every other key (the file is written back sorted and pretty-printed); twice = once; a file that is not plain JSON or a `hooks` of another shape is refused untouched. Uninstall removes only our entry. The script (in the app's Application Support) writes the hook's stdin JSON (at most 256 KB; the app reads only session_id, tool_use_id, tool_input) to a temp file and renames it into the app's records folder, mode 600; it prints nothing and always exits 0, so it never blocks or changes the call. The app reads the newest records, ignores and removes those over a day old. Binding: newest record of the agent's herdr session; no result for that call in the log; the screen is its exact rendering. A local process that writes a fake record gains nothing: a key goes only when the screen is that record's exact rendering, so the key does what the record's question says. Claude sessions started before Install do not have the hook; their questions stay "answer on the Mac".
 
 ## 8. Mac app: adding a remote host (phase 5)
 
@@ -240,7 +240,7 @@ Phone for the Mac first. The Linux remote follows as one block.
 | 2 | Swift hub in the Mac app: Settings > Remote access (off by default), `NWListener` on the Tailscale address, TLS (`tailscale cert`), pairing (QR + 6-word code), device tokens (hash only, in a mode-600 file), per-device `read`/`input`, revoke. Serves snapshot, events, conversation, screen, `send`/`approve`/`answer`. Headless tests with a test client against a named session. | L (2–3 weeks) |
 | 3 | PWA served by the hub: agent list, conversation, approval and question cards, composer (only with `input`). Phone check by the owner. | M (1–2 weeks) |
 | 4 | Web Push for "Needs you" (installed PWA, iOS 16.4+), with Allow / Deny only for `input` devices. | S–M (1 week) |
-| 5 | Linux remote, one block: option 0 (`--socket` + `ssh -L`, the limited mode), the Rust `flockbook-hub` on Linux (same protocol and fixtures), and the Mac app remote mode (host list, Keychain token, a `RemoteStore` that feeds the same views as `HerdrStore`). | L (3–4 weeks) |
+| 5 | Linux remote, one block: option 0 (`--socket` + `ssh -L`, the limited mode), the Rust `herdr-contr-hub` on Linux (same protocol and fixtures), and the Mac app remote mode (host list, Keychain token, a `RemoteStore` that feeds the same views as `HerdrStore`). | L (3–4 weeks) |
 | 6 | Remote terminal stream (both hubs). | L (3+ weeks) |
 
 ## 11. Open questions

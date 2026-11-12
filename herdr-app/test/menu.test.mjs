@@ -4,9 +4,9 @@ import { fake, log, reset } from "./stub/herdr.mjs";
 import { textOf, byId } from "./stub/ui.mjs";
 import { fakeCx } from "./fake-cx.mjs";
 import { agent, space } from "./fixtures.mjs";
-import { tabItems, spaceItems, openMenu, act, MenuView } from "../mods/flockbook/menu.js";
-import { TopView } from "../mods/flockbook/top.js";
-import { screenFor } from "../mods/flockbook/state.js";
+import { tabItems, spaceItems, openMenu, act, MenuView } from "../mods/herdr-contr/menu.js";
+import { TopView } from "../mods/herdr-contr/top.js";
+import { screenFor } from "../mods/herdr-contr/state.js";
 
 const tab = (id, index, extra = {}) => ({ id, index, name: String(index), named: false, active: false, status: null, panes: 1, settled: false, ...extra });
 
@@ -44,5 +44,5 @@ test("a split tab shows its panes; one pane with an agent shows the chat", () =>
   assert.equal(screenFor(tab("tb1", 1)), "chat");
   assert.equal(screenFor(tab("tb1", 1, { panes: 2 })), "tab");
   act({ act: "panes" });
-  assert.equal(fake.shared["flockbook.screen"], "tab");
+  assert.equal(fake.shared["herdr-contr.screen"], "tab");
 });

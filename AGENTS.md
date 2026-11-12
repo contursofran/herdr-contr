@@ -35,17 +35,17 @@ as Herdr draws it, for now.
 
 | Path | Holds |
 |---|---|
-| `herdr-app/layouts`, `herdr-app/themes`, `herdr-app/keys.json` | the layouts (`flockbook`, and `flockbook-herdr` with Herdr's sidebar), the themes and the keys that the mod installs |
-| `herdr-app/mods/flockbook` | the mod: one file for each screen or part |
+| `herdr-app/layouts`, `herdr-app/themes`, `herdr-app/keys.json` | the layouts (`herdr-contr` with Herdr's sidebar, and `herdr-contr-own` with the mod's own sidebar), the themes and the keys that the mod installs |
+| `herdr-app/mods/herdr-contr` | the mod: one file for each screen or part |
 | `herdr-app/test` | the mod's tests, with a stub of Herdr's UI in `test/stub` |
 | `herdr-app/RECIPE.md` | each part of the mod in words: sizes, colors, behavior |
 | `herdr-app/docs/protocol.md` | the contract between the mod and the helper (JSON Lines) |
 | `herdr-app/install.sh`, `herdr-app/install-isolated.sh` | the install into a Herdr home, and into a test home |
-| `xplat/flockbook-modfeed` | the helper (Rust): reads the agents' session logs and talks to hc |
+| `xplat/herdr-contr-feed` | the helper (Rust): reads the agents' session logs and talks to hc |
 | `xplat/herdr-core` | the helper's hc client |
 | `xplat/fixtures` | the session logs and hub answers that the helper's tests read |
-| `xplat/flockbook-modfeed/web` | the phone page that the helper embeds (built output; do not edit) |
-| `web`, `scripts/web-build.mjs`, `scripts/sw-test.mjs` | the phone page's source, its build into `xplat/flockbook-modfeed/web`, and its service worker test |
+| `xplat/herdr-contr-feed/web` | the phone page that the helper embeds (built output; do not edit) |
+| `web`, `scripts/web-build.mjs`, `scripts/sw-test.mjs` | the phone page's source, its build into `xplat/herdr-contr-feed/web`, and its service worker test |
 | `docs/design`, `docs/research` | the notes on the phone page's protocol and on the question keys, that the helper's code names |
 
 Herdr's API for mods is in the Herdr app's home: `AGENTS.md`, `herdr.d.ts`
@@ -54,7 +54,7 @@ and `gpui-kit.d.ts`. Read them there. Do not copy them into this repository.
 ## Checks
 
 - Mod: `cd herdr-app && npm test`.
-- Helper: `cargo test --locked --manifest-path xplat/Cargo.toml -p flockbook-modfeed -p herdr-core`.
+- Helper: `cargo test --locked --manifest-path xplat/Cargo.toml -p herdr-contr-feed -p herdr-core`.
 - Both must pass, and the `CI` check on the PR, before you report done.
 
 ## Design rules (lessons from contr)

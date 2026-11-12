@@ -2,10 +2,10 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { fake, log, reset } from "./stub/herdr.mjs";
 import { fakeCx } from "./fake-cx.mjs";
-import { peekAtEdge, endPeek, peekClosed, toggleSidebar, sidebarShown, noteWindowHeight } from "../mods/flockbook/state.js";
+import { peekAtEdge, endPeek, peekClosed, toggleSidebar, sidebarShown, noteWindowHeight } from "../mods/herdr-contr/state.js";
 
 test("the pointer at the left edge floats the sidebar over the content; leaving closes it", () => {
-  reset(); fake.shared["flockbook.sidebar"] = false;
+  reset(); fake.shared["herdr-contr.sidebar"] = false;
   peekAtEdge({ position: { x: 40, y: 100 } });
   assert.equal(log.overlays.length, 0, "not at the edge");
   peekAtEdge({ position: { x: 2, y: 100 } });
@@ -23,7 +23,7 @@ test("the pointer at the left edge floats the sidebar over the content; leaving 
 });
 
 test("a panel closed by Esc or a click beside it can open again", () => {
-  reset(); fake.shared["flockbook.sidebar"] = false;
+  reset(); fake.shared["herdr-contr.sidebar"] = false;
   peekAtEdge({ position: { x: 0, y: 5 } });
   peekClosed("o1");   // the panel's close(): Herdr closed it
   peekAtEdge({ position: { x: 0, y: 5 } });
@@ -31,10 +31,10 @@ test("a panel closed by Esc or a click beside it can open again", () => {
 });
 
 test("with the sidebar kept open there is no panel; the button closes a panel", () => {
-  reset(); fake.shared["flockbook.sidebar"] = true;
+  reset(); fake.shared["herdr-contr.sidebar"] = true;
   peekAtEdge({ position: { x: 0, y: 5 } });
   assert.equal(log.overlays.length, 0);
-  fake.shared["flockbook.sidebar"] = false;
+  fake.shared["herdr-contr.sidebar"] = false;
   peekAtEdge({ position: { x: 0, y: 5 } });
   toggleSidebar();
   assert.deepEqual(log.closed, ["o1"]);
@@ -42,9 +42,9 @@ test("with the sidebar kept open there is no panel; the button closes a panel", 
 });
 
 test("the panel's side view closes itself when the pointer leaves it", async () => {
-  reset(); fake.shared["flockbook.sidebar"] = false;
+  reset(); fake.shared["herdr-contr.sidebar"] = false;
   fake.props = { view: "side", peek: true, overlay: "o9" };
-  const { SideView } = await import("../mods/flockbook/side.js");
+  const { SideView } = await import("../mods/herdr-contr/side.js");
   const v = new SideView(fakeCx());
   const el = v.render(fakeCx());
   assert.ok(el._h.on_hover, "watches the pointer");
@@ -54,16 +54,16 @@ test("the panel's side view closes itself when the pointer leaves it", async () 
 });
 
 test("the panel is as tall as the window, less a gap above and below", () => {
-  reset(); fake.shared["flockbook.sidebar"] = false;
+  reset(); fake.shared["herdr-contr.sidebar"] = false;
   noteWindowHeight({ width: 900, height: 820 });
   peekAtEdge({ position: { x: 0, y: 5 } });
   assert.equal(log.overlays.at(-1).height, 820 - 16);
 });
 
 test("the panel slides in: first drawn left of its spot, then moved to it with a spring", async () => {
-  reset(); fake.shared["flockbook.sidebar"] = false;
+  reset(); fake.shared["herdr-contr.sidebar"] = false;
   fake.props = { view: "side", peek: true, overlay: "o9" };
-  const { SideView } = await import("../mods/flockbook/side.js");
+  const { SideView } = await import("../mods/herdr-contr/side.js");
   const cx = fakeCx(); const v = new SideView(cx);
   const first = v.render(cx);
   assert.ok(first._a.left < 0, "starts out of view");
@@ -75,11 +75,11 @@ test("the panel slides in: first drawn left of its spot, then moved to it with a
 });
 
 test("the sidebar button is on the same spot in the panel as in the docked sidebar", async () => {
-  const { SideView } = await import("../mods/flockbook/side.js");
+  const { SideView } = await import("../mods/herdr-contr/side.js");
   const { byId } = await import("./stub/ui.mjs");
-  const { BAR_H, lightsRoom } = await import("../mods/flockbook/top.js");
+  const { BAR_H, lightsRoom } = await import("../mods/herdr-contr/top.js");
   const spot = (peek) => {
-    reset(); fake.shared["flockbook.sidebar"] = !peek;
+    reset(); fake.shared["herdr-contr.sidebar"] = !peek;
     fake.props = peek ? { view: "side", peek: true, overlay: "o9" } : { view: "side" };
     const el = new SideView(fakeCx()).render(fakeCx());
     const header = el.kids.find((k) => byId(k, "side-toggle"));
@@ -94,9 +94,9 @@ test("the sidebar button is on the same spot in the panel as in the docked sideb
 });
 
 test("a right-click in the panel opens the menu at the press, not at Herdr's last pointer", async () => {
-  const { SideView } = await import("../mods/flockbook/side.js");
+  const { SideView } = await import("../mods/herdr-contr/side.js");
   const { byId } = await import("./stub/ui.mjs");
-  reset(); fake.shared["flockbook.sidebar"] = false;
+  reset(); fake.shared["herdr-contr.sidebar"] = false;
   fake.spaces = [{ id: "s1", name: "one", tabs: [] }];
   fake.props = { view: "side", peek: true, overlay: "o9" };
   const el = new SideView(fakeCx()).render(fakeCx());

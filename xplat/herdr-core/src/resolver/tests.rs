@@ -477,7 +477,7 @@ fn omp_temp_root_from_env() {
         assert_eq!(omp_tmp("omp TMPDIR=/a TMP=/b TEMP=/c"), "/a", "TMPDIR first");
         assert_eq!(omp_tmp("omp TMP=/b TEMP=/c"), "/b", "then TMP");
         assert_eq!(omp_tmp("omp TEMP=/c HOME=/h"), "/c", "then TEMP");
-        assert_eq!(omp_tmp("omp HOME=/h"), "/tmp", "else /tmp, not Flockbook's own temp folder");
+        assert_eq!(omp_tmp("omp HOME=/h"), "/tmp", "else /tmp, not herdr-contr's own temp folder");
         assert_eq!(omp_tmp("omp TMPDIR=/a/"), "/a", "no trailing '/'");
     }
     #[cfg(windows)]
@@ -488,7 +488,7 @@ fn omp_temp_root_from_env() {
     }
 }
 
-/// `env -u TMPDIR omp` in a folder under /tmp: omp names it -tmp-<name>, whatever Flockbook's TMPDIR is.
+/// `env -u TMPDIR omp` in a folder under /tmp: omp names it -tmp-<name>, whatever herdr-contr's TMPDIR is.
 #[cfg(unix)] // /tmp is omp's last temp root only on Unix
 #[test]
 fn omp_without_tmpdir_uses_tmp() {

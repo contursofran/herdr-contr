@@ -1,16 +1,16 @@
-// The Phone page section of the Flockbook settings: the helper's `phone status|on|off` (docs/protocol.md, phone).
+// The Phone page section of the herdr-contr settings: the helper's `phone status|on|off` (docs/protocol.md, phone).
 import { test, beforeEach } from "node:test";
 import assert from "node:assert/strict";
 import { fake, log, reset } from "./stub/herdr.mjs";
 import { textOf, byId } from "./stub/ui.mjs";
 import { fakeCx } from "./fake-cx.mjs";
 import { agent, space } from "./fixtures.mjs";
-import { loadConfig } from "../mods/flockbook/config.js";
-import { SettingsView } from "../mods/flockbook/settings.js";
-import { pollPhone, phoneOn } from "../mods/flockbook/phone.js";
+import { loadConfig } from "../mods/herdr-contr/config.js";
+import { SettingsView } from "../mods/herdr-contr/settings.js";
+import { pollPhone, phoneOn } from "../mods/herdr-contr/phone.js";
 
 const HOME = "/home/test/.config/herdr-app";
-const CONFIG = `${HOME}/flockbook/config.json`;
+const CONFIG = `${HOME}/herdr-contr/config.json`;
 const jl = (...lines) => ({ code: 0, stdout: lines.map((l) => JSON.stringify(l)).join("\n") + "\n", stderr: "" });
 const header = (cmd) => ({ type: "header", protocol: 1, sidecar: "0.1.0", cmd });
 const end = (ok = true) => ({ type: "end", ok });
@@ -23,9 +23,9 @@ const line = () => ({
   user: JSON.parse(file ?? "{}").phone_user || ts?.login || null,
   port: 8787, read_only: JSON.parse(file ?? "{}").phone_read_only === true,
   serve: { set: Boolean(url), url, command: reason ? "tailscale serve --bg --https=8443 8787" : "tailscale serve --bg 8787", reason: reason ?? null },
-  qr: url ? (qrAt ?? `${HOME}/flockbook/phone-qr-1a2b3c4d.svg`) : null,
-  service: { kind: "systemd", state, file: "/home/test/.config/systemd/user/flockbook-serve.service",
-    message: state === "error" ? "It failed. Its log: journalctl --user -u flockbook-serve" : state === "by-hand" ? "Set up by hand (see SERVE.md)." : null },
+  qr: url ? (qrAt ?? `${HOME}/herdr-contr/phone-qr-1a2b3c4d.svg`) : null,
+  service: { kind: "systemd", state, file: "/home/test/.config/systemd/user/herdr-contr-serve.service",
+    message: state === "error" ? "It failed. Its log: journalctl --user -u herdr-contr-serve" : state === "by-hand" ? "Set up by hand (see SERVE.md)." : null },
 });
 const phoneCalls = () => log.exec.filter(([, a]) => a[0] === "phone").map(([, a]) => a.slice(0, a.indexOf("--home")).join(" "));
 
@@ -157,11 +157,11 @@ test("once Serve is set: the address to open, Copy, and a QR code", async () => 
   byId(s, "phone-url-copy")._h.on_click({}, cx);
   assert.equal(cx.copied, "https://box.tail1.ts.net/");
   // svg() reads a path under the app root (the app home), not an absolute one.
-  assert.equal(byId(s, "phone-qr").kids[0]._a.path, "flockbook/phone-qr-1a2b3c4d.svg");
+  assert.equal(byId(s, "phone-qr").kids[0]._a.path, "herdr-contr/phone-qr-1a2b3c4d.svg");
 });
 
 test("a QR file outside the app home is not drawn (svg() could not find it)", async () => {
-  state = "running"; url = "https://box.tail1.ts.net/"; qrAt = "/elsewhere/flockbook/phone-qr-1a2b3c4d.svg";
+  state = "running"; url = "https://box.tail1.ts.net/"; qrAt = "/elsewhere/herdr-contr/phone-qr-1a2b3c4d.svg";
   const { el } = await screen();
   const s = byId(el(), "set-phone");
   assert.equal(textOf(byId(s, "phone-url")), "https://box.tail1.ts.net/", "the address still shows");
@@ -182,7 +182,7 @@ test("Off stops it; an error says what failed and where to look", async () => {
   assert.match(textOf(byId(el(), "phone-state")), /no bus/);
   state = "error";
   await pollPhone();
-  assert.match(textOf(byId(el(), "phone-state")), /journalctl --user -u flockbook-serve/);
+  assert.match(textOf(byId(el(), "phone-state")), /journalctl --user -u herdr-contr-serve/);
 });
 
 test("set up by hand: the choices do nothing and the section says it leaves it alone", async () => {
@@ -276,7 +276,7 @@ test("guide, no Tailscale: step 1 says why, links Get Tailscale and the full gui
   let opened = null;
   byId(one, "phone-get-tailscale")._h.on_click({}, { ...fakeCx(), open_url: (u) => { opened = u; } });
   assert.equal(opened, "https://tailscale.com/download");
-  assert.equal(textOf(byId(one, "phone-guide")), "https://github.com/minchenlee/flockbook/blob/main/xplat/flockbook-modfeed/SERVE.md");
+  assert.equal(textOf(byId(one, "phone-guide")), "https://github.com/minchenlee/flockbook/blob/main/xplat/herdr-contr-feed/SERVE.md");
   assert.ok(byId(one, "phone-guide-copy"));
   assert.doesNotMatch(textOf(s), /Guide: SERVE\.md/, "not a bare file name");
   assert.equal(byId(s, "phone-login-row"), null);
@@ -313,7 +313,7 @@ test("guide, stopped with an error: the red line is at the top; step 2 is the st
   const { el } = await screen();
   const s = byId(el(), "set-phone");
   const st = byId(s, "phone-state");
-  assert.match(textOf(st), /journalctl --user -u flockbook-serve/);
+  assert.match(textOf(st), /journalctl --user -u herdr-contr-serve/);
   assert.equal(st.kids[0]._a.bg, "#blocked", "a red dot");
   const [top, setUp] = order(s, /journalctl/, /SET UP/);
   assert.ok(top < setUp, "above the steps");
