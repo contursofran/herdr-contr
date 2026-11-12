@@ -157,7 +157,7 @@ fn claude_screen_and_log() {
         r#"{"type":"user","message":{"content":"queue-operation"}}"#,
     ];
     assert_eq!(queue::log_of(ops).items, vec![Some("QC".to_string()), None]);
-    let fixture = include_str!("../../../Tests/HerdrKitTests/Fixtures/queued.jsonl");
+    let fixture = include_str!("../../fixtures/queued.jsonl");
     assert!(queue::log_of(fixture.lines()).items.is_empty(), "the fixture's queue ends empty");
     assert_eq!(queue::log_of(fixture.lines().take(3)).items, vec![Some("Also check the lint step.".to_string())], "the open queue");
 

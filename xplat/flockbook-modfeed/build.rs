@@ -47,39 +47,21 @@ fn main() {
     src.push_str(&format!("/// herdr-app/keys.json.\npub static KEYS: &[u8] = include_bytes!({:?});\n", keys.display().to_string()));
     let out = PathBuf::from(std::env::var("OUT_DIR").unwrap());
     let known = known_files(&out);
-    src.push_str(&format!("/// The files of every earlier Flockbook (scripts/known-files.mjs): `<sha256>  <version>  <path>` lines.\npub static KNOWN: &[u8] = include_bytes!({:?});\n", known.display().to_string()));
+    src.push_str(&format!("/// The files of earlier versions (FLOCKBOOK_KNOWN_FILES, else empty): `<sha256>  <version>  <path>` lines.\npub static KNOWN: &[u8] = include_bytes!({:?});\n", known.display().to_string()));
     fs::write(out.join("embedded.rs"), src).unwrap();
 }
 
-/// The known-files table: FLOCKBOOK_KNOWN_FILES when set (a file made by the script), else the script run here
-/// on this checkout's git history. Without node or the history, an empty table (a warning), unless
-/// FLOCKBOOK_REQUIRE_KNOWN_FILES=1 (the release's helpers): then the build fails.
+/// The known-files table: FLOCKBOOK_KNOWN_FILES when set (a file of `<sha256>  <version>  <path>` lines), else
+/// an empty table. This repository has no older releases, so by default no file in a home is an older one of ours.
 fn known_files(out: &Path) -> PathBuf {
     println!("cargo:rerun-if-env-changed=FLOCKBOOK_KNOWN_FILES");
-    println!("cargo:rerun-if-env-changed=FLOCKBOOK_REQUIRE_KNOWN_FILES");
     if let Ok(p) = std::env::var("FLOCKBOOK_KNOWN_FILES") {
         let p = PathBuf::from(p);
         println!("cargo:rerun-if-changed={}", p.display());
         assert!(p.is_file(), "FLOCKBOOK_KNOWN_FILES={} is not a file", p.display());
         return p;
     }
-    let script = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../scripts/known-files.mjs");
-    println!("cargo:rerun-if-changed={}", script.display());
     let dest = out.join("known-files.txt");
-    let made = std::process::Command::new("node").arg(&script).arg("--out").arg(&dest).output();
-    match made {
-        Ok(o) if o.status.success() => dest,
-        other => {
-            let why = match other {
-                Ok(o) => String::from_utf8_lossy(&o.stderr).trim().to_string(),
-                Err(e) => format!("cannot run node: {e}"),
-            };
-            if std::env::var("FLOCKBOOK_REQUIRE_KNOWN_FILES").as_deref() == Ok("1") {
-                panic!("the known-files table: {why}");
-            }
-            println!("cargo:warning=no known-files table ({why}); this helper treats every older Flockbook file as the person's");
-            fs::write(&dest, "").unwrap();
-            dest
-        }
-    }
+    fs::write(&dest, "").unwrap();
+    dest
 }

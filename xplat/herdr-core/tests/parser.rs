@@ -16,7 +16,7 @@ macro_rules! check {
 }
 
 fn fixture(name: &str) -> Vec<String> {
-    let path = format!("{}/../../Tests/HerdrKitTests/Fixtures/{name}", env!("CARGO_MANIFEST_DIR"));
+    let path = format!("{}/../fixtures/{name}", env!("CARGO_MANIFEST_DIR"));
     let text = std::fs::read_to_string(&path).unwrap_or_else(|e| panic!("{path}: {e}"));
     text.split('\n').filter(|l| !l.is_empty()).map(str::to_string).collect()
 }

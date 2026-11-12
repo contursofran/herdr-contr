@@ -1,3 +1,0 @@
-# Only the full-app shots are kept; tests regenerate the rest.
-*.png
-!app-*.png

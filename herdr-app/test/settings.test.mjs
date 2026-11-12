@@ -259,67 +259,19 @@ test("a screen saved as the old settings screen shows the chat", () => {
   assert.equal(shownScreen(), "chat");
 });
 
-test("update line: a newer release shows one line in the sidebar, Copy puts the one-line install on the clipboard", async () => {
+test("update check off: a newer Flockbook is never asked for or offered, even with Check for updates on", async () => {
+  file = JSON.stringify({ check_updates: true });
   await loadConfig();
-  await pollUpdate();
-  assert.equal(updateShown()?.latest, "0.9.0");
-  const el = new SideView(fakeCx()).render(fakeCx());
-  const line = byId(el, "update-line");
-  assert.match(textOf(line), /Flockbook 0\.9\.0 is out/);
-  assert.match(textOf(byId(line, "update-copy")), /^Copy install command$/);
-  assert.match(textOf(byId(line, "update-dismiss")), /^Not now$/);
-  let copied = null;
-  const cx = { ...fakeCx(), write_to_clipboard: (s) => { copied = s; } };
-  byId(line, "update-copy")._h.on_click({}, cx);
-  assert.equal(copied, ONE_LINE);
-  // The settings dialog shows the command itself too.
+  assert.equal(await pollUpdate(), null);
+  assert.equal(log.exec.filter(([, a]) => a[0] === "update-check").length, 0, "the helper is not asked");
+  // A line left from an older run is not shown either.
+  fake.shared["flockbook.update"] = update("newer");
+  assert.equal(updateShown(), null);
+  fake.shared["flockbook.sidebar"] = false;
+  assert.equal(byId(byId(new TopView(fakeCx()).render(fakeCx()), "sidebar"), "update-dot"), null);
+  assert.equal(byId(new SideView(fakeCx()).render(fakeCx()), "update-line"), null);
   const sv = new SettingsView(fakeCx()); sv.section = "updates";
-  assert.match(textOf(sv.render(fakeCx())), /install\.sh \| sh/);
-});
-
-test("update line: Not now hides it for that version (the helper remembers)", async () => {
-  await loadConfig(); await pollUpdate();
-  const el = new SideView(fakeCx()).render(fakeCx());
-  byId(el, "update-dismiss")._h.on_click({}, fakeCx());
-  await new Promise((r) => setTimeout(r, 5));
-  assert.ok(log.exec.some(([, a]) => a[0] === "update-check" && a.includes("--dismiss") && a.includes("0.9.0")));
-  assert.equal(updateShown(), null);
-  assert.equal(byId(new SideView(fakeCx()).render(fakeCx()), "update-line"), null);
-});
-
-test("update line: nothing for current, offline or an old helper; off asks nothing at all", async () => {
-  for (const a of [update("current", "0.8.0"), update("error", null), update("unknown", null)]) {
-    reset(); fake.readText = () => null; fake.exec = () => jl(header("update-check"), a, end());
-    await loadConfig(); await pollUpdate();
-    assert.equal(updateShown(), null, a.state);
-    assert.equal(byId(new SideView(fakeCx()).render(fakeCx()), "update-line"), null, a.state);
-  }
-  // A helper that has no update-check (usage error): nothing either.
-  reset(); fake.readText = () => null; fake.exec = () => jl(header("x"), { type: "error", code: "usage", message: "commands: …" }, end(false));
-  await loadConfig(); await pollUpdate();
-  assert.equal(updateShown(), null);
-  // Off: no call to the helper.
-  reset(); fake.readText = () => JSON.stringify({ check_updates: false }); fake.exec = () => jl(header("update-check"), update("newer"), end());
-  await loadConfig(); await pollUpdate();
-  assert.equal(log.exec.length, 0);
-  assert.equal(updateShown(), null);
-});
-
-test("update line: turning updates off hides the line at once", async () => {
-  await loadConfig(); await pollUpdate();
-  assert.ok(updateShown());
-  await setSetting("check_updates", false);
-  assert.equal(updateShown(), null);
-  assert.equal(byId(new SideView(fakeCx()).render(fakeCx()), "update-line"), null);
-});
-
-test("update-check is asked at most once an hour by the mod (the helper keeps it to once a day)", async () => {
-  await loadConfig();
-  await pollUpdate(1_000_000);
-  await pollUpdate(1_000_000 + 60_000);
-  assert.equal(log.exec.filter(([, a]) => a[0] === "update-check").length, 1);
-  await pollUpdate(1_000_000 + 3_600_000);
-  assert.equal(log.exec.filter(([, a]) => a[0] === "update-check").length, 2);
+  assert.doesNotMatch(textOf(sv.render(fakeCx())), /install\.sh/);
 });
 
 test("status row: Show by default, Hide leaves out the chips above the reply box", async () => {
@@ -376,30 +328,6 @@ test("helper on other machines, Never: the tab menu has no Remove helper", async
   act(hint);
   assert.equal(log.overlays.at(-1)?.props?.view, "settings", "the settings dialog");
   assertDialog(log.overlays.at(-1));
-});
-
-test("sidebar hidden: a small dot on the top bar's sidebar button, until the sidebar opens or Not now", async () => {
-  const dot = () => byId(byId(new TopView(fakeCx()).render(fakeCx()), "sidebar"), "update-dot");
-  await loadConfig();
-  fake.shared["flockbook.sidebar"] = false;
-  assert.equal(dot(), null, "nothing out yet");
-  await pollUpdate();
-  assert.ok(dot(), "a newer release, sidebar hidden");
-  toggleSidebar(); toggleSidebar();   // opened, then hidden again: seen
-  assert.equal(dot(), null);
-  // A newer one again: the dot is back; the floating sidebar counts as opening it too.
-  fake.shared["flockbook.update"] = update("newer", "0.10.0");
-  assert.ok(dot());
-  peekAtEdge({ position: { x: 1, y: 300 } });
-  assert.equal(dot(), null);
-  // Not now hides it as well.
-  fake.shared["flockbook.update"] = update("newer", "0.11.0");
-  fake.shared["flockbook.sidebar.peek"] = null;
-  assert.ok(dot());
-  const el = new SideView(fakeCx()).render(fakeCx());
-  byId(el, "update-dismiss")._h.on_click({}, fakeCx());
-  await new Promise((r) => setTimeout(r, 5));
-  assert.equal(dot(), null);
 });
 
 test("the words: Status row names cost; Never says how to remove a helper", () => {

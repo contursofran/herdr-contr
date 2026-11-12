@@ -74,9 +74,13 @@ export async function setSetting(key, value) {
 }
 
 const HOUR = 60 * 60 * 1000;
+// The update check is off in this repository: it would offer a newer Flockbook and its install command,
+// which is not this mod. pollUpdate asks the helper nothing, and no update line shows.
+export const UPDATES_ON = false;
 // Asks the helper whether a newer Flockbook is out, at most once an hour (it asks GitHub at most once a
 // day and keeps the answer). Off: the helper is not even asked.
 export async function pollUpdate(now = Date.now()) {
+  if (!UPDATES_ON) { if (shared(KEY_UPDATE)) setShared(KEY_UPDATE, null); return null; }
   const at = shared(KEY_UPDATE_AT);
   if (at != null && now - at < HOUR) return shared(KEY_UPDATE) ?? null;
   setShared(KEY_UPDATE_AT, now);
@@ -90,6 +94,7 @@ export async function pollUpdate(now = Date.now()) {
 // The update line to show, or null: only for a newer release that was not dismissed, and only while on.
 export function updateShown() {
   const u = shared(KEY_UPDATE);
+  if (!UPDATES_ON) return null;
   return u?.state === "newer" && u.latest && setting("check_updates") ? u : null;
 }
 

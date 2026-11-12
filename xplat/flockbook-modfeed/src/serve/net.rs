@@ -13,7 +13,7 @@ use std::time::{Duration, Instant};
 use tungstenite::protocol::{Role, WebSocketConfig};
 use tungstenite::{Message, WebSocket};
 
-/// The page, built from web/ by scripts/web-build.mjs (the Mac app bundles the same files).
+/// The page, built from web/ by scripts/web-build.mjs.
 #[derive(RustEmbed)]
 #[folder = "web/"]
 struct Web;

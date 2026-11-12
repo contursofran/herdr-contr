@@ -142,7 +142,7 @@ type Keys = IndexMap<String, IndexMap<String, Value>>;
 /// The known-files table: path in the home -> (sha256 -> the Flockbook version that had it).
 pub type Known = BTreeMap<String, BTreeMap<String, String>>;
 
-/// Reads `<sha256>  <version>  <path>` lines (scripts/known-files.mjs); `#` lines and bad lines are skipped.
+/// Reads `<sha256>  <version>  <path>` lines (FLOCKBOOK_KNOWN_FILES at build time); `#` lines and bad lines are skipped.
 pub fn known_files(text: &[u8]) -> Known {
     let mut k = Known::new();
     for line in String::from_utf8_lossy(text).lines() {
