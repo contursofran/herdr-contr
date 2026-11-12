@@ -82,14 +82,18 @@ and `gpui-kit.d.ts`. Read them there. Do not copy them into this repository.
 
 ## Safety
 
-- The owner's Herdr app and hc core are live. Never write to the owner's
-  Herdr home (`~/.config/herdr-app`). Never send input to the owner's Herdr
-  app. Never stop, restart or send input to the owner's hc core.
+- The owner's Herdr app and hc core are live. Do not edit files in the
+  owner's Herdr home (`~/.config/herdr-app`) by hand. Never send input to the
+  owner's Herdr app. Never stop, restart or send input to the owner's hc core.
 - Try the mod only in a test home: `herdr-app/install-isolated.sh <folder>`
   and `HERDR_APP_HOME=<folder>`, with a scratch `HC_SESSION` and scratch XDG
   folders. If you cannot be sure that a run uses the scratch core, do not
   start it. Report that instead.
-- Only the owner installs into the real Herdr home.
+- An agent can install merged `main` into the real Herdr home with the
+  helper's `install` (owner, 2026-11-12): build the helper, run `install
+  --dry-run` first, then `install --helper`. After it, `herdr-app do
+  layout.switch` and `herdr-app shot` are allowed, to look at the result.
+  Do not install a branch that is not merged.
 - Tests use fakes and fixtures. No test reads the owner's session logs
   (`~/.claude`, `~/.codex` and the others), and no test starts the real
   `claude` program.
