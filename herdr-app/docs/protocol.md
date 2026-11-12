@@ -50,6 +50,7 @@ does not download; `install-isolated.sh` copies the sidecar in.
 | `answer` | `--terminal <addr> --request <id> --answers <json>` `[--cache <file>]` | `done` |
 | `send` | `--terminal <addr> --text <s>` `[--file <path>]…` `[--expect-kind <agent>]` `[--expect-path <log>]` `[--cache <file>]` | `done` (`changed` when the terminal now runs another agent or conversation than the expected one; nothing is sent. Its message says "new conversation" when the same agent process wrote the expected log, e.g. after `/clear`. With `--cache` the log is looked up again and written to the cache, so the next `feed` reads it) |
 | `queue` | `--terminal <addr>` `[--cache <file>]` (Rust sidecar only; `serve` and other machines) | `queued` |
+| `working` | `--terminal <addr>` `[--cache <file>]` (Rust sidecar only; read only) | `working` |
 | `commands` | `--terminal <addr>` `[--cache <file>]` (Rust sidecar only) | `commands` |
 | `helper install` | `--machine <m> --sha256 <hex> [--cache <file>]` | `installed` |
 | `helper remove` | `--machine <m> [--cache <file>]` | `removed` |
@@ -160,7 +161,7 @@ Targets: `x86_64-unknown-linux-musl`, `aarch64-unknown-linux-musl`, `universal-a
 ### `version`
 
 ```json
-{"commands":["version","feed","status","card","approve","answer","send","paste-image","helper","queue","phone","commands"],"release":"0.9.0","type":"version"}
+{"commands":["version","feed","status","card","approve","answer","send","paste-image","helper","queue","phone","commands","working"],"release":"0.9.0","type":"version"}
 ```
 
 `commands`: the commands this sidecar has. The mod hides actions whose command is missing.
@@ -357,6 +358,16 @@ while a Claude Code, Codex or Grok Build agent works. No queue: `agent` is `""` 
 - `items`: oldest first; `null` is a queued message whose text neither the log nor the screen shows.
 - `pullable`: the agent's input box is empty, so the queue can be pulled back now.
 - `pullsAll`: Claude Code (Up takes back every queued message as one text).
+
+### `working` (`working`)
+
+```json
+{"type":"working","text":"Improvising…","detail":"1m 16s · ↓ 6.0k tokens · thought for 1s"}
+```
+
+- The agent's working line on its screen, while the agent works (Claude Code only). Key hints such as
+  "esc to interrupt" are left out of `detail`; `detail` can be empty.
+- None on screen, the agent is not working, or another agent kind: `text` and `detail` are `null`.
 
 ### `commands` (`commands`)
 

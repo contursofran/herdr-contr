@@ -25,6 +25,8 @@ import { startTop, overBar, barH, herdrTabBar } from "./top.js";
 import { HelperUI, isRemoteProblem } from "./helpercard.js";
 
 export const POLL_MS = 2000;
+// How often the working line is read while the shown agent works.
+const WORK_MS = 1000;
 const CHECK_MS = 400;
 // A sent message waits dimmed until the agent's log has it.
 const ECHO_OPACITY = 0.55;
@@ -79,7 +81,7 @@ export class ChatView {
     this.open = new Set();       // tool rows that show their calls
     this.heights = new WeakMap(); // row → { w, open, k, zoom, h }
     this.busy = false;
-    this.lastPoll = 0;
+    this.lastPoll = 0; this.lastWork = 0; this.work = null;
     this.composer = new Composer(cx);
     this.composer.seen = (address) => { const f = this.feeds.get(address); return f ? { agent: f.agent ?? null, path: f.path ?? null } : null; };
     this.top = {}; startTop(cx, this.top);
@@ -130,7 +132,34 @@ export class ChatView {
     if (this.wantOlder) { this.wantOlder = false; cx.spawn((cx) => this.loadOlder(cx)); }
     const f = this.feed();
     if (f && settleEchoes(f)) cx.notify();
+    if (agent?.status === "working") { if (Date.now() - this.lastWork >= WORK_MS) cx.spawn((cx) => this.pollWorking(cx, agent.address)); }
+    else if (this.work) { this.work = null; cx.notify(); }
     if (Date.now() - this.lastPoll >= (f?.echoes?.length ? CHECK_MS : POLL_MS)) return this.poll(cx);
+  }
+
+  // The rows drawn: the feed's, the sent messages that wait, then the agent's working line.
+  rowsOf(f) {
+    const rows = shownRows(f);
+    return this.work && this.work.address === f.address ? rows.concat(this.work) : rows;
+  }
+
+  // The agent's working line ("Improvising… · 1m 16s · ↓ 6.0k tokens"), read from its screen while it works.
+  // An older helper without the command: no line.
+  async pollWorking(cx, address) {
+    if (this.workBusy) return;
+    this.workBusy = true; this.lastWork = Date.now();
+    try {
+      if (!(await sidecar.hasCommand("working"))) return;
+      const r = await sidecar.working(address);
+      const l = r.error ? null : r.lines.find((x) => x.type === "working");
+      const was = this.work;
+      if (address !== this.address || currentAgent()?.status !== "working") return;
+      if (!l?.text) { if (was) { this.work = null; cx.notify(); } return; }
+      if (was && was.address === address && was.text === l.text && was.detail === (l.detail ?? "")) return;
+      this.work = { id: "working", k: "working", address, text: l.text, detail: l.detail ?? "" };
+      if (!was && this.follow) this.toNewest();
+      cx.notify();
+    } finally { this.workBusy = false; }
   }
 
   // The first row is on screen and the log goes back further: read the 2 MB before and put it on
@@ -174,7 +203,7 @@ export class ChatView {
   }
 
   toNewest() {
-    const f = this.feed(), n = f ? shownRows(f).length : 0;
+    const f = this.feed(), n = f ? this.rowsOf(f).length : 0;
     if (n) this.scroll.scroll_to_item(n - 1, "top");
   }
 
@@ -206,6 +235,11 @@ export class ChatView {
         return h_flex().w_full().h(SEP_H).items_center().justify_center().text_size(11.5).text_color(t.dim).child(row.text || "");
       case "footer":
         return div().w_full().h(FOOTER_H).pt(2).text_size(11.5).text_color(t.dim).child(row.text || "");
+      case "working":
+        return h_flex().w_full().h(STATUS_H).gap(8).items_center().text_size(12.5)
+          .child(svg(icon("spinner")).size(12).flex_none().text_color(t.working).spin(SPIN_MS))
+          .child(div().flex_none().text_color(t.foreground).child(row.text))
+          .when(Boolean(row.detail), (el) => el.child(div().min_w(0).truncate().text_color(t.muted).child(`(${row.detail})`)));
       case "status":
         return h_flex().w_full().h(STATUS_H).items_center().justify_center().text_size(12).text_color(t.muted).child(row.text || "");
       case "perm": {
@@ -321,7 +355,7 @@ export class ChatView {
   }
 
   list(t, f) {
-    const rows = shownRows(f), n = rows.length;
+    const rows = this.rowsOf(f), n = rows.length;
     // The first row starts below the bar; the rest scroll up under it.
     const sizes = rows.map((r, i) => this.height(r) + (i === 0 ? barH() : 0));
     const box = v_flex().relative().flex_1().min_h(0)
