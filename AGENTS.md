@@ -115,8 +115,9 @@ and `gpui-kit.d.ts`. Read them there. Do not copy them into this repository.
   `agent/<issue>-<slug>`, one PR into `main`, ideally under about 400
   changed lines. A PR that only deletes can be larger.
 - Update a branch by merging `main` into it. Never force-push.
-- Squash merge. The coordinator merges after CI passes on the exact head. A
-  builder does not merge its own PR.
+- Squash merge. The coordinator merges after CI passes on the exact head,
+  without the owner's approval (owner, 2026-11-12). A builder does not merge
+  its own PR.
 - Docs, comments and commit messages: concise ASD-STE100 Simplified
   Technical English. No `Co-Authored-By`, AI attribution or generated-by
   lines.
