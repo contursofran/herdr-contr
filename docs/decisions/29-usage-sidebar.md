@@ -14,7 +14,12 @@ one compact row per plan with data, Claude first.
   - Codex: `codex app-server` (`account/rateLimits/read`, 10 s limit), else the newest Codex
     rollout file.
 - The mod reads it when the sidebar opens and every 5 minutes, with `cx.spawn` (off the UI
-  thread). The docked and the floating sidebar share one read.
+  thread). All the views share one read. The chat, Needs you and Overview screens start the
+  reads too, so the hidden block can show.
+- The herdr-contr layout (Herdr's sidebar) gets a `usage` block of the mod between Herdr's
+  sidebar lists and its footer (56 px, view `usage`), with the same rows. It starts hidden and
+  shows while a plan has data (`layout.show` and `layout.hide`, as the view switch does). The
+  owner uses this layout.
 - A plan with no data has no row. An error or an older helper keeps what is shown.
 
 ## Why
@@ -26,6 +31,4 @@ meter for the most used one.
 
 ## Not done
 
-- Herdr's own sidebar (layout `herdr-contr`) is drawn by Herdr, so the rows show only in the
-  mod's own sidebar (layout `herdr-contr-own`).
 - The helper does not write Claude's status line. It reads what contr writes.

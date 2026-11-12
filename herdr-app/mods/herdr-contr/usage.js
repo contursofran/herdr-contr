@@ -1,18 +1,38 @@
 // The plan usage rows at the foot of the sidebar: one per plan (Claude, Codex) with data. The helper's `usage`
-// command reads them (docs/protocol.md); the mod asks it every USAGE_MS, off the UI thread, once for both copies
-// of the sidebar (docked and floating). A plan with no data has no row.
+// command reads them (docs/protocol.md); the mod asks it every USAGE_MS, off the UI thread, once for all the
+// views that show them. A plan with no data has no row.
+// Two places draw the rows: the mod's own sidebar (side.js), and the `usage` block of the herdr-contr layout,
+// between Herdr's sidebar lists and its footer. That block hides while no plan has data.
 import { div } from "gpui-kit";
-import { h_flex } from "gpui-base";
+import { h_flex, v_flex } from "gpui-base";
+import { theme, layout, run } from "herdr";
 import * as sidecar from "./sidecar.js";
+
+// The id of the block in layouts/herdr-contr.json.
+export const USAGE_BLOCK = "usage";
 
 export const USAGE_MS = 5 * 60_000;
 const NAMES = { claude: "Claude", codex: "Codex" };
 // The window kinds: Claude's five_hour and seven_day, Codex's primary (5 h) and secondary (week).
 const SHORT = { five_hour: "5h", primary: "5h", seven_day: "wk", secondary: "wk" };
 
-const state = { plans: [], at: 0, busy: false };
+const state = { plans: [], at: 0, busy: false, shown: null };
 // For tests.
-export const resetUsage = () => Object.assign(state, { plans: [], at: 0, busy: false });
+export const resetUsage = () => Object.assign(state, { plans: [], at: 0, busy: false, shown: null });
+
+function find(node, id) {
+  if (node?.id === id) return node;
+  for (const c of node?.children ?? []) { const f = find(c, id); if (f) return f; }
+  return null;
+}
+
+// The layout's usage block shows while a plan has data. It runs only on a change.
+function showBlock() {
+  const want = state.plans.length > 0;
+  if (want === state.shown || !find(layout(), USAGE_BLOCK)) return;
+  state.shown = want;
+  run(want ? "layout.show" : "layout.hide", { id: USAGE_BLOCK });
+}
 export const usagePlans = () => state.plans;
 
 // Reads the plans again when the last read is USAGE_MS old. An error or an older helper keeps what was shown.
@@ -25,6 +45,7 @@ export async function pollUsage(cx, now = Date.now()) {
     const l = r.error ? null : r.lines.find((x) => x.type === "usage");
     if (!l) return;
     state.plans = (l.plans ?? []).filter((p) => NAMES[p.plan] && p.windows?.length);
+    showBlock();
     cx?.notify?.();
   } finally { state.busy = false; }
 }
@@ -59,4 +80,18 @@ export function usageRows(t, nowSecs = Date.now() / 1000) {
       .child(div().flex_none().child(r.name))
       .child(div().flex_1().min_w(0).truncate().font_family("Menlo").text_size(10.5).text_color(t.dim).child(r.text));
   });
+}
+
+// Starts the reads: one now and one every USAGE_MS.
+export function startUsage(cx) {
+  cx?.spawn?.((cx2) => pollUsage(cx2));
+  cx?.timer?.every?.(USAGE_MS, (cx2) => cx2?.spawn?.((cx3) => pollUsage(cx3)));
+}
+
+// The `usage` block of the herdr-contr layout: the rows, under Herdr's sidebar lists.
+export class UsageView {
+  constructor(cx) { startUsage(cx); }
+  render(_cx) {
+    return v_flex().id("usage-block").size_full().px(4).pt(4).children(usageRows(theme()));
+  }
 }

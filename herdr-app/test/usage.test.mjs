@@ -5,7 +5,7 @@ import { textOf, byId } from "./stub/ui.mjs";
 import { fakeCx } from "./fake-cx.mjs";
 import { SideView } from "../mods/herdr-contr/side.js";
 import { forgetCommands } from "../mods/herdr-contr/sidecar.js";
-import { pollUsage, resetUsage, usagePlans, planRow, untilText, USAGE_MS } from "../mods/herdr-contr/usage.js";
+import { UsageView, pollUsage, resetUsage, usagePlans, planRow, untilText, USAGE_MS } from "../mods/herdr-contr/usage.js";
 
 const NOW = Math.floor(Date.now() / 1000);
 const answer = (...lines) => ({ code: 0, stdout: [{ type: "header", protocol: 1 }, ...lines, { type: "end", ok: true }].map((l) => JSON.stringify(l)).join("\n") });
@@ -77,4 +77,30 @@ test("row text: whole percents, the time to reset, a window past its reset is 0%
   assert.deepEqual(planRow(PLANS[1], NOW), { name: "Codex", used: 20, text: "5h 0% · wk 20%" });
   assert.equal(planRow(PLANS[0], NOW).used, 38);
   assert.deepEqual([untilText(30), untilText(45 * 60), untilText(5 * 3600), untilText(2 * 86400)], ["1m", "45m", "5h", "2d"]);
+});
+
+test("herdr-contr layout: the usage block shows when a plan has data, hides when none, and runs only on a change", async () => {
+  fake.layout = { id: "root", children: [{ id: "sidebar", children: [{ id: "usage" }] }] };
+  const blockRuns = () => log.run.filter(([c, a]) => c.startsWith("layout.") && a?.id === "usage").map(([c]) => c);
+  await pollUsage(null, 1);
+  await pollUsage(null, 1 + USAGE_MS);
+  assert.deepEqual(blockRuns(), ["layout.show"]);
+  plans = [];
+  await pollUsage(null, 1 + 2 * USAGE_MS);
+  assert.deepEqual(blockRuns(), ["layout.show", "layout.hide"]);
+});
+
+test("no usage block in the layout (herdr-contr-own): nothing to show or hide", async () => {
+  fake.layout = { id: "root", children: [] };
+  await pollUsage(null, 1);
+  assert.equal(log.run.length, 0);
+});
+
+test("the usage view (block view 'usage') starts the reads and draws the same rows", async () => {
+  const cx = fakeCx();
+  const v = new UsageView(cx);
+  await cx.settle();
+  const el = v.render(fakeCx());
+  assert.equal(textOf(byId(el, "side-usage-codex")), "Codex 5h 0% · wk 20%");
+  assert.ok(byId(el, "side-usage-claude"));
 });

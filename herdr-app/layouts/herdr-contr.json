@@ -59,6 +59,20 @@
           ]
         },
         {
+          "id": "usage",
+          "type": "block",
+          "size": {
+            "px": 56
+          },
+          "hidden": true,
+          "content": {
+            "mod": "herdr-contr",
+            "props": {
+              "view": "usage"
+            }
+          }
+        },
+        {
           "id": "sidebar-footer",
           "type": "block",
           "size": {

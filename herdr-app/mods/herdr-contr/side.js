@@ -7,7 +7,7 @@ import { openMenu, spaceItems } from "./menu.js";
 import { needing, showNeeds, showOverview, showSettings, shownScreen, icon, showSpace, toggleSidebar, peekClosed, PEEK_W, PEEK_GAP, SPRING } from "./state.js";
 import { statusMark, lightsRoom, BAR_H } from "./top.js";
 import { dragger, dropPlace } from "./drag.js";
-import { pollUsage, usageRows, USAGE_MS } from "./usage.js";
+import { startUsage, usageRows } from "./usage.js";
 
 // The workspace being dragged up or down (drag.js): one at a time, so the docked and the floating
 // sidebar draw from the same one.
@@ -36,8 +36,7 @@ export class SideView {
     this.slid = !this.floating;
     if (!this.slid) cx?.timer?.after?.(16, (cx2) => { this.slid = true; cx2?.notify?.(); });
     // The plan usage: read now and every USAGE_MS (usage.js shares one read between the two copies).
-    cx?.spawn?.((cx2) => pollUsage(cx2));
-    cx?.timer?.every?.(USAGE_MS, (cx2) => cx2?.spawn?.((cx3) => pollUsage(cx3)));
+    startUsage(cx);
   }
 
   // The panel goes when the pointer leaves it.
