@@ -7,6 +7,7 @@ import { agent, space } from "./fixtures.mjs";
 import { Composer, tagsFor, shortPath, quoted, withFiles, slashQuery, matchCommands, screenNote, argItems, matchArgs } from "../mods/herdr-contr/composer.js";
 import { ChatView } from "../mods/herdr-contr/chat.js";
 import { forgetCommands } from "../mods/herdr-contr/sidecar.js";
+import { KEY_CONFIG } from "../mods/herdr-contr/config.js";
 
 const jl = (...lines) => ({ code: 0, stdout: lines.map((l) => JSON.stringify(l)).join("\n") + "\n", stderr: "" });
 const header = (command) => ({ type: "header", protocol: 1, sidecar: "0.1.0", command });
@@ -325,7 +326,7 @@ const CMDS = [
   { name: "context", description: "Show how full the context is", source: "builtin" },
   { name: "deploy", description: "Deploy the app", source: "project" },
 ];
-const T = new Proxy({}, { get: (_t, k) => `#${k}` });
+const TH = new Proxy({}, { get: (_t, k) => `#${k}` });
 function slashRig({ hasCommands = true, list = CMDS, screens = [] } = {}) {
   const asked = [];
   forgetCommands();
@@ -340,7 +341,7 @@ function slashRig({ hasCommands = true, list = CMDS, screens = [] } = {}) {
   const c = new Composer(cx);
   const b = c.box(fake.agents[0]);
   const type = async (v) => { b.input.set_value(v); b.input._h.change({}, cx); await cx.settle(); };
-  const view = () => c.render(fake.agents[0], T);
+  const view = () => c.render(fake.agents[0], TH);
   const rows = () => { const l = byId(view(), "slash"); return l ? l.kids.map((k) => textOf(k)) : null; };
   const act = async (name) => { byId(view(), "slash-keys")._h[`on_action:${name}`](null, cx); await cx.settle(); };
   return { cx, c, b, type, view, rows, act, asked, bound };
@@ -416,7 +417,7 @@ test("a list for any agent the helper lists commands for; none when its list is 
   fake.agents[0] = agent("t1", "idle", { tab_name: "api", app: "codex", program: { key: "codex", name: "Codex" } });
   s.c.box(fake.agents[0]);
   await s.type("/");
-  assert.equal(byId(s.c.render(fake.agents[0], T), "slash").kids.length, 4, "a Codex chat shows what the helper lists");
+  assert.equal(byId(s.c.render(fake.agents[0], TH), "slash").kids.length, 4, "a Codex chat shows what the helper lists");
   assert.equal(s.asked.length, 1);
   const e = slashRig({ list: [] });
   await e.type("/");
@@ -568,4 +569,53 @@ test("the status tags row scrolls sideways with no scrollbar", async () => {
   await c.pollStatus(cx);
   const row = byId(c.render(fake.agents[0], new Proxy({}, { get: (_t, k) => `#${k}` })), "tags");
   assert.ok("overflow_x_scroll" in row._a && !("overflow_x_scrollbar" in row._a));
+});
+
+
+test("a Claude Code session that does not orchestrate shows Orchestrate, and a press puts /contr:orchestrate in the box", () => {
+  const cx = fakeCx(); const c = new Composer(cx);
+  const a = fake.agents[0];
+  const b = c.box(a);
+  const el = c.render(a, TH);
+  assert.equal(byId(el, "orchestrating"), null);
+  const btn = byId(el, "orchestrate");
+  assert.equal(textOf(btn), "Orchestrate");
+  btn._h.on_click({}, cx);
+  assert.equal(b.input.value(), "/contr:orchestrate ");
+});
+
+test("a session with the contr.orchestrating label shows Orchestrating with no count", () => {
+  const a = fake.agents[0];
+  fake.terminals = [{ address: a.address, labels: { "contr.orchestrating": "1" }, state: "running" }];
+  const c = new Composer(fakeCx()); c.box(a);
+  const el = c.render(a, TH);
+  assert.equal(textOf(byId(el, "orchestrating")), "Orchestrating");
+  assert.equal(byId(el, "orchestrate"), null);
+});
+
+test("live workers make a session orchestrate and are counted; finished ones are not", () => {
+  const a = fake.agents[0];
+  fake.terminals = [
+    { address: a.address, labels: {}, state: "running" },
+    { address: "w1", parent: a.address, state: "running" },
+    { address: "w2", parent: a.address, state: "running" },
+    { address: "w3", parent: a.address, state: "finished" },
+    { address: "w4", parent: "other", state: "running" },
+  ];
+  const c = new Composer(fakeCx()); c.box(a);
+  assert.match(textOf(byId(c.render(a, TH), "orchestrating")), /Orchestrating.*2 workers/);
+  fake.terminals = fake.terminals.filter((x) => x.address !== "w2");
+  assert.match(textOf(byId(c.render(a, TH), "orchestrating")), /1 worker$/);
+});
+
+test("other agents get no Orchestrate button, and a hidden status row still shows the pill", () => {
+  const cx = fakeCx(); const c = new Composer(cx);
+  const a = { ...fake.agents[0], app: "codex" };
+  c.box(a);
+  assert.equal(byId(c.render(a, TH), "orchestrate"), null);
+  fake.terminals = [{ address: "w1", parent: a.address, state: "running" }];
+  fake.shared[KEY_CONFIG] = { file: { status_row: "hide" } };
+  const el = c.render(a, TH);
+  assert.equal(byId(el, "tags"), null);
+  assert.ok(byId(el, "orchestrating"));
 });

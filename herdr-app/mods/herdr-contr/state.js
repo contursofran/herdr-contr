@@ -1,6 +1,6 @@
 // What every view agrees on: the agent shown in the chat, and the screen in the stack.
 // Kept in shared() so the copies of this mod (one per layout block) see the same value.
-import { agents, focused, shared, setShared, run, spaces, openOverlay, closeOverlay, appHome, readTextFile } from "herdr";
+import { agents, terminals, focused, shared, setShared, run, spaces, openOverlay, closeOverlay, appHome, readTextFile } from "herdr";
 import { div } from "gpui-kit";
 import { loadConfig } from "./config.js";
 
@@ -231,4 +231,17 @@ export function openTerminal(a) {
     ] },
   });
   setShared(KEY_TERM, id);
+}
+
+// contr's orchestration (D: orchestrate pill): a session orchestrates when the kit's Stop hook set its
+// hc label `contr.orchestrating` after /contr:orchestrate, or when it has live workers
+// (terminals that are not finished and whose parent is the session).
+export const ORCHESTRATE_LABEL = "contr.orchestrating";
+export function orchestration(agent) {
+  if (!agent) return null;
+  const all = terminals() ?? [];
+  const self = all.find((x) => x.address === agent.address);
+  const workers = all.filter((x) => x.parent === agent.address && x.state !== "finished").length;
+  const labeled = Boolean(self?.labels?.[ORCHESTRATE_LABEL]);
+  return labeled || workers > 0 ? { workers } : null;
 }

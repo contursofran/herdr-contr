@@ -3,7 +3,7 @@
 import { div, svg } from "gpui-kit";
 import { v_flex, h_flex, Textarea, TextareaState } from "gpui-base";
 import { theme, panes, home, exec, window } from "herdr";
-import { agentName, icon, loader } from "./state.js";
+import { agentName, icon, loader, orchestration } from "./state.js";
 import * as sidecar from "./sidecar.js";
 import { setting } from "./config.js";
 
@@ -437,10 +437,27 @@ export class Composer {
       .child(div().max_w(180).truncate().child(base(p)))
       .child(div().id(`file-x-${i}`).size(16).flex().items_center().justify_center().rounded(4).text_color(t.muted).hover((s) => s.bg(t.hover))
         .on_click((_e, cx) => { this.files = this.files.filter((f) => f !== p); cx.notify(); }).child("×"));
+    // Top right of the box: contr's orchestration. Orchestrating with the worker count, or for a
+    // Claude Code session an Orchestrate button that starts /contr:orchestrate in the box.
+    const orch = orchestration(agent);
+    const pill = orch
+      ? h_flex().id("orchestrating").h(22).px(8).gap(5).items_center().rounded(11).flex_none().text_size(11.5)
+        .bg(t.selected).text_color(t.foreground).border(1).border_color(t.border)
+        .child(div().size(6).rounded(3).bg(t.working)).child("Orchestrating")
+        .when(orch.workers > 0, (el) => el.child(div().text_color(t.muted).child(`· ${orch.workers} ${orch.workers === 1 ? "worker" : "workers"}`)))
+      : agent?.app === "claude-code"
+        ? h_flex().id("orchestrate").h(22).px(8).items_center().rounded(11).flex_none().text_size(11.5)
+          .text_color(t.muted).border(1).border_color(t.border).hover((st) => st.bg(t.hover).text_color(t.foreground))
+          .on_click((_e, cx) => { b.setText("/contr:orchestrate "); b.empty = false; cx.notify(); })
+          .child("Orchestrate")
+        : null;
+    const showTags = setting("status_row") !== "hide";
     return v_flex().id("composer").w_full().px(16).pb(14).pt(6).gap(6).items_center()
       .key_context(PASTE_CONTEXT)
       .on_action(PASTE_ACTION, (_e, cx) => { const text = cx.read_from_clipboard?.(); cx.spawn((cx) => this.paste(cx, text)); })
-      .when(setting("status_row") !== "hide", (el) => el.child(h_flex().id("tags").w_full().max_w(width).gap(5).items_center().overflow_x_scroll().children(tags.map(tag))))
+      .when(showTags || Boolean(pill), (el) => el.child(h_flex().id("tags-row").w_full().max_w(width).gap(5).items_center()
+        .child(showTags ? h_flex().id("tags").flex_1().min_w(0).gap(5).items_center().overflow_x_scroll().children(tags.map(tag)) : div().flex_1())
+        .when(Boolean(pill), (r) => r.child(pill))))
       .when(Boolean(s), (el) => el.child(v_flex().id("slash").w_full().max_w(width).p(4).gap(0).rounded(12).bg(t.raised)
         .border(1).border_color(t.border).shadow_sm().on_scroll_wheel((e, cx) => this.slashWheel(e, cx))
         .children(shown.map(row)).when(Boolean(more), (l) => l.child(more))))

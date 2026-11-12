@@ -535,6 +535,6 @@ test("the reply box is as wide as the chat's column", async () => {
     v.width = w;
     const el = v.render(cx);
     assert.equal(byId(el, "box")._a.max_w, v.colWidth(), `pane ${w}`);
-    assert.equal(byId(el, "tags")._a.max_w, v.colWidth());
+    assert.equal(byId(el, "tags-row")._a.max_w, v.colWidth());
   }
 });
