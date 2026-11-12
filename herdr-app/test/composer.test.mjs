@@ -61,6 +61,9 @@ test("status is read for the shown agent and drawn as tags", async () => {
   assert.match(textOf(byId(el, "tags")), /Opus 5\.5.*feat\/login.*api/);
   assert.doesNotMatch(textOf(byId(el, "tags")), /ctx/, "the context is on the right (#40)");
   assert.equal(textOf(byId(el, "ctx-tag")), "ctx 84%");
+  const warn = byId(el, "ctx-tag").kids[0];
+  assert.equal(warn._a.bg, "#chrome", "a warning is an outline, not a fill (#43)");
+  assert.equal(warn._a.border_color, "#blocked");
   assert.ok(textOf(byId(el, "tags-row")).indexOf("ctx 84%") < textOf(byId(el, "tags-row")).indexOf("Orchestrate"), "ctx sits before the pill");
   assert.deepEqual(log.exec[0][1].slice(0, 3), ["status", "--terminal", "t1"]);
 });
