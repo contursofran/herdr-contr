@@ -73,6 +73,19 @@
           }
         },
         {
+          "id": "settings-row",
+          "type": "block",
+          "size": {
+            "px": 32
+          },
+          "content": {
+            "mod": "herdr-contr",
+            "props": {
+              "view": "settings-row"
+            }
+          }
+        },
+        {
           "id": "sidebar-footer",
           "type": "block",
           "size": {
