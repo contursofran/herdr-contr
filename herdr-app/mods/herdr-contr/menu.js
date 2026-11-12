@@ -3,7 +3,7 @@
 import { div } from "gpui-kit";
 import { v_flex, h_flex } from "gpui-base";
 import { theme, props, run, openOverlay, closeOverlay, agents, shared, setShared } from "herdr";
-import { openTerminal, showScreen, shownScreen, showAgent, openTab, showSettings, KEY_SCREEN, KEY_REMOVE, machineOf } from "./state.js";
+import { openTerminal, setView, showScreen, shownScreen, showAgent, openTab, showSettings, KEY_SCREEN, KEY_REMOVE, machineOf } from "./state.js";
 import { setting } from "./config.js";
 
 const ROW_H = 28, PAD = 6, WIDTH = 220;
@@ -25,8 +25,8 @@ export function act(item) {
   const a = item.args ?? {};
   switch (item.act) {
     case "terminal": return openTerminal(agents().find((x) => x.address === a.address) ?? null);
-    case "panes": return showScreen("tab");
-    case "chat": return showScreen("chat");
+    case "panes": return setView("tab");
+    case "chat": return setView("chat");
     case "open-agent": return showAgent(a.address);
     case "open-tab": return openTab(a.space, { id: a.tab });
     // The chat shows a card that asks before anything is removed.

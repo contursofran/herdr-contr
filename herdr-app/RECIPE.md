@@ -166,9 +166,12 @@ per 900 ms, as Herdr's own); done is a check
 - **Agent's terminal**: ⌃` or the terminal button opens the agent's real terminal in a floating
   window (70% of the window, 16 px corners) with a 42 px title bar (a terminal chip, the name,
   "Terminal", a round close button). ⌃` again closes it.
+- **Chat | Terminal switch** (`herdr-contr` layout): a tab with an agent shows a switch on the right
+  of a 36 px strip, over the chat and over the tab's terminal (block `view-switch`, view `switch`).
+  ⌘⇧T does the same. The tab keeps the pick. A tab without an agent hides the block.
 - **Keys** (while this layout shows): ⌘T new tab, ⌘W close tab, ⌘⇧N new space, ⌘1-⌘9 a tab,
   ⌘⇧[ / ⌘⇧] or ⌃Tab / ⌃⇧Tab the tab before or after, ⌘⌥↑ / ⌘⌥↓ the space before or after,
-  ⌘⌃⇧← / ⌘⌃⇧→ move the tab, ⌘⇧I Needs you, ⌘⇧\ Overview, ⌘B sidebar, ⌃` terminal,
+  ⌘⌃⇧← / ⌘⌃⇧→ move the tab, ⌘⇧I Needs you, ⌘⇧\ Overview, ⌘B sidebar, ⌃` terminal, ⌘⇧T chat or terminal,
   ⌘= / ⌘- / ⌘0 zoom, ⌘, settings, ⌘⇧, herdr-contr settings, ⌘/ help. In the herdr-contr settings,
   Tab moves through the sections, then the choices, and Enter or Space picks one.
 
@@ -211,7 +214,7 @@ per 900 ms, as Herdr's own); done is a check
 - **Commands it runs**: `layout.select {stack: "screen", child}`, `layout.show` / `layout.hide
   {id: "sidebar"}`, `tab.select`, `tab.close`, `tab.move`, `tab.rename`, `tab.settle`, `tab.new`,
   `pane.split`, `space.select`, `space.new`, `space.rename`, `space.close`, `agent.focus`,
-  `app.settings`. Its own key commands: `herdr-contr.terminal`, `herdr-contr.needs`,
+  `app.settings`. Its own key commands: `herdr-contr.terminal`, `herdr-contr.view`, `herdr-contr.needs`,
   `herdr-contr.sidebar`, `herdr-contr.overview`, `herdr-contr.settings`, `herdr-contr.move-left`,
   `herdr-contr.move-right`.
 - **Shipped mods**: `new-menu` (the + popup, 250 × 512).

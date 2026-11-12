@@ -7,11 +7,12 @@ import { SideView } from "./side.js";
 import { ChatView } from "./chat.js";
 import { NeedsView } from "./needs.js";
 import { TermBar } from "./termbar.js";
+import { SwitchView } from "./viewswitch.js";
 import { OverviewView } from "./overview.js";
 import { MenuView } from "./menu.js";
 import { SettingsView } from "./settings.js";
 
-const VIEWS = { top: TopView, side: SideView, chat: ChatView, needs: NeedsView, termbar: TermBar, overview: OverviewView, menu: MenuView, settings: SettingsView };
+const VIEWS = { top: TopView, side: SideView, chat: ChatView, needs: NeedsView, termbar: TermBar, switch: SwitchView, overview: OverviewView, menu: MenuView, settings: SettingsView };
 
 export default class HerdrContr extends View {
   // The block's props come from props(); init's first argument is not them.

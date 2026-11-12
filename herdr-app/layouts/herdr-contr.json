@@ -136,6 +136,19 @@
                   "type": "column",
                   "children": [
                     {
+                      "id": "view-switch",
+                      "type": "block",
+                      "size": {
+                        "px": 36
+                      },
+                      "content": {
+                        "mod": "herdr-contr",
+                        "props": {
+                          "view": "switch"
+                        }
+                      }
+                    },
+                    {
                       "id": "tab-panes",
                       "type": "block",
                       "content": {
