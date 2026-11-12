@@ -221,11 +221,13 @@ pub struct Question {
     pub text: String,
     pub options: Vec<QOption>,
     pub multi_select: bool,
+    /// Claude's preview layout (an option with a `preview`): the picker has no "Type something" row.
+    pub no_other: bool,
 }
 
 impl Question {
     pub fn new(header: &str, text: &str, options: Vec<QOption>, multi_select: bool) -> Self {
-        Question { id: text.into(), header: header.into(), text: text.into(), options, multi_select }
+        Question { id: text.into(), header: header.into(), text: text.into(), options, multi_select, no_other: false }
     }
 }
 

@@ -144,8 +144,8 @@ export class Cards {
     }
     if (n === null) return false;
     const qi = Math.min(en.step ?? 0, qs.length - 1);
-    // The number after the options moves the keyboard into the own-answer box.
-    if (n - 1 === (qs[qi]?.options ?? []).length && this.others[qi]) { this.others[qi].focus?.(); return true; }
+    // The number after the options moves the keyboard into the own-answer box (none: a preview picker).
+    if (n - 1 === (qs[qi]?.options ?? []).length && this.others[qi] && !qs[qi]?.noOther) { this.others[qi].focus?.(); return true; }
     if (!this.pick(en, qs, qi, n - 1)) return false;
     cx.notify();
     return true;
@@ -190,8 +190,9 @@ export class Cards {
     return this.act(cx, address, (c) => sidecar.answer(address, c.request, answers));
   }
 
-  // The card for `address`, or null. `id` makes the ids unique when two views show one.
-  view(address, t, id = "card") {
+  // The card for `address`, or null. `id` makes the ids unique when two views show one. `width`: the
+  // reply box's width (composer.js), so the card lines up with it.
+  view(address, t, id = "card", width = 800) {
     const e = this.byAgent.get(address);
     const c = e?.card;
     if (!c) return null;
@@ -200,7 +201,7 @@ export class Cards {
       .border(1).border_color(primary && !off ? t.accent : t.border)
       .when(!off, (el) => el.hover((s) => s.opacity(0.9)).on_click((_e, cx) => cx.spawn((cx) => action(cx))))
       .child(label);
-    const box = v_flex().id(id).w_full().max_w(800).p(14).gap(10).rounded(14).bg(t.raised);
+    const box = v_flex().id(id).w_full().min_w(0).max_w(width).p(14).gap(10).rounded(14).bg(t.raised);
     if (this.focus) box.track_focus(this.focus)
       .on_mouse_down("left", () => this.focus.focus())
       .on_key_down((ev, cx) => { if (this.key_down(ev, cx, address)) cx.stop_propagation(); });
@@ -252,7 +253,8 @@ export class Cards {
           .when(oi < 9, (el) => el.child(hint(oi + 1))));
       });
       // The boxes are shared by every card; fill them with this card's text when it is shown.
-      const input = this.others[qi];
+      // Claude's preview layout has no own-answer row: the card shows none either.
+      const input = qq.noOther ? null : this.others[qi];
       if (this.address !== address) { this.others.forEach((b, k) => b.set_value(e.others.get(k) ?? "")); this.address = address; }
       // Own answer: a row like the options. Clicks and keys stay in the text box: the card would
       // take the focus on a press and read 1-9 and Enter as picks.

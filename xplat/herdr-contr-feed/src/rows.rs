@@ -122,6 +122,9 @@ pub struct FeedQuestionItem {
     pub text: String,
     pub multi: bool,
     pub options: Vec<FeedOption>,
+    /// The picker has no own-answer row (Claude's preview layout); left out when false.
+    #[serde(rename = "noOther", skip_serializing_if = "std::ops::Not::not")]
+    pub no_other: bool,
 }
 
 #[derive(Serialize, Clone, Debug, PartialEq)]
@@ -213,6 +216,7 @@ pub fn question(q: &QuestionRequest) -> FeedQuestion {
                 header: x.header.clone(),
                 text: x.text.clone(),
                 multi: x.multi_select,
+                no_other: x.no_other,
                 options: x
                     .options
                     .iter()
@@ -381,4 +385,19 @@ pub fn separator<Tz: TimeZone>(d: &Date, now: &Date, tz: &Tz) -> String {
         MO[day.month0() as usize],
         clock(d, tz)
     )
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use herdr_core::model::{QOption, Question, QuestionRequest};
+
+    #[test]
+    fn no_other_is_sent_only_when_true() {
+        let mut q = Question::new("H", "Pick?", vec![QOption { label: "A".into(), detail: String::new(), recommended: false }], false);
+        let json = |q: &Question| serde_json::to_value(question(&QuestionRequest::new("screen-1", vec![q.clone()]))).unwrap();
+        assert!(json(&q)["questions"][0].get("noOther").is_none(), "false: left out");
+        q.no_other = true;
+        assert_eq!(json(&q)["questions"][0]["noOther"], true, "true: noOther");
+    }
 }

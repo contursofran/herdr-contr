@@ -71,7 +71,7 @@ Left to right:
      the tag shows only with `autoCompactWindow`), then a 16 px rounded `raised`
      box with a one-line text area ("Reply to the agent"), + to attach files on the left (macOS only), the
      branch, and a round 28 px send button (accent when there is text). File chips above the text.
-   - **Card** between the chat and the reply box, at most 800 px, 14 px corners, `raised`, 14 px
+   - **Card** between the chat and the reply box, as wide as the reply box (the chat's column), 14 px corners, `raised`, 14 px
      padding, an orange 8 px dot before the title.
      - Approval: the title (the prompt's own, for example "Bash command"; else "<tool> wants to
        run"), the command in Menlo 12.5 px on `background`
@@ -152,7 +152,10 @@ drawn by Herdr's `frames`; every loader of the mod is this one); done is a check
   "It changed on screen. Here is what it shows now." when the prompt on screen is another one.
 - **Question card**: 1-9 picks an option (a one-choice pick moves on); the number after the
   options moves the keyboard into the own-answer box; Enter goes on or sends. With more questions
-  behind the first: **Show all N questions** reads them all from the agent's picker.
+  behind the first: **Show all N questions** reads them all from the agent's picker. Claude's
+  preview layout (an option with a `preview`): the box on the right is not read, the card has no
+  own-answer row (`noOther`), and Send moves the focus with Up or Down to the pick, then presses
+  Enter.
 - **herdr-contr settings** (the herdr-contr row, or ⌘⇧,): saved in `<herdr-app home>/herdr-contr/config.json`
   as `{"status_row": "show", "remote_helper": "ask"}`. The install never
   creates the file; a missing file or key is the default, and so is a value that is not one of the
