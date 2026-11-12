@@ -90,6 +90,18 @@ test("a sub-agent row shows its model too", async () => {
   assert.equal(text(modelEls(sub())[0]), "Opus 5.5 \u00b7 low");
 });
 
+test("a sub-agent in its own terminal, without a pane, shows its model (#65)", async () => {
+  setup({ type: "model", agent: "claude", model: "claude-opus-5-5", effort: "low" });
+  const v = make({ notify() {}, timer: { every() {} } });
+  v.listed = new Map();
+  const sub = () => v.subRow(theme(), { t: { address: "t9", name: "b-1", status: "working", parent: "t1" }, lines: ["└"] }, null, false, { notify() {} });
+  sub(); await settle(); await settle();
+  assert.deepEqual(log.exec.filter(([, a]) => a[0] === "model").map(([, a]) => a.slice(0, 3)), [["model", "--terminal", "t9"]]);
+  assert.equal(text(modelEls(sub())[0]), "Opus 5.5 \u00b7 low");
+  sub(); sub(); await settle();
+  assert.equal(log.exec.filter(([, a]) => a[0] === "model").length, 1);
+});
+
 test("a sub-agent row with a model has two lines, and the tree line goes on through line 2", async () => {
   setup({ type: "model", agent: "claude", model: "claude-opus-5-5", effort: "low" });
   const v = make({ notify() {}, timer: { every() {} } });
