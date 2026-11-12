@@ -1,6 +1,7 @@
 // What every view agrees on: the agent shown in the chat, and the screen in the stack.
 // Kept in shared() so the copies of this mod (one per layout block) see the same value.
 import { agents, focused, shared, setShared, run, spaces, openOverlay, closeOverlay, appHome, readTextFile } from "herdr";
+import { div } from "gpui-kit";
 import { loadConfig } from "./config.js";
 
 export const KEY_AGENT = "herdr-contr.agent";
@@ -22,9 +23,12 @@ export function showScreen(child) {
 const MOD = "mods/herdr-contr";
 export const icon = (name) => `${MOD}/icons/${name}.svg`;
 
-// One spinner speed everywhere (ms per turn). Herdr draws a spin at about 30 frames a second: at 900 ms
-// the arc moves 13 degrees a frame (at 600 ms it was 20, and looked jerky). Herdr's own spinner turns at 900.
-export const SPIN_MS = 900;
+// One loader everywhere: a braille spinner, drawn by Herdr's frames (native; render does not run for it).
+// A mono font keeps each frame the same width. Callers set the color.
+export const BRAILLE = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"];
+export const BRAILLE_MS = 80;
+export const loader = (size) => div().flex_none().w(size).h(size).flex().items_center().justify_center()
+  .font_family("Menlo").text_size(size).line_height(size).frames(BRAILLE, BRAILLE_MS).child(BRAILLE[0]);
 
 // Motion: a quick ease-out for fades and a soft spring for moves, as in the web app.
 export const FADE = { duration: 180, easing: "ease-out" };

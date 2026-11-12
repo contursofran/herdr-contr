@@ -31,7 +31,7 @@ test("one tab per tab of the shown space: named, else its agent, else its number
 test("status marks: spinner while working, check when done, dot when blocked, ring when idle", () => {
   const el = new TopView(fakeCx()).render(fakeCx());
   const kids = (id) => byId(el, id).kids;
-  assert.ok(kids("tab-tb-t1").some((k) => k.tag === "svg" && k._a.path.endsWith("spinner.svg") && k._a.spin === 900));
+  assert.ok(kids("tab-tb-t1").some((k) => k._a.frames?.[0]?.[0] === "⠋" && k._a.frames[1] === 80));
   assert.ok(kids("tab-tb-t2").some((k) => k.tag === "svg" && k._a.path.endsWith("check.svg")));
   assert.ok(kids("tab-tb-t3").some((k) => k.tag === "div" && k._a.bg === "#blocked"));
   assert.ok(kids("tab-tb-sh").some((k) => k.tag === "div" && k._a.border_color === "#dim"));
@@ -264,20 +264,14 @@ test("a drag released on the bar's edge drops at the last place shown", () => {
   assert.equal(byId(render(), "drop-line"), null);
 });
 
-test("the spinner: one turn per 900 ms (Herdr draws about 30 frames a second: 13 degrees a frame), a short arc over a faint ring", async () => {
-  const { SPIN_MS } = await import("../mods/herdr-contr/state.js");
-  const { readFileSync } = await import("node:fs");
-  assert.ok(SPIN_MS >= 900 && SPIN_MS <= 1000, String(SPIN_MS));
-  const svg = readFileSync(new URL("../mods/herdr-contr/icons/spinner.svg", import.meta.url), "utf8");
-  // The ring: a full circle, faint, that does not seem to move while the arc turns.
-  const ring = /<circle[^>]*r="([\d.]+)"[^>]*stroke-opacity="([\d.]+)"/.exec(svg);
-  assert.ok(ring && Number(ring[2]) <= 0.4, "a faint full ring");
-  // The arc: a quarter turn on the same circle (radius as the ring's; not large-arc).
-  const arc = /<path d="M([\d.]+) ([\d.]+)a([\d.]+) ([\d.]+) 0 0 1 ([\d.-]+) ([\d.-]+)"/.exec(svg);
-  assert.ok(arc, svg);
-  assert.equal(arc[3], ring[1]);
-  assert.equal(Math.abs(Number(arc[5])), Number(arc[3]), "a quarter turn: as far across as the radius");
-  assert.equal(Math.abs(Number(arc[6])), Number(arc[3]), "and as far down");
+test("the loader: braille frames, 80 ms apart, in a mono font, the same size each way", async () => {
+  const { loader, BRAILLE } = await import("../mods/herdr-contr/state.js");
+  assert.equal(BRAILLE.join(""), "⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏");
+  const el = loader(12);
+  assert.deepEqual(el._a.frames, [BRAILLE, 80]);
+  assert.equal(el._a.font_family, "Menlo");
+  assert.equal(el._a.w, 12); assert.equal(el._a.h, 12);
+  assert.equal(el.kids[0], "⠋", "the first frame, before Herdr turns it");
 });
 
 test("the tab row scrolls sideways with no scrollbar drawn over the pills", () => {

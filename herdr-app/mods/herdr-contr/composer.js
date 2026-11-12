@@ -3,7 +3,7 @@
 import { div, svg } from "gpui-kit";
 import { v_flex, h_flex, Textarea, TextareaState } from "gpui-base";
 import { theme, panes, home, exec, window } from "herdr";
-import { agentName, icon, SPIN_MS } from "./state.js";
+import { agentName, icon, loader } from "./state.js";
 import * as sidecar from "./sidecar.js";
 import { setting } from "./config.js";
 
@@ -463,7 +463,7 @@ export class Composer {
           .child(div().id("send").size(28).flex_none().flex().items_center().justify_center().rounded(14)
             .bg(empty || this.sending ? t.chrome : t.accent).text_color(empty || this.sending ? t.dim : t.background)
             .on_click((_e, cx) => cx.spawn((cx) => this.submit(cx)))
-            .child(this.sending ? svg(icon("spinner")).size(13).spin(SPIN_MS) : svg(icon("send")).size(14)))))
+            .child(this.sending ? loader(13) : svg(icon("send")).size(14)))))
       .when(Boolean(this.note), (el) => el.child(div().id("send-note").w_full().max_w(width).text_size(12)
         .text_color(this.note.bad ? t.blocked : t.muted).child(this.note.text)));
   }
