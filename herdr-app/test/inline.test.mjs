@@ -146,3 +146,107 @@ test("height: the Textarea is the estimate's paragraph height, and the drawn lin
   }
   assert.ok(drawn > 0 && fell > 0, `both cases seen: ${drawn} drawn, ${fell} fell back`);
 });
+
+// A coordinator message as the owner sees it (#68): paragraphs, bullets with references, a numbered list,
+// a nested list and a contr-status block.
+import { splitPieces } from "../mods/herdr-contr/blocks.js";
+import { markdownRaw } from "../mods/herdr-contr/estimate.js";
+import { splitBlocks } from "../mods/herdr-contr/mdblocks.js";
+const COORD = [
+  "Status after the last round. PR #63 merged on green CI, and #57 is closed with it.",
+  "",
+  "Open work:",
+  "- PR #63: inline icons behind the experimental setting, merged.",
+  "- The phone page waits on #51; the builder is on it.",
+  "- Nothing else is queued.",
+  "",
+  "Next steps:",
+  "1. Merge PR #51 when CI passes on its head.",
+  "2. Install merged main and look at the chat.",
+  "   - nested, see #7",
+  "",
+  "```contr-status",
+  "workers: 1/4  ci: 2 queued",
+  "```",
+  "",
+  "I will report when #51 lands.",
+].join("\n");
+// The Textareas and the TextViews in a drawn tree, and the slots (the divs with a height) under `el`.
+const walk = (el, f) => { if (el && typeof el === "object") { f(el); (el.kids || []).forEach((c) => walk(c, f)); } };
+const tagged = (el, tag) => { const o = []; walk(el, (e) => e.tag === tag && o.push(e)); return o; };
+
+test("pieces: paragraphs and top-level items; a nested list keeps its item whole", () => {
+  const ps = splitPieces(splitBlocks(COORD)[0].text);
+  assert.deepEqual(ps.map((p) => p.k), ["para", "para", "item", "item", "item", "para", "item", "other"]);
+  assert.deepEqual(ps.map((p) => p.mark ?? null).filter(Boolean), ["-", "-", "-", "1.", "2."]);
+  assert.equal(ps[1].lines.length, 1, "a line right above a list is its own paragraph");
+  assert.equal(ps.flatMap((p) => [...p.lines, ...p.tail]).join("\n"), splitBlocks(COORD)[0].text, "the pieces give the block again");
+  assert.deepEqual(splitPieces("- a\n  more\n- b").map((p) => [p.k, p.body.join(" ")]), [["item", "a more"], ["item", "b"]]);
+  assert.deepEqual(splitPieces("- a\n\n  later").map((p) => p.k), ["other"], "a second paragraph in an item: TextView");
+  assert.deepEqual(splitPieces("# H #5\ntext").map((p) => p.k), ["other", "para"]);
+  assert.deepEqual(splitPieces("> q #5\nlazy").map((p) => p.k), ["other"]);
+});
+
+test("a coordinator message: references drawn with icons, the rest TextView, heights as the estimate counts", async () => {
+  on();
+  let drawn = 0;
+  for (const w of [360, 600, 900]) for (const k of [0.875, 1, 1.125]) {
+    forgetInline();
+    markdownView("c", COORD, theme(), w, k, "o/r");
+    await inlineTick(new Set(["c"]));
+    const el = markdownView("c", COORD, theme(), w, k, "o/r");
+    const blocks = splitBlocks(COORD);
+    assert.equal(el.kids.length, blocks.length);
+    // Each text block's slots add up to its part of the estimate; with the code box, to the whole.
+    let sum = 0;
+    for (const [i, b] of blocks.entries()) {
+      if (b.k === "code") { sum += markdownRaw("```\n" + b.text + "\n```", w, k); continue; }
+      const slots = el.kids[i].kids.map((d) => d._a.h);
+      const own = markdownRaw(blocks[i + 1]?.k === "code" ? b.text.replace(/(\n[ \t]*)+$/, "") : b.text, w, k);
+      assert.ok(Math.abs(slots.reduce((a, x) => a + x, 0) - own) < 1e-9, `block ${i} at ${w}/${k}`);
+      for (const d of el.kids[i].kids) assert.ok(d._a.pt >= 0 && d._a.pt <= d._a.h);
+      sum += own;
+    }
+    assert.ok(Math.abs(sum - markdownRaw(COORD, w, k)) < 1e-9, `whole at ${w}/${k}`);
+    // Most pieces with a reference draw with icons (the one-more-line fallback is rare).
+    const tas = tagged(el.kids[0], "ta").length;
+    assert.ok(tas >= 3, `${tas} of 4 drawn at ${w}/${k}`);
+    // Pieces without references stay TextView; the nested list stays in its item's TextView.
+    const mds = tagged(el.kids[0], "md").map((m) => m._a.text);
+    assert.ok(mds.some((t) => /Nothing else is queued/.test(t)));
+    assert.ok(mds.some((t) => /2\. Install merged main[\s\S]*nested/.test(t)));
+    assert.equal(tagged(el.kids[2], "ta").length, 1, "the last paragraph");
+    drawn += tas;
+  }
+  assert.ok(drawn >= 34, `${drawn} of 36 pieces with references drawn with icons`);
+});
+
+test("a list item: its bullet or number outside the Textarea, the text indented", async () => {
+  on();
+  const md = "Intro.\n\n- PR #51 merged\n3. then #7";
+  markdownView("l", md, theme(), 600, 1, "o/r");
+  await inlineTick(new Set(["l"]));
+  const el = markdownView("l", md, theme(), 600, 1, "o/r");
+  const rows = tagged(el, "h").filter((h) => h.kids.length === 2 && h.kids[1].kids[0]?.tag === "ta");
+  assert.deepEqual(rows.map((r) => r.kids[0].kids[0]), ["•", "3."]);
+  assert.equal(rows[0].kids[0]._a.w, 22);
+  const ta = rows[0].kids[1].kids[0];
+  assert.equal(ta._a.h, markdownRaw("- PR #51 merged", 600, 1), "the item's height at its indented width");
+  assert.equal(tagged(el, "md")[0]._a.text, "Intro.\n");
+});
+
+test("on, no reference in the block: one TextView, as with the setting off", async () => {
+  on();
+  const md = "One.\n\n- two\n- three";
+  markdownView("n", md, theme(), 600, 1, "o/r");
+  await inlineTick(new Set(["n"]));
+  const el = markdownView("n", md, theme(), 600, 1, "o/r");
+  assert.equal(el.tag, "md");
+  assert.equal(el._a.id, "md-n-0");
+});
+
+test("off: a coordinator message is drawn as before, one TextView per text block", async () => {
+  const el = markdownView("c", COORD, theme(), 600, 1, "o/r");
+  assert.deepEqual(el.kids.map((e) => e.tag), ["md", "v", "md"]);
+  assert.equal(await inlineTick(new Set(["c"])), false);
+});

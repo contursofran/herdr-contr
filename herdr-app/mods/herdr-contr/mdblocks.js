@@ -3,10 +3,10 @@
 // are drawn here (rounded), the rest stays TextView markdown.
 import { div } from "gpui-kit";
 import { v_flex, h_flex, TextView } from "gpui-base";
-import { colWidths, markdownHeight } from "./estimate.js";
-import { splitBlocks, tableCells } from "./blocks.js";
+import { colWidths, markdownHeight, markdownRaw, lineHeight } from "./estimate.js";
+import { splitBlocks, splitPieces, tableCells } from "./blocks.js";
 import { linkRefs } from "./refs.js";
-import { inlineParagraph } from "./inline.js";
+import { inlinePiece } from "./inline.js";
 import { setting } from "./config.js";
 
 export { splitBlocks, tableCells };
@@ -61,6 +61,11 @@ function table(id, b, t, width, k) {
     .children(b.rows.map((r, i) => row(r, i, false)));
 }
 
+function textView(key, md, repo, k) {
+  const view = TextView.markdown(key, linkRefs(md, repo)).selectable(true);
+  return k === 1 ? view : view.text_size(16 * k);
+}
+
 // The whole text: one element. `id` keeps the TextView ids unique per row; `width` is the text's
 // width in px (tables need it). A text block's id is always md-<id>-<i>, one block or many: a message that
 // grows a code box while the agent writes keeps its first view (and the selection in it).
@@ -68,17 +73,50 @@ function table(id, b, t, width, k) {
 // `repo`: "owner/repo" for a bare "#51" (refs.js); PR and issue references in prose become links.
 export function markdownView(id, text, t, width, k = 1, repo = null) {
   const blocks = splitBlocks(text);
-  // "Inline PR icons" on: a paragraph with a reference as a Textarea with icons (inline.js), when its state is made.
+  // "Inline PR icons" on: paragraphs and list items with a reference drawn with icons (#68).
   const inline = setting("inline_icons") === "on";
-  const prose = (key, md) => {
-    const tokens = inline ? inlineParagraph(key, id, md, repo, t, width, k) : null;
-    if (tokens) return tokens;
-    const view = TextView.markdown(key, linkRefs(md, repo)).selectable(true);
-    return k === 1 ? view : view.text_size(16 * k);
-  };
-  if (blocks.length === 1 && blocks[0].k === "md") return prose(`md-${id}-0`, blocks[0].text);
+  const prose = (key, md, next) => (inline && inlineSplit(key, id, md, next, repo, t, width, k)) || textView(key, md, repo, k);
+  if (blocks.length === 1 && blocks[0].k === "md") return prose(`md-${id}-0`, blocks[0].text, null);
   return v_flex().w_full().children(blocks.map((b, i) =>
     b.k === "code" ? codeBox(`md-${id}-k${i}`, b, t, k)
       : b.k === "table" ? table(`md-${id}-t${i}`, b, t, width, k)
-        : prose(`md-${id}-${i}`, b.text)));
+        : prose(`md-${id}-${i}`, b.text, blocks[i + 1]?.k ?? null)));
+}
+
+// A text block cut at its paragraphs and top-level list items (blocks.js: splitPieces). A piece with a
+// reference is drawn with icons (inline.js); the pieces between stay together in one TextView. Each part
+// is as tall as estimate.js counts it (markdownRaw of the text up to its end, less that up to its start),
+// with the gap the estimate counts above it as top padding, so the rows neither clip nor leave a gap.
+// null when no piece has icons (yet): the block is one TextView, as with the setting off.
+// `next`: the kind of the block after it; the estimate drops a blank line's gap above a code box.
+export function inlineSplit(key, rowId, md, next, repo, t, width, k = 1) {
+  const text = next === "code" ? md.replace(/(\n[ \t]*)+$/, "") : md;
+  const pieces = splitPieces(text);
+  const raw = (lines) => markdownRaw(lines.join("\n"), width, k);
+  const up = Math.max(1, k), lh = lineHeight(16 * k);
+  const parts = []; let src = [], group = null, any = false;
+  for (const [j, p] of pieces.entries()) {
+    const before = raw(src);
+    src = src.concat(p.lines);
+    const lead = Math.max(0, raw(src) - before - raw(p.lines));
+    src = src.concat(p.tail);
+    const slot = raw(src) - before;
+    let el = null;
+    if (p.k === "para" || p.k === "item") {
+      const w = p.k === "item" ? width - 22 * up : width;
+      const body = inlinePiece(pieces.length === 1 ? key : `${key}-p${j}`, rowId, p.body.join("\n"), repo, t, w, k, raw(p.lines));
+      if (body) el = p.k === "para" ? body
+        : h_flex().w_full().items_start()
+          .child(div().w(22 * up).flex_none().h(lh).text_size(16 * k).child(/^\d/.test(p.mark) ? p.mark : "\u2022"))
+          .child(div().flex_1().min_w(0).child(body));
+    }
+    if (el) { any = true; group = null; parts.push({ el, h: slot, lead }); continue; }
+    if (group) { group.lines.push(...p.lines, ...p.tail); group.h += slot; continue; }
+    parts.push(group = { key: `${key}-g${j}`, lines: [...p.lines, ...p.tail], h: slot, lead });
+  }
+  if (!any) return null;
+  // One plain paragraph: the Textarea itself, as before the split.
+  if (parts.length === 1 && pieces[0].k === "para" && parts[0].lead === 0 && !pieces[0].tail.length) return parts[0].el;
+  return v_flex().w_full().children(parts.map((q) => div().w_full().h(q.h).pt(q.lead).overflow_hidden()
+    .child(q.el ?? textView(q.key, q.lines.join("\n"), repo, k))));
 }

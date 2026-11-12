@@ -130,14 +130,19 @@ export function tokenLook(url, t) {
 // would need one more line, it is null too.
 export function inlineParagraph(key, rowId, md, repo, t, width, k = 1) {
   if (!isParagraph(md)) return null;
+  return inlinePiece(key, rowId, md, repo, t, width, k, paragraphHeight(md, width, k));
+}
+// One paragraph or list item's text (no marker) drawn with icons in `h` px, the estimate's height for it;
+// null as above. mdblocks.js gives `width` and `h` for a list item from its indented width.
+export function inlinePiece(key, rowId, md, repo, t, width, k, h) {
   const content = inlineContent(md, repo);
   if (!content) return null;
   want(key, rowId, md, content);
   const v = views.get(key);
   if (!v) return null;
-  const fs = FS * k, h = paragraphHeight(md, width, k);
+  const fs = FS * k;
   // The icons would need one more line than the estimate counts: TextView, so the row heights hold.
-  if (inlineLines(content, width, k) * lineHeight(fs) > h) return null;
+  if (inlineLines(content, width, k) * lineHeight(fs) > h + 0.5) return null;
   return Textarea.new(v.state).id(key).disabled(true).w_full().h(h)
     .border(0).bg(t.transparent ?? "#00000000").p(0).text_size(fs).line_height(lineHeight(fs)).text_color(t.foreground)
     .token((tok) => {
@@ -153,9 +158,9 @@ export function paragraphHeight(md, width, k = 1) {
   const fs = FS * k;
   return proseLines(String(md).split("\n").map((l) => l.trim()).join(" ").replace(/\*\*/g, ""), width, fs, k) * lineHeight(fs);
 }
-// Lines the drawn paragraph takes: each token is its text and an icon (about two characters).
+// Lines the drawn paragraph takes: each token is its text and an icon (14 px and a 2 px gap: about "MI" wide).
 export function inlineLines(content, width, k = 1) {
   let s = content.text;
-  for (const tk of [...content.tokens].reverse()) s = s.slice(0, tk.range.start) + "MM" + s.slice(tk.range.start);
+  for (const tk of [...content.tokens].reverse()) s = s.slice(0, tk.range.start) + "MI" + s.slice(tk.range.start);
   return proseLines(s, width, FS * k, k);
 }
