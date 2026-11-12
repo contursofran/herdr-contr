@@ -5,7 +5,7 @@ import { h_flex } from "gpui-base";
 import { theme, layout, window, settings, openOverlay, run, setAgentOrder, nextCommand, shared, setShared } from "herdr";
 import { openMenu, tabItems } from "./menu.js";
 import { spaceAgents, spaceTabs, activeTab, currentAgent, tabLabel, screenFor, showTab, closeTab, openTerminal, showNeeds, icon, tabAgents, shownScreen,
-  SPIN_MS, FADE, sidebarShown, herdrSidebar, toggleSidebar, loadSidebar, showScreen, showOverview, showSettings, watchEdge } from "./state.js";
+  SPIN_MS, FADE, sidebarShown, herdrSidebar, toggleSidebar, loadSidebar, showScreen, showOverview, showSettings, watchEdge, toggleView } from "./state.js";
 import { loadConfig, stepTextSize } from "./config.js";
 import { dragger, dropPlace } from "./drag.js";
 
@@ -38,6 +38,8 @@ export function lightsRoom() {
 export const BAR_H = 56;
 // A layout with Herdr's own tab bar (a "tabs" block) needs no bar from this mod: the screens then
 // draw none and leave no room for one. The key commands and the screen sync still run.
+// The block over the tab's terminal that holds the Chat | Terminal switch (herdr-contr layout).
+export const VIEW_SWITCH = "view-switch";
 export const herdrTabBar = () => find(layout(), "tabs")?.content?.mod === "tabs";
 export const barH = () => (herdrTabBar() ? 0 : BAR_H);
 
@@ -52,6 +54,7 @@ export function command(c) {
   const tabs = spaceTabs(), tab = activeTab(), i = tabs.findIndex((x) => x.id === tab?.id);
   if (c === "terminal") return openTerminal(currentAgent());
   if (c === "needs") return showNeeds();
+  if (c === "view") return toggleView();
   if (c === "sidebar") return toggleSidebar();
   if (c === "overview") return showOverview();
   if (c === "settings") return showSettings();
@@ -93,6 +96,8 @@ export function syncScreen(owner) {
   if (now === owner.seen) return;
   owner.seen = now;
   if (!tab) return;
+  // The switch over the tab's terminal shows only for a tab with an agent.
+  if (find(layout(), VIEW_SWITCH)) run(tabAgents(tab.id).length ? "layout.show" : "layout.hide", { id: VIEW_SWITCH });
   // layout() is the file, not the live tree, so the shown screen is unknown: select it outright.
   showScreen(screenFor(tab));
 }

@@ -20,7 +20,7 @@ test("keys.json binds only commands that exist, in the herdr-contr layout's sect
   const keys = JSON.parse(readFileSync(new URL("../keys.json", import.meta.url)));
   // Not mod:herdr-contr: with it, no key worked at all.
   assert.deepEqual(Object.keys(keys), ["layout:herdr-contr-own", "layout:herdr-contr"]);
-  const mine = ["terminal", "needs", "move-left", "move-right", "sidebar", "overview", "settings", "text-smaller", "text-larger", "text-default"];
+  const mine = ["terminal", "view", "needs", "move-left", "move-right", "sidebar", "overview", "settings", "text-smaller", "text-larger", "text-default"];
   for (const [key, action] of Object.entries(keys["layout:herdr-contr-own"])) {
     if (action.startsWith("herdr-contr.")) assert.ok(mine.includes(action.slice("herdr-contr.".length)), `${key}: ${action}`);
   }

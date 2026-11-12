@@ -123,7 +123,27 @@ export function tabLabel(tab) {
 
 // The screen for a tab: the chat when an agent runs in it, else the tab's own terminals.
 // The chat for a tab with an agent in one pane; the tab's panes once it is split (or for a shell).
-export const screenFor = (tab) => (tab && tabAgents(tab.id).length && (tab.panes ?? 1) <= 1 ? "chat" : "tab");
+// The owner's pick (the Chat | Terminal switch, its key, the tab menu) wins, per tab, for a tab with an agent.
+export const screenFor = (tab) => {
+  if (!tab || !tabAgents(tab.id).length) return "tab";
+  return shared(KEY_VIEW)?.[tab.id] ?? ((tab.panes ?? 1) <= 1 ? "chat" : "tab");
+};
+// The owner's pick of chat or terminal, per tab id.
+export const KEY_VIEW = "herdr-contr.view";
+// Shows the chat or the tab's terminal for the shown tab, and keeps that pick for the tab.
+export function setView(child, tab = activeTab()) {
+  if (tab) setShared(KEY_VIEW, { ...(shared(KEY_VIEW) ?? {}), [tab.id]: child });
+  showScreen(child);
+  // The terminal gets the keys at once.
+  const a = child === "tab" ? currentAgent() : null;
+  if (a) run("agent.focus", { terminal: a.address });
+}
+// The key: chat → terminal, any other screen → chat. Only for a tab with an agent.
+export function toggleView() {
+  const tab = activeTab();
+  if (!tab || !tabAgents(tab.id).length) return;
+  setView(shownScreen() === "chat" ? "tab" : "chat", tab);
+}
 
 export function showTab(tab) {
   setShared(KEY_AGENT, null);

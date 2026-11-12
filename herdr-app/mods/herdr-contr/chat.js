@@ -13,6 +13,7 @@ import { GUTTER, columnWidth, rowHeight } from "./estimate.js";
 import { ROW_PAD_Y, BUBBLE_PAD_X, BUBBLE_PAD_Y, BUBBLE_GAP, IMAGES_FS, bubbleWidth, bubbleTextWidth, CHIP_H, CHIP_PAD_Y, CHIP_GAP, OPEN_INDENT,
   CALL_H, SEP_H, FOOTER_H, STATUS_H, CARD_ROW_H, OTHER_H } from "./metrics.js";
 import { Composer } from "./composer.js";
+import { switchStrip } from "./viewswitch.js";
 import { markdownView, codeBlockAt } from "./mdblocks.js";
 import { textScale } from "./config.js";
 
@@ -20,7 +21,7 @@ import { textScale } from "./config.js";
 const appZoom = () => { const z = Number(settings?.()?.zoom); return z > 0 ? z : 1; };
 import { openMenu } from "./menu.js";
 import { Cards, wanted } from "./cards.js";
-import { startTop, overBar, barH } from "./top.js";
+import { startTop, overBar, barH, herdrTabBar } from "./top.js";
 import { HelperUI, isRemoteProblem } from "./helpercard.js";
 
 export const POLL_MS = 2000;
@@ -388,6 +389,8 @@ export class ChatView {
       // No press stop on the content: under Herdr 0.1.13 an ancestor's stop_propagation on the left press
       // makes TextView text unselectable. Put the stop back (so content presses don't drag the window; the
       // block has window_drag for the bar) once Herdr fixes that. The reply box and the cards keep theirs.
+      // Under Herdr's tab bar: the Chat | Terminal switch, for an agent (the own layout's bar has it in the tab menu).
+      .when(herdrTabBar() && Boolean(f), (el) => el.child(switchStrip(t, "chat")))
       .child(v_flex().flex_1().min_h(0)
         .child(this.appear.wrap(main, "chat-body", this.address, cx).flex_1().min_h(0).flex().flex_col()))
       .when(Boolean(this.helper.removeCard(t, this.refresh)), (el) => el.child(h_flex().w_full().px(16).pt(8).justify_center()
