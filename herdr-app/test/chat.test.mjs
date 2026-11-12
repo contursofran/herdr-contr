@@ -208,7 +208,8 @@ test("messages for a missing sidecar, a wrong protocol and a non-agent terminal"
     const cx = fakeCx(); const v = new ChatView(cx); await cx.settle(); return textOf(v.render(cx)); };
   const missing = await show(null);
   assert.match(missing, /sidecar did not answer/);
-  assert.match(missing, /helper is missing\. Get it from github\.com\/minchenlee\/flockbook\/releases\./);
+  assert.match(missing, /helper is missing\. Build it: cargo build --release -p herdr-contr-feed \(in xplat\), then herdr-contr-feed install --helper <it>\./);
+  assert.doesNotMatch(missing, /flockbook/i);
   assert.match(await show(() => jl({ ...header, protocol: 2 }, end)), /protocol 2; this mod needs 1/);
   assert.match(await show(() => jl(header, { type: "error", code: "not-agent", message: "t1 runs no agent" }, { type: "end", ok: false })), /runs no agent/);
   assert.match(await show(() => jl(header, logLine("c1", null), { type: "splice", at: 0, count: 0 }, end)), /No conversation yet/);

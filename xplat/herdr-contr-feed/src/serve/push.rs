@@ -98,7 +98,7 @@ pub fn decrypt(body: &[u8], ua: &p256::SecretKey, auth: &[u8]) -> Option<Vec<u8>
 }
 
 /// The VAPID contact every push service sees: the project page, never the helper's own address.
-pub const SUBJECT: &str = "https://github.com/minchenlee/flockbook";
+pub const SUBJECT: &str = "https://github.com/contursofran/herdr-contr";
 
 /// `Authorization: vapid t=<jwt>, k=<public key>` (RFC 8292). `audience`: the endpoint's origin. Valid 12 hours.
 pub fn vapid(audience: &str, subject: &str, key: &p256::ecdsa::SigningKey, now_s: u64) -> String {

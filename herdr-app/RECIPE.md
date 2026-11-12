@@ -213,12 +213,9 @@ per 900 ms, as Herdr's own); done is a check
 - **Programs**:
   - `herdr-contr-feed`, a helper program at `<herdr-app home>/herdr-contr/bin/herdr-contr-feed`
     (make it executable). The gallery copies only `layouts/` and `mods/`, so get the helper on its
-    own: the release's one-line install
-    (`curl -fsSL https://github.com/minchenlee/flockbook/releases/latest/download/install.sh | sh`)
-    or the zip's `./install.sh` puts it there. The zip `herdr-contr-<version>.zip` at
-    <https://github.com/minchenlee/flockbook/releases> has it for macOS (`bin/`, signed universal) and
-    Linux (`remote/<target>/`); or build it from that repo with
-    `(cd xplat && cargo build --release -p herdr-contr-feed)`. It reads each agent's session log
+    own: build it in this repository with
+    `(cd xplat && cargo build --release -p herdr-contr-feed)`, then run
+    `xplat/target/release/herdr-contr-feed install --helper xplat/target/release/herdr-contr-feed`. It reads each agent's session log
     (`~/.claude/projects/`, `~/.codex/sessions/`, `~/.grok/sessions/`, `~/.cursor/projects/`,
     `~/.pi/agent/sessions/`, `~/.gemini/antigravity-cli/`) and talks to herdr-core (`hc`) to read
     screens and send keys and text. Commands: `feed`, `status`, `card`, `approve`, `answer`,
@@ -238,8 +235,8 @@ per 900 ms, as Herdr's own); done is a check
 
 - The mod alone draws nothing, and the layout alone shows empty blocks. Copy both, and the themes
   the layout names.
-- Without the helper, the chat says "The herdr-contr helper is missing. Get it from
-  github.com/minchenlee/flockbook/releases." Every other view still works.
+- Without the helper, the chat says "The herdr-contr helper is missing. Build it:
+  cargo build --release -p herdr-contr-feed (in xplat), then herdr-contr-feed install --helper <it>." Every other view still works.
 - Tell the person before adding it: the mod runs programs (`exec` of the helper and `osascript`;
   the helper runs `hc` and sends keys and text to agents' terminals, only on a press or a key), and
   reads files outside its folder: the agents' session logs (`~/.claude/projects/`,
