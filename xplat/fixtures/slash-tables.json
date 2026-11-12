@@ -1,5 +1,5 @@
 {
- "about": "The built-in \"/\" commands and /model values per agent kind. The Rust helper (xplat/flockbook-modfeed commands.rs, models.rs) and the Mac app (HerdrKit SlashCommands) each hold these tables in code; a test on each side compares its tables with this file, so they stay in step. Change all three together.",
+ "about": "The built-in \"/\" commands and /model values per agent kind. The Rust helper (xplat/herdr-contr-feed commands.rs, models.rs) and the Mac app (HerdrKit SlashCommands) each hold these tables in code; a test on each side compares its tables with this file, so they stay in step. Change all three together.",
  "efforts": [
   "low",
   "medium",

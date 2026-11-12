@@ -5,8 +5,8 @@
 // boxes. Both use blocks.js; a text in KNOWN_MISMATCH would be one they still split differently (none now).
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { markdownHeight, rowHeight } from "../mods/flockbook/estimate.js";
-import { splitBlocks } from "../mods/flockbook/mdblocks.js";
+import { markdownHeight, rowHeight } from "../mods/herdr-contr/estimate.js";
+import { splitBlocks } from "../mods/herdr-contr/mdblocks.js";
 import { TEXTS, KNOWN_MISMATCH, WIDTHS, ROWS } from "./rowgolden.texts.mjs";
 
 // markdownHeight at WIDTHS (748, 400).

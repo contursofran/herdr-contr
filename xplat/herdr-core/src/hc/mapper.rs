@@ -96,7 +96,7 @@ fn last_path_component(p: &str) -> String {
     t.rsplit('/').next().unwrap_or(t).to_string()
 }
 
-/// Agent programs Flockbook knows, by executable name.
+/// Agent programs herdr-contr knows, by executable name.
 fn known_kind(w: &str) -> Option<&'static str> {
     Some(match w {
         "claude" => "claude",

@@ -1,9 +1,9 @@
 # Mod ↔ sidecar protocol (version 1)
 
-The Flockbook mod draws the screens. A sidecar program reads the agents' session logs and talks to
+The herdr-contr mod draws the screens. A sidecar program reads the agents' session logs and talks to
 herdr-core. This file is the contract between them. Any sidecar that prints these lines works with
-the mod, whatever language it is written in (the first one is Swift, `flockbook-modfeed` in the
-Flockbook repo).
+the mod, whatever language it is written in (the first one is Swift, `herdr-contr-feed` in the
+herdr-contr repo).
 
 ## Rules
 
@@ -21,7 +21,7 @@ Flockbook repo).
 
 ## Finding the sidecar
 
-1. The mod looks for `<herdr-app home>/flockbook/bin/flockbook-modfeed` (`appHome()` in the mod).
+1. The mod looks for `<herdr-app home>/herdr-contr/bin/herdr-contr-feed` (`appHome()` in the mod).
 2. It runs `version`. It uses the sidecar only when `header.protocol` is `1`.
 3. Missing sidecar, or another protocol number: the chat view says so and shows no conversation.
    The tab bar, sidebar and "Needs you" screen still work (they read herdr-app's own data).
@@ -30,12 +30,12 @@ Flockbook repo).
 
 ```json
 { "protocol": 1, "version": "0.1.0",
-  "assets": [ { "os": "macos", "arch": "arm64", "url": "https://…/flockbook-modfeed-macos-arm64", "sha256": "…" } ] }
+  "assets": [ { "os": "macos", "arch": "arm64", "url": "https://…/herdr-contr-feed-macos-arm64", "sha256": "…" } ] }
 ```
 
-On first start, with no sidecar in `flockbook/bin/`, the mod downloads the asset for this machine
-into `flockbook/bin/.download`, checks its SHA-256, makes it executable, then renames it to
-`flockbook-modfeed`. A wrong checksum deletes the download and shows an error. Version 1 of the mod
+On first start, with no sidecar in `herdr-contr/bin/`, the mod downloads the asset for this machine
+into `herdr-contr/bin/.download`, checks its SHA-256, makes it executable, then renames it to
+`herdr-contr-feed`. A wrong checksum deletes the download and shows an error. Version 1 of the mod
 does not download; `install-isolated.sh` copies the sidecar in.
 
 ## Commands
@@ -53,18 +53,17 @@ does not download; `install-isolated.sh` copies the sidecar in.
 | `commands` | `--terminal <addr>` `[--cache <file>]` (Rust sidecar only) | `commands` |
 | `helper install` | `--machine <m> --sha256 <hex> [--cache <file>]` | `installed` |
 | `helper remove` | `--machine <m> [--cache <file>]` | `removed` |
-| `update-check` | `--home <herdr-app home>` `[--dismiss <x.y.z>]` (Rust sidecar only) | `update` |
 | `phone status` / `on` / `off` | `--home <herdr-app home>` (Rust sidecar only) | `phone` |
 
 `card` and `commands` only read. `approve` and `answer` send keys to the agent; the mod runs them only when the
 owner presses a button, never on a timer. `send` types a message and presses Enter.
 
 `<addr>` is the herdr-core terminal address (`t7`). The pane id form (`hc:t7`) also works.
-`--cache` is a file the sidecar may read and write; the mod passes `<herdr-app home>/flockbook/cache.json`.
+`--cache` is a file the sidecar may read and write; the mod passes `<herdr-app home>/herdr-contr/cache.json`.
 `--home <herdr-app home>`: every command takes it, and the mod always passes its `appHome()`, last; the last `--home`
 counts, so a `--text` that says `--home` is not taken for it. The sidecar reads the
-settings in `<home>/flockbook/config.json` from it (without it: the folder the sidecar is in, when that is
-`<home>/flockbook/bin`). With `"remote_helper": "never"`, every command for a terminal on another machine, and
+settings in `<home>/herdr-contr/config.json` from it (without it: the folder the sidecar is in, when that is
+`<home>/herdr-contr/bin`). With `"remote_helper": "never"`, every command for a terminal on another machine, and
 `helper install` and `remove`, stop with the error `remote-off` before anything runs there.
 
 ### Terminals on another machine (`m/t7`; Rust sidecar only)
@@ -73,11 +72,11 @@ The same helper runs on machine `m` with the same command and `--terminal t7`. F
 finds the platform there with `uname -sm` (`argv`). A machine without a helper target (Windows,
 another CPU) gets `remote_helper_unsupported` and nothing else runs there. On Unix, hc `machine.exec`
 gets `argv` `["sh", "-c", <fixed script>, "sh", <command>, <values>…]`: the fixed script runs
-`"$HOME"/.local/share/flockbook/helper/<version>/flockbook-modfeed` (so the cwd of exec does not
+`"$HOME"/.local/share/herdr-contr/helper/<version>/herdr-contr-feed` (so the cwd of exec does not
 matter), and the values are only in `"$@"`, so the shell never reads them: `--text` reaches the helper
 exactly as given.
 Its lines come back unchanged, so `header`, `end` and everything between are the helper's there.
-The helper there keeps its own cache (`"$HOME"/.cache/flockbook/cache.json` there); this computer's
+The helper there keeps its own cache (`"$HOME"/.cache/herdr-contr/cache.json` there); this computer's
 `--cache` is not passed on. `send --file`: the file is first put beside the terminal there (`terminal.put`) and the
 text names that copy. Only one level: `a/b/t7` is `bad_terminal`. The Swift sidecar does not do
 this: it answers `not-agent` for these terminals.
@@ -87,23 +86,23 @@ another machine without the user's yes:
 
 1. A command for `m/t7` answers `remote_helper_missing` (or `remote_helper_outdated`) with
    `install`: `{"machine","target","path","bytes","sha256","source"}`, or `null` when this
-   Flockbook carries no helper for that platform.
+   herdr-contr carries no helper for that platform.
 2. The mod shows a card with the machine, the path there, the size and the sha256. `source`
-   `"dev"` means the file is from `FLOCKBOOK_REMOTE_HELPERS` (a test or local build), not from the
-   installed Flockbook: the card says so.
+   `"dev"` means the file is from `HERDR_CONTR_REMOTE_HELPERS` (a test or local build), not from the
+   installed herdr-contr: the card says so.
 3. Only when the user presses Install: `helper install --machine m --sha256 <the card's sha256>`.
    The sidecar reads the file again, checks it against `SHA256SUMS` and that sha256, and writes it
    there in parts of at most 6 MiB with this run's own tag. Then one command there joins the parts,
    computes the sha256, and only when it matches makes the file runnable and moves it in place.
    When it does not match, the file is removed.
-4. `helper remove --machine m` removes `~/.local/share/flockbook/helper` there (every version).
+4. `helper remove --machine m` removes `~/.local/share/herdr-contr/helper` there (every version).
 5. With `--cache <file>` the sidecar keeps `remote.json` beside that file: each machine's platform
    and "no helper there" for 60 s, and the local file's sha256 while its path, size and mtime stay
    the same. `helper install` and `remove` reset "no helper there". The install reads and checks the
    whole file again in any case.
 
-The file comes from `<herdr-app home>/flockbook/remote/<target>/flockbook-modfeed`, with
-`SHA256SUMS` in `remote/` (`<sha256>  <target>/flockbook-modfeed`, a leading `./` is fine) or in
+The file comes from `<herdr-app home>/herdr-contr/remote/<target>/herdr-contr-feed`, with
+`SHA256SUMS` in `remote/` (`<sha256>  <target>/herdr-contr-feed`, a leading `./` is fine) or in
 `remote/<target>/`. A file that names the helper twice, or a sum that is not 64 hex digits, gives
 `checksum`.
 Targets: `x86_64-unknown-linux-musl`, `aarch64-unknown-linux-musl`, `universal-apple-darwin`.
@@ -150,7 +149,7 @@ Targets: `x86_64-unknown-linux-musl`, `aarch64-unknown-linux-musl`, `universal-a
 | `remote_helper_outdated` | The helper there is another version. `remote`: its `protocol` and `sidecar`; `install` as above. |
 | `remote_helper_unsupported` | No helper for that machine's platform (Windows, or another CPU). `message` says which. |
 | `no-tailscale` | `phone on`: Tailscale is not installed, not running or not signed in. Nothing was written. |
-| `by-hand` | `phone on` / `off`: the service file was set up by hand (no Flockbook marker). It was not changed. |
+| `by-hand` | `phone on` / `off`: the service file was set up by hand (no herdr-contr marker). It was not changed. |
 | `service` | `phone on`: launchctl or systemctl failed (bootstrap is tried a few times while launchd is still busy), or `id -u` failed; `message` says which and its output. |
 | `bad-value` | `phone on`: the login (config.json `phone_user`) has spaces or control characters, or HC_SESSION / HC_SOCKET has a control character. Nothing was written. |
 | `write` | `phone on` / `off`: the service file could not be written or removed; `message` says why. No `.new` file is left. |
@@ -161,34 +160,23 @@ Targets: `x86_64-unknown-linux-musl`, `aarch64-unknown-linux-musl`, `universal-a
 ### `version`
 
 ```json
-{"commands":["version","feed","status","card","approve","answer","send","paste-image","helper","update-check","queue","phone","commands"],"release":"0.9.0","type":"version"}
+{"commands":["version","feed","status","card","approve","answer","send","paste-image","helper","queue","phone","commands"],"release":"0.9.0","type":"version"}
 ```
 
 `commands`: the commands this sidecar has. The mod hides actions whose command is missing.
-`release`: the Flockbook release this helper was built for (`x.y.z`, what `update-check` compares with), or
+`release`: the herdr-contr release this helper was built for (`x.y.z`), or
 `null` for a build from source. The release's package job checks that every helper it ships says the tag's version.
-
-### `update` (`update-check`)
-
-```json
-{"command":"curl -fsSL https://github.com/minchenlee/flockbook/releases/latest/download/install.sh | sh","current":"0.8.0","latest":"0.9.0","state":"newer","type":"update"}
-```
-
-`state`: `newer` (show the line), `current`, `dismissed` (`--dismiss` hid that version), `off` (config.json
-`check_updates: false`; nothing asked), `unknown` (the sidecar has no release version: built from source; nothing
-asked), `no-home`, or `error` (no answer yet, for example offline). Only `newer` shows anything. It asks
-`api.github.com` for the latest release at most once a day, and keeps the answer in `<home>/flockbook/update-check.json`.
 
 ### `phone` (`phone status`, `on`, `off`)
 
 ```json
-{"port":8787,"qr":"<home>/flockbook/phone-qr-1a2b3c4d.svg","read_only":false,"serve":{"command":"tailscale serve --bg 8787","reason":null,"set":true,"url":"https://box.tail1.ts.net/"},"service":{"file":"/home/me/.config/systemd/user/flockbook-serve.service","kind":"systemd","message":null,"state":"running"},"tailscale":{"dns":"box.tail1.ts.net","login":"me@example.com"},"tailscale_error":null,"type":"phone","user":"me@example.com"}
+{"port":8787,"qr":"<home>/herdr-contr/phone-qr-1a2b3c4d.svg","read_only":false,"serve":{"command":"tailscale serve --bg 8787","reason":null,"set":true,"url":"https://box.tail1.ts.net/"},"service":{"file":"/home/me/.config/systemd/user/herdr-contr-serve.service","kind":"systemd","message":null,"state":"running"},"tailscale":{"dns":"box.tail1.ts.net","login":"me@example.com"},"tailscale_error":null,"type":"phone","user":"me@example.com"}
 ```
 
 The phone page (`serve`, SERVE.md) as a user service. Every answer has this line, also after an `error`.
 `on` writes the service file that `serve --print` makes, with a marker line and the app's `HC_SESSION` /
-`HC_SOCKET`, and loads it (launchd agent `~/Library/LaunchAgents/dev.flockbook.serve.plist`; systemd user unit
-`~/.config/systemd/user/flockbook-serve.service`). Run again, it writes the file again with the current
+`HC_SOCKET`, and loads it (launchd agent `~/Library/LaunchAgents/dev.herdr-contr.serve.plist`; systemd user unit
+`~/.config/systemd/user/herdr-contr-serve.service`). Run again, it writes the file again with the current
 settings and restarts it. `off` stops it and removes that file, only when it has the marker.
 
 - `tailscale`: the login and machine name from `tailscale status --json`, or null with `tailscale_error`.
@@ -199,7 +187,7 @@ settings and restarts it. `off` stops it and removes that file, only when it has
   command would replace it: `command` is `tailscale serve --bg --https=8443 <port>` (the first free of 8443,
   10443, …) and `reason` says why (else null). The address keeps a port other than 443
   (`https://box.tail1.ts.net:8443/`). `qr`: an SVG QR code of the address, once it is set:
-  `<home>/flockbook/phone-qr-<8 hex of its sha256>.svg`, a new name for a new address; the helper removes its older
+  `<home>/herdr-contr/phone-qr-<8 hex of its sha256>.svg`, a new name for a new address; the helper removes its older
   `phone-qr*.svg` files there. The mod draws it from the path under the app home (`svg()` reads from the app root).
 - `service.state`: `off` (no file), `running`, `stopped`, `error` (`message` says where its log is), or
   `by-hand` (a file without the marker; never changed).
@@ -207,15 +195,15 @@ settings and restarts it. `off` stops it and removes that file, only when it has
 ### `installed` (`helper install`), `removed` (`helper remove`)
 
 ```json
-{"bytes":4371392,"machine":"box","parts":1,"path":"~/.local/share/flockbook/helper/0.1.0/flockbook-modfeed","sha256":"7ac5…","source":"release","type":"installed"}
-{"machine":"box","path":"~/.local/share/flockbook/helper","type":"removed"}
+{"bytes":4371392,"machine":"box","parts":1,"path":"~/.local/share/herdr-contr/helper/0.1.0/herdr-contr-feed","sha256":"7ac5…","source":"release","type":"installed"}
+{"machine":"box","path":"~/.local/share/herdr-contr/helper","type":"removed"}
 ```
 
 ### `files`, `image` (`paste-image --dir <folder>`)
 
 ```json
 {"paths":["/home/you/Desktop/Shot 1.png","/home/you/notes.txt"],"type":"files"}
-{"path":"/home/you/.config/herdr-app/flockbook/paste/paste-20261105-140000-A1B2C3.png","type":"image"}
+{"path":"/home/you/.config/herdr-app/herdr-contr/paste/paste-20261105-140000-A1B2C3.png","type":"image"}
 ```
 
 What ⌘V in the reply box attaches. `files`: files copied in Finder or a file manager (file URLs), in order;
@@ -329,7 +317,7 @@ approval is the `card` command's job.
 
 | Field | Meaning |
 |---|---|
-| `source` | `statusline` (Flockbook's status line wrapper is on), `log` (only the model, from the log), `none`. |
+| `source` | `statusline` (herdr-contr's status line wrapper is on), `log` (only the model, from the log), `none`. |
 | `tags[]` | `kind` (`model`, `effort`, `context`, `cost`, `own`), `text`, `percent` (context only), `warn` (context 80% or more). |
 
 The mod adds the cwd, the branch and the agent name from herdr-app's own `panes()` data.
@@ -436,7 +424,7 @@ files only; no key goes to the agent. Another agent: `commands` is empty (the mo
 | `sent` | The keys or the text went out. | Clears the card or the composer. |
 | `changed` | Another card, or none, is on screen now. Nothing was sent. | Reads `card` again. |
 | `unconfirmed` | herdr-core did not answer in time. The text or the key may still arrive. | Keeps the composer empty (a retry could send it twice) and says so; an approval shows as `answered`. |
-| `no-identity` | Flockbook cannot tell the agent from another program in that terminal (hc: no process, for example under a wrapper script). Nothing was sent; a retry does not help. | Keeps the text or the card, shows `message`. |
+| `no-identity` | herdr-contr cannot tell the agent from another program in that terminal (hc: no process, for example under a wrapper script). Nothing was sent; a retry does not help. | Keeps the text or the card, shows `message`. |
 | `answered` | `approve` only: this prompt was answered less than 60 s ago (or its key may still arrive) and is still on screen. Nothing was sent. | Shows the note; no buttons. |
 | `busy` | `approve` only: another press of a prompt in this terminal (another view, or a double key) was being handled at the same moment. Nothing was sent and nothing is decided. | Keeps the card and its buttons, shows `message` (press again). |
 | `opens_screen` | `send` only: the text is a screen command alone (`/model`, `/status`), and its screen would open in the terminal. Nothing was sent. `message` says what to add. | Keeps the text, shows `message`. |

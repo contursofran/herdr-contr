@@ -1,11 +1,11 @@
-// The dark `flockbook` theme keeps its own black-and-white accent and state colors on the same base colors
-// as `flockbook-mac`, and its text stays readable on every base color.
+// The dark `herdr-contr` theme keeps its own black-and-white accent and state colors on the same base colors
+// as `herdr-contr-mac`, and its text stays readable on every base color.
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 
 const load = (name) => JSON.parse(readFileSync(new URL(`../themes/${name}.json`, import.meta.url), "utf8"));
-const mono = load("flockbook"), mac = load("flockbook-mac");
+const mono = load("herdr-contr"), mac = load("herdr-contr-mac");
 const BASE = ["canvas", "chrome", "raised", "hover", "selected", "border"];
 
 // WCAG contrast ratio of two #rrggbb colors.
@@ -16,12 +16,12 @@ const lum = (hex) => {
 };
 const contrast = (a, b) => { const [x, y] = [lum(a), lum(b)].sort((p, q) => q - p); return (x + 0.05) / (y + 0.05); };
 
-test("the flockbook dark theme has the flockbook-mac base colors", () => {
+test("the herdr-contr dark theme has the herdr-contr-mac base colors", () => {
   assert.equal(mono.background, mac.background);
   for (const k of BASE) assert.equal(mono.colors[k], mac.colors[k], k);
 });
 
-test("the flockbook dark theme keeps its own black-and-white accent and state colors", () => {
+test("the herdr-contr dark theme keeps its own black-and-white accent and state colors", () => {
   for (const k of ["accent", "done", "blocked"]) assert.equal(mono.colors[k], mono.foreground, k);
   assert.equal(mono.colors.working, mono.colors.muted);
 });

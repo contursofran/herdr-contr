@@ -2,7 +2,7 @@
 //! `HC_SOCKET` overrides the endpoint; else `$XDG_RUNTIME_DIR/herdr-core/<session>.sock` when that variable is set;
 //! else `/run/user/<uid>/herdr-core/` when it exists (Linux only in practice); else the session's state directory,
 //! `${XDG_STATE_HOME:-~/.local/state}/herdr-core/<session>/<session>.sock`. The session name comes from
-//! `HC_SESSION`, default `default`. Flockbook's overrides on top: `--hc-socket <path>` and `HERDR_DESK_HC_SOCKET`.
+//! `HC_SESSION`, default `default`. herdr-contr's overrides on top: `--hc-socket <path>` and `HERDR_DESK_HC_SOCKET`.
 
 use std::collections::HashMap;
 

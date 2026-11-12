@@ -1,4 +1,4 @@
-// Flockbook service worker: shows the hub's Web Push messages and opens the agent when one is tapped. No fetch
+// herdr-contr service worker: shows the hub's Web Push messages and opens the agent when one is tapped. No fetch
 // handler and no cache: the page always comes from the hub. A classic script (no imports), served as /sw.js.
 //
 // A message is JSON from the Mac (`PushNotice` in HerdrKit): {title, body?, tag?, pane?}. It holds no conversation
@@ -30,7 +30,7 @@ function swNotice(data: unknown): { title: string; options: NotificationOptions 
   const pane = text(d.pane, 200);
   const tag = text(d.tag, 200);
   return {
-    title: text(d.title, 120) || "Flockbook",
+    title: text(d.title, 120) || "herdr-contr",
     options: { body: text(d.body, 200), icon: "icon-192.png", tag: tag || undefined, data: { pane: pane || null } },
   };
 }

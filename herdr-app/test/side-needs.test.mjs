@@ -4,9 +4,9 @@ import { fake, log, reset } from "./stub/herdr.mjs";
 import { textOf, byId } from "./stub/ui.mjs";
 import { fakeCx } from "./fake-cx.mjs";
 import { agent, space } from "./fixtures.mjs";
-import { SideView, tabMarks, monogram } from "../mods/flockbook/side.js";
-import { NeedsView } from "../mods/flockbook/needs.js";
-import { KEY_AGENT } from "../mods/flockbook/state.js";
+import { SideView, tabMarks, monogram } from "../mods/herdr-contr/side.js";
+import { NeedsView } from "../mods/herdr-contr/needs.js";
+import { KEY_AGENT } from "../mods/herdr-contr/state.js";
 
 const tab = (id, status) => ({ id, status });
 
@@ -31,7 +31,7 @@ test("side: Needs you badge, one row per space, clicks run herdr commands", () =
   byId(el, "space-sp2")._h.on_click({}, fakeCx());
   assert.deepEqual(log.run.slice(-2), [["space.select", { id: "sp2" }], ["layout.select", { stack: "screen", child: "chat" }]],
     "a workspace click leaves Needs you for that workspace's chat");
-  assert.equal(fake.shared["flockbook.agent"], null, "the chat starts at that workspace's first agent");
+  assert.equal(fake.shared["herdr-contr.agent"], null, "the chat starts at that workspace's first agent");
   byId(el, "space-new")._h.on_click({}, fakeCx());
   assert.deepEqual(log.run.at(-1), ["space.new", undefined]);
   byId(el, "side-needs")._h.on_click({}, fakeCx());

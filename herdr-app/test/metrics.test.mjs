@@ -1,7 +1,7 @@
 // The derived row sizes keep the numbers the drawing and the estimate used before they were shared.
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { CHIP_ROW, bubbleWidth, bubbleTextWidth, ROW_PAD_Y, BUBBLE_PAD_Y } from "../mods/flockbook/metrics.js";
+import { CHIP_ROW, bubbleWidth, bubbleTextWidth, ROW_PAD_Y, BUBBLE_PAD_Y } from "../mods/herdr-contr/metrics.js";
 
 test("a chip row is 40 px; the bubble 78% of the column, its text 28 px narrower", () => {
   assert.equal(CHIP_ROW, 40);

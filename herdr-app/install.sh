@@ -1,6 +1,6 @@
 #!/bin/sh
-# Installs Flockbook for the Herdr app from this folder (the release zip). It runs
-# `flockbook-modfeed install` with this machine's helper and the helpers for other machines (remote/).
+# Installs herdr-contr for the Herdr app from this folder (the release zip). It runs
+# `herdr-contr-feed install` with this machine's helper and the helpers for other machines (remote/).
 # The helper: bin/ on macOS (the signed one); remote/<target>/ on Linux, checked against remote/SHA256SUMS.
 # The layout, mod, themes and keys are built into the helper; python3 is not needed.
 # Usage: ./install.sh [--home <herdr-app home>] [--dry-run]     (./install.sh --help: every option)
@@ -11,15 +11,15 @@ die() { echo "STOP: $*" >&2; exit 1; }
 
 os="$(uname -s)"
 case "$os" in
-  Darwin) rel=bin/flockbook-modfeed ;;
+  Darwin) rel=bin/herdr-contr-feed ;;
   Linux)
     case "$(uname -m)" in
-      x86_64|amd64) rel=remote/x86_64-unknown-linux-musl/flockbook-modfeed ;;
-      aarch64|arm64) rel=remote/aarch64-unknown-linux-musl/flockbook-modfeed ;;
+      x86_64|amd64) rel=remote/x86_64-unknown-linux-musl/herdr-contr-feed ;;
+      aarch64|arm64) rel=remote/aarch64-unknown-linux-musl/herdr-contr-feed ;;
       *) die "there is no helper for Linux on $(uname -m) yet." ;;
     esac ;;
-  MINGW* | MSYS* | CYGWIN*) die "Windows is not supported yet. Flockbook for the Herdr app installs on macOS and Linux." ;;
-  *) die "$os is not supported yet. Flockbook for the Herdr app installs on macOS and Linux." ;;
+  MINGW* | MSYS* | CYGWIN*) die "Windows is not supported yet. herdr-contr for the Herdr app installs on macOS and Linux." ;;
+  *) die "$os is not supported yet. herdr-contr for the Herdr app installs on macOS and Linux." ;;
 esac
 
 exe="$here/$rel"
@@ -36,12 +36,12 @@ if [ -x "$exe" ]; then
       ;;
   esac
 else
-  exe="${FLOCKBOOK_MODFEED:-}"
+  exe="${HERDR_CONTR_FEED:-}"
 fi
 if [ -z "$exe" ] || [ ! -x "$exe" ]; then
   echo "STOP: no helper at $here/$rel." >&2
-  echo "In the repo, build one: (cd xplat && cargo build --release -p flockbook-modfeed)," >&2
-  echo "then run: xplat/target/release/flockbook-modfeed install --helper xplat/target/release/flockbook-modfeed" >&2
+  echo "In the repo, build one: (cd xplat && cargo build --release -p herdr-contr-feed)," >&2
+  echo "then run: xplat/target/release/herdr-contr-feed install --helper xplat/target/release/herdr-contr-feed" >&2
   exit 1
 fi
 set -- --helper "$exe" "$@"

@@ -64,7 +64,7 @@ const push = (data) => ({ data: data === undefined ? null : { json: () => (typeo
   await w.fire("push", push());
   await w.fire("push", push("not json"));
   await w.fire("push", push(["a list"]));
-  check(w.did.shown.length === 3 && w.did.shown.every((n) => n.title === "Flockbook" && n.options.body === "" && n.options.data.pane === null),
+  check(w.did.shown.length === 3 && w.did.shown.every((n) => n.title === "herdr-contr" && n.options.body === "" && n.options.data.pane === null),
     "push: no data, bad JSON or a wrong shape still shows a notification");
 }
 {

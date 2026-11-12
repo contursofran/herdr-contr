@@ -4,10 +4,10 @@ import { fake, log, reset } from "./stub/herdr.mjs";
 import { textOf, byId, calls, lastList } from "./stub/ui.mjs";
 import { fakeCx } from "./fake-cx.mjs";
 import { agent, space } from "./fixtures.mjs";
-import { ChatView, chipIcon, oneLine } from "../mods/flockbook/chat.js";
-import { parseAnswer } from "../mods/flockbook/sidecar.js";
-import { emptyFeed, applyFeed, applyOlder, olderFrom } from "../mods/flockbook/feedstate.js";
-import { wrapLines, markdownHeight, rowHeight, LH } from "../mods/flockbook/estimate.js";
+import { ChatView, chipIcon, oneLine } from "../mods/herdr-contr/chat.js";
+import { parseAnswer } from "../mods/herdr-contr/sidecar.js";
+import { emptyFeed, applyFeed, applyOlder, olderFrom } from "../mods/herdr-contr/feedstate.js";
+import { wrapLines, markdownHeight, rowHeight, LH } from "../mods/herdr-contr/estimate.js";
 
 const jl = (...lines) => ({ code: 0, stdout: lines.map((l) => JSON.stringify(l)).join("\n") + "\n", stderr: "" });
 const header = { type: "header", protocol: 1, sidecar: "0.1.0", command: "feed" };
@@ -91,7 +91,7 @@ test("the chat loads the shown agent's feed, opens at the newest row, and passes
   const v = new ChatView(cx); await cx.settle();
   const feeds = () => log.exec.filter(([, a]) => a[0] === "feed");
   const [cmd, args] = feeds()[0];
-  assert.match(cmd, /flockbook\/bin\/flockbook-modfeed$/);
+  assert.match(cmd, /herdr-contr\/bin\/herdr-contr-feed$/);
   assert.deepEqual(args.slice(0, 3), ["feed", "--terminal", "t1"]);
   v.width = 900;
   v.render(cx);
@@ -218,7 +218,7 @@ test("switching agents shows the other agent's rows", async () => {
   fake.agents = [agent("t1", "idle"), agent("t2", "idle")];
   fake.exec = (_c, args) => jl(header, logLine("c-" + args[2]), { type: "splice", at: 0, count: 1 }, user("u-" + args[2], "from " + args[2]), end);
   const cx = fakeCx(); const v = new ChatView(cx); await cx.settle(); v.width = 900;
-  fake.shared["flockbook.agent"] = "t2";
+  fake.shared["herdr-contr.agent"] = "t2";
   await v.tick(cx); await cx.settle();
   v.render(cx);
   assert.match(textOf(lastList._args.render({ start: 0, end: 1 })[0]), /from t2/);
@@ -235,7 +235,7 @@ test("a call without a result shows as running, not as an approval", async () =>
 });
 
 test("cmd-alt-up / down switch spaces from the chat; other keys pass", async () => {
-  const { spaceKey } = await import("../mods/flockbook/chat.js");
+  const { spaceKey } = await import("../mods/herdr-contr/chat.js");
   const m = (x) => ({ shift: false, control: false, alt: false, platform: false, function: false, ...x });
   assert.equal(spaceKey({ key: "up", modifiers: m({ platform: true, alt: true }) }), "space.prev");
   assert.equal(spaceKey({ key: "down", modifiers: m({ platform: true, alt: true }) }), "space.next");
@@ -247,16 +247,16 @@ test("every chat opens at its newest row: switching back to a read chat, and com
   fake.agents = [agent("t1", "idle"), agent("t2", "idle")];
   fake.exec = (_c, args) => jl(header, logLine("c-" + args[2]), { type: "splice", at: 0, count: 2 }, user("u-" + args[2], "a"), asst("a-" + args[2], "b"), end);
   const cx = fakeCx(); const v = new ChatView(cx); await cx.settle(); v.width = 900;
-  fake.shared["flockbook.agent"] = "t2"; await v.tick(cx); await cx.settle();
+  fake.shared["herdr-contr.agent"] = "t2"; await v.tick(cx); await cx.settle();
   v.follow = false;                                  // scrolled up in t2
   fake.exec = () => jl(header, logLine("c-t1"), { type: "unchanged" }, end);
   calls.length = 0;
-  fake.shared["flockbook.agent"] = "t1"; await v.tick(cx); await cx.settle();
+  fake.shared["herdr-contr.agent"] = "t1"; await v.tick(cx); await cx.settle();
   assert.equal(v.follow, true);
   assert.deepEqual(calls.find((c) => c[0] === "scroll_to_item"), ["scroll_to_item", 1, "top"], "t1 is read and unchanged, still at its end");
-  fake.shared["flockbook.screen"] = "overview"; await v.tick(cx);
+  fake.shared["herdr-contr.screen"] = "overview"; await v.tick(cx);
   v.follow = false; calls.length = 0;
-  fake.shared["flockbook.screen"] = "chat"; await v.tick(cx);
+  fake.shared["herdr-contr.screen"] = "chat"; await v.tick(cx);
   assert.equal(v.follow, true);
   assert.deepEqual(calls.find((c) => c[0] === "scroll_to_item"), ["scroll_to_item", 1, "top"]);
 });
@@ -377,9 +377,9 @@ test("no element above a chat reply's text stops the press (Herdr 0.1.13: that m
 });
 
 test("right-click on a code box opens a menu with Copy code (that box as written) and Copy message", async () => {
-  const { MenuView } = await import("../mods/flockbook/menu.js");
-  const { BAR_H } = await import("../mods/flockbook/top.js");
-  const { codeBlockAt } = await import("../mods/flockbook/mdblocks.js");
+  const { MenuView } = await import("../mods/herdr-contr/menu.js");
+  const { BAR_H } = await import("../mods/herdr-contr/top.js");
+  const { codeBlockAt } = await import("../mods/herdr-contr/mdblocks.js");
   const text = "Run:\n\n```\n  tailscale serve 8787\n```\nThen:\n\n```\necho two\n```";
   fake.exec = () => jl(header, logLine("c1"), { type: "splice", at: 0, count: 2 }, user("u1", "hi"), asst("a1", text), end);
   const cx = fakeCx(); const v = new ChatView(cx); await cx.settle(); v.width = 900;
@@ -410,7 +410,7 @@ test("right-click on a code box opens a menu with Copy code (that box as written
 });
 
 test("Copy message copies the row's markdown as written, for user, assistant and note rows; not for others", async () => {
-  const { MenuView } = await import("../mods/flockbook/menu.js");
+  const { MenuView } = await import("../mods/herdr-contr/menu.js");
   const reply = "**Done.**\n\n- one\n- two\n\n```sh\nmake\n```";
   const note = { type: "row", id: "n1", k: "user", from: "t2 docs-worker", text: "Notes updated.\nSee notes.md" };
   fake.exec = () => jl(header, logLine("c1"), { type: "splice", at: 0, count: 4 }, user("u1", "Fix `a.rs`, please"), asst("a1", reply),

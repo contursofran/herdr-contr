@@ -28,10 +28,10 @@ jobs:
           workspaces: xplat -> target
 
       - name: Build the helper
-        run: cargo build --locked --manifest-path xplat/Cargo.toml -p flockbook-modfeed
+        run: cargo build --locked --manifest-path xplat/Cargo.toml -p herdr-contr-feed
 
       - name: Helper tests
-        run: cargo test --locked --manifest-path xplat/Cargo.toml -p flockbook-modfeed -p herdr-core
+        run: cargo test --locked --manifest-path xplat/Cargo.toml -p herdr-contr-feed -p herdr-core
 
       - uses: actions/setup-node@v4
         with:
@@ -41,5 +41,5 @@ jobs:
       - name: Mod tests
         working-directory: herdr-app
         env:
-          FLOCKBOOK_MODFEED: ${{ github.workspace }}/xplat/target/debug/flockbook-modfeed
+          HERDR_CONTR_FEED: ${{ github.workspace }}/xplat/target/debug/herdr-contr-feed
         run: npm test

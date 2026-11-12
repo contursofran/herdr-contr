@@ -356,28 +356,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d45db016d36b838f563236e9193d0ee6ce38f3f68b6c94e914b4929c96bbb890"
 
 [[package]]
-name = "flockbook-modfeed"
-version = "0.1.0"
-dependencies = [
- "aes-gcm",
- "base64",
- "chrono",
- "herdr-core",
- "hkdf",
- "indexmap",
- "p256",
- "qrcode",
- "rand_core 0.6.4",
- "rust-embed",
- "serde",
- "serde_json",
- "sha2 0.10.9",
- "tempfile",
- "tungstenite",
- "unicode-segmentation",
-]
-
-[[package]]
 name = "fsevent-sys"
 version = "4.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -481,6 +459,28 @@ name = "hashbrown"
 version = "0.17.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ed5909b6e89a2db4456e54cd5f673791d7eca6732202bbf2a9cc504fe2f9b84a"
+
+[[package]]
+name = "herdr-contr-feed"
+version = "0.1.0"
+dependencies = [
+ "aes-gcm",
+ "base64",
+ "chrono",
+ "herdr-core",
+ "hkdf",
+ "indexmap",
+ "p256",
+ "qrcode",
+ "rand_core 0.6.4",
+ "rust-embed",
+ "serde",
+ "serde_json",
+ "sha2 0.10.9",
+ "tempfile",
+ "tungstenite",
+ "unicode-segmentation",
+]
 
 [[package]]
 name = "herdr-core"

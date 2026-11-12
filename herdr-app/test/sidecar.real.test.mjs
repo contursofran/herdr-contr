@@ -1,5 +1,5 @@
-// The mod's sidecar calls against a real sidecar binary: set FLOCKBOOK_MODFEED to its path (CI does, for the Rust
-// one in xplat/flockbook-modfeed). Without it these tests are skipped. herdr-core is a fake on a Unix socket (no app, no network).
+// The mod's sidecar calls against a real sidecar binary: set HERDR_CONTR_FEED to its path (CI does, for the Rust
+// one in xplat/herdr-contr-feed). Without it these tests are skipped. herdr-core is a fake on a Unix socket (no app, no network).
 import { test, before, after } from "node:test";
 import assert from "node:assert/strict";
 import { execFile } from "node:child_process";
@@ -8,10 +8,10 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fake, reset } from "./stub/herdr.mjs";
-import { call, feed, card, approve, PROTOCOL } from "../mods/flockbook/sidecar.js";
+import { call, feed, card, approve, PROTOCOL } from "../mods/herdr-contr/sidecar.js";
 
-const bin = process.env.FLOCKBOOK_MODFEED;
-const skip = !bin || process.platform === "win32" ? "set FLOCKBOOK_MODFEED to a sidecar binary (Unix)" : false;
+const bin = process.env.HERDR_CONTR_FEED;
+const skip = !bin || process.platform === "win32" ? "set HERDR_CONTR_FEED to a sidecar binary (Unix)" : false;
 
 const screen = "Bash command\n  rm -rf build\nDo you want to proceed?\n❯ 1. Yes\n  2. No";
 const terminals = [{ address: "t1", argv: ["claude"], pid: 4242, created_ms: 1, cwd: "/tmp/proj", state: "live",

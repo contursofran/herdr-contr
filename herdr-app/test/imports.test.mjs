@@ -17,7 +17,7 @@ const EXPORTS = {
 };
 
 test("each name imported from gpui-kit or gpui-base is one that module exports", () => {
-  const dir = new URL("../mods/flockbook/", import.meta.url);
+  const dir = new URL("../mods/herdr-contr/", import.meta.url);
   let seen = 0;
   for (const f of readdirSync(dir).filter((f) => f.endsWith(".js"))) {
     const src = readFileSync(new URL(f, dir), "utf8");

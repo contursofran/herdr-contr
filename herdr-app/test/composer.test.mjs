@@ -4,9 +4,9 @@ import { fake, log, reset } from "./stub/herdr.mjs";
 import { textOf, byId } from "./stub/ui.mjs";
 import { fakeCx } from "./fake-cx.mjs";
 import { agent, space } from "./fixtures.mjs";
-import { Composer, tagsFor, shortPath, quoted, withFiles, slashQuery, matchCommands, screenNote, argItems, matchArgs } from "../mods/flockbook/composer.js";
-import { ChatView } from "../mods/flockbook/chat.js";
-import { forgetCommands } from "../mods/flockbook/sidecar.js";
+import { Composer, tagsFor, shortPath, quoted, withFiles, slashQuery, matchCommands, screenNote, argItems, matchArgs } from "../mods/herdr-contr/composer.js";
+import { ChatView } from "../mods/herdr-contr/chat.js";
+import { forgetCommands } from "../mods/herdr-contr/sidecar.js";
 
 const jl = (...lines) => ({ code: 0, stdout: lines.map((l) => JSON.stringify(l)).join("\n") + "\n", stderr: "" });
 const header = (command) => ({ type: "header", protocol: 1, sidecar: "0.1.0", command });
@@ -66,7 +66,7 @@ test("Enter sends the text and files through the sidecar, then empties the box",
   const b = c.box(fake.agents[0]);
   b.input.set_value("Fix it\n"); c.addFiles(["/tmp/a.png", "/tmp/a.png", "/tmp/b.txt"], cx);
   b.input._h.submit({}, cx); await cx.settle();
-  assert.deepEqual(sent[0], ["send", "--terminal", "t1", "--text", "Fix it /tmp/a.png /tmp/b.txt", "--file", "/tmp/a.png", "--file", "/tmp/b.txt", "--cache", "/home/test/.config/herdr-app/flockbook/cache.json", "--home", "/home/test/.config/herdr-app"]);
+  assert.deepEqual(sent[0], ["send", "--terminal", "t1", "--text", "Fix it /tmp/a.png /tmp/b.txt", "--file", "/tmp/a.png", "--file", "/tmp/b.txt", "--cache", "/home/test/.config/herdr-app/herdr-contr/cache.json", "--home", "/home/test/.config/herdr-app"]);
   assert.equal(b.input.value(), ""); assert.deepEqual(b.files, []);
 });
 
@@ -84,8 +84,8 @@ test("a blank box sends nothing; a failed send puts the text back with the reaso
   b.input.set_value("again"); await c.submit(cx);
   assert.equal(b.input.value(), "again");
   assert.match(textOf(byId(c.render(fake.agents[0], new Proxy({}, { get: (_t, k) => `#${k}` })), "send-note")), /Another agent is in this pane now/);
-  // An agent Flockbook cannot tell apart: not sent, the text comes back, the sidecar's reason as it is.
-  fake.sendResult = "no-identity"; fake.sendMessage = "Flockbook cannot tell this agent from another program in this terminal, so it sends nothing. Use the terminal.";
+  // An agent herdr-contr cannot tell apart: not sent, the text comes back, the sidecar's reason as it is.
+  fake.sendResult = "no-identity"; fake.sendMessage = "herdr-contr cannot tell this agent from another program in this terminal, so it sends nothing. Use the terminal.";
   b.input.set_value("third"); await c.submit(cx);
   assert.equal(b.input.value(), "third");
   assert.match(textOf(byId(c.render(fake.agents[0], new Proxy({}, { get: (_t, k) => `#${k}` })), "send-note")), /cannot tell this agent/);
@@ -133,7 +133,7 @@ test("the + file dialog (osascript) shows on macOS only; drop still attaches on 
 
 // ⌘V in the box: the box's own paste runs before any key handler, so the mod binds the chord under its own
 // key context and asks the sidecar first: files, else plain text (the box types it), else an image.
-const PASTE_DIR = "/home/test/.config/herdr-app/flockbook/paste";
+const PASTE_DIR = "/home/test/.config/herdr-app/herdr-contr/paste";
 function pasteRig(answer) {
   const asked = [];
   fake.exec = (cmd, args) => {
@@ -158,12 +158,12 @@ test("paste: the mod binds ⌘V (Ctrl+V on Linux) for its own box only, once", a
   const cx = fakeCx(); const bound = [];
   cx.bind_keys = (b) => { bound.push(...b); return b.length; };
   const v = new ChatView(cx); await cx.settle(); new ChatView(cx);
-  assert.deepEqual(bound.filter((b) => b.action === "flockbook_paste"), [{ keystroke: "secondary-v", action: "flockbook_paste", context: "FlockbookComposer > Input" }]);
+  assert.deepEqual(bound.filter((b) => b.action === "herdr_contr_paste"), [{ keystroke: "secondary-v", action: "herdr_contr_paste", context: "HerdrContrComposer > Input" }]);
   // The "/" list's keys, once, under the context its wrapper has only while the list shows.
-  assert.deepEqual(bound.filter((x) => x.action.startsWith("flockbook_slash")).map((x) => [x.keystroke, x.context]),
-    [["up", "FlockbookSlash > Input"], ["down", "FlockbookSlash > Input"], ["tab", "FlockbookSlash > Input"], ["escape", "FlockbookSlash > Input"]]);
+  assert.deepEqual(bound.filter((x) => x.action.startsWith("herdr_contr_slash")).map((x) => [x.keystroke, x.context]),
+    [["up", "HerdrContrSlash > Input"], ["down", "HerdrContrSlash > Input"], ["tab", "HerdrContrSlash > Input"], ["escape", "HerdrContrSlash > Input"]]);
   const el = byId(v.render(cx), "composer");
-  assert.equal(el._a.key_context, "FlockbookComposer");
+  assert.equal(el._a.key_context, "HerdrContrComposer");
   assert.equal(typeof el._h.on_action, "function");
 });
 
@@ -282,7 +282,7 @@ test("send names the agent and the log the chat showed, so the sidecar can refus
   c.seen = (address) => address === "t1" ? { agent: "claude", path: "/logs/a.jsonl" } : null;
   const b = c.box(fake.agents[0]);
   b.input.set_value("Go on"); b.input._h.submit({}, cx); await cx.settle();
-  assert.deepEqual(sent[0], ["send", "--terminal", "t1", "--text", "Go on", "--expect-kind", "claude", "--expect-path", "/logs/a.jsonl", "--cache", "/home/test/.config/herdr-app/flockbook/cache.json", "--home", "/home/test/.config/herdr-app"]);
+  assert.deepEqual(sent[0], ["send", "--terminal", "t1", "--text", "Go on", "--expect-kind", "claude", "--expect-path", "/logs/a.jsonl", "--cache", "/home/test/.config/herdr-app/herdr-contr/cache.json", "--home", "/home/test/.config/herdr-app"]);
 });
 
 test("after /clear the send says the agent started a new conversation, and the chat reads the new log at once", async () => {
@@ -372,24 +372,24 @@ test("typing / in a Claude Code chat shows its commands above the box, filtered 
   // The keys go to the list only while it shows: its key context is on then, and off without it.
   assert.equal(byId(r.view(), "slash-keys")._a.key_context, undefined);
   await r.type("/d");
-  assert.equal(byId(r.view(), "slash-keys")._a.key_context, "FlockbookSlash");
+  assert.equal(byId(r.view(), "slash-keys")._a.key_context, "HerdrContrSlash");
 });
 
 test("up and down choose (stopping at the ends), Tab completes the full name and a space; Esc closes until the text changes", async () => {
   const r = slashRig();
   await r.type("/c");
-  await r.act("flockbook_slash_up");
-  await r.act("flockbook_slash_down");
-  await r.act("flockbook_slash_complete");
+  await r.act("herdr_contr_slash_up");
+  await r.act("herdr_contr_slash_down");
+  await r.act("herdr_contr_slash_complete");
   assert.equal(r.b.input.value(), "/compact ", "up on the first row stays there; down: the second");
   assert.equal(r.rows(), null);
   assert.equal(sent.length, 0, "completing sends nothing");
   await r.type("/c");
-  for (let i = 0; i < 5; i++) await r.act("flockbook_slash_down");
-  await r.act("flockbook_slash_complete");
+  for (let i = 0; i < 5; i++) await r.act("herdr_contr_slash_down");
+  await r.act("herdr_contr_slash_complete");
   assert.equal(r.b.input.value(), "/context ", "down on the last row stays there (no wrap)");
   await r.type("/c");
-  await r.act("flockbook_slash_close");
+  await r.act("herdr_contr_slash_close");
   assert.equal(r.rows(), null, "Esc closes it");
   await r.type("/cl");
   assert.equal(r.rows().length, 1, "typing opens it again");
@@ -434,17 +434,17 @@ test("20 matches: 8 rows show; down past the last row moves the window; the coun
   await r.type("/cmd");
   assert.deepEqual(shown(r), MANY.slice(0, 8).map((c) => `/${c.name}`));
   assert.match(textOf(byId(r.view(), "slash-more")), /1–8 of 20/);
-  for (let i = 0; i < 10; i++) await r.act("flockbook_slash_down");
+  for (let i = 0; i < 10; i++) await r.act("herdr_contr_slash_down");
   assert.deepEqual(shown(r), MANY.slice(3, 11).map((c) => `/${c.name}`), "pick 10 is the window's last row: rows 3 to 10");
   assert.match(textOf(byId(r.view(), "slash-more")), /4–11 of 20/);
-  for (let i = 0; i < 20; i++) await r.act("flockbook_slash_down");
+  for (let i = 0; i < 20; i++) await r.act("herdr_contr_slash_down");
   assert.deepEqual(shown(r).at(-1), "/cmd19", "down stops at the last match");
-  for (let i = 0; i < 19; i++) await r.act("flockbook_slash_up");
+  for (let i = 0; i < 19; i++) await r.act("herdr_contr_slash_up");
   assert.deepEqual(shown(r), MANY.slice(0, 8).map((c) => `/${c.name}`), "up to the first: the window follows back");
-  for (let i = 0; i < 12; i++) await r.act("flockbook_slash_down");
+  for (let i = 0; i < 12; i++) await r.act("herdr_contr_slash_down");
   await r.type("/cmd1");
   assert.deepEqual(shown(r), MANY.slice(10, 18).map((c) => `/${c.name}`), "a new filter starts at its first match");
-  await r.act("flockbook_slash_complete");
+  await r.act("herdr_contr_slash_complete");
   assert.equal(r.b.input.value(), "/cmd10 ");
 });
 
@@ -454,7 +454,7 @@ test("the wheel moves the window a row per 30 px; the pick stays on a shown row"
   const wheel = async (dy) => { byId(r.view(), "slash")._h.on_scroll_wheel({ delta: { x: 0, y: dy }, touch_phase: "moved" }, r.cx); await r.cx.settle(); };
   await wheel(-90);
   assert.deepEqual(shown(r), MANY.slice(3, 11).map((c) => `/${c.name}`), "down 90 px: three rows");
-  await r.act("flockbook_slash_complete");
+  await r.act("herdr_contr_slash_complete");
   assert.equal(r.b.input.value(), "/cmd03 ", "the pick moved into the window");
   await r.type("/cmd");
   await wheel(-15); await wheel(-15);
@@ -510,7 +510,7 @@ test("Enter on a bare screen command sends nothing, keeps the text and says why;
 test("after \"/model \" the list offers the model names; Tab or Enter completes one, Enter on a whole one sends it", async () => {
   const r = slashRig({ list: BUILT });
   await r.type("/mo");
-  await r.act("flockbook_slash_complete");
+  await r.act("herdr_contr_slash_complete");
   assert.equal(r.b.input.value(), "/model ");
   await r.type("/model ");
   assert.deepEqual(shown(r).length, 0, "values are not commands");
@@ -519,7 +519,7 @@ test("after \"/model \" the list offers the model names; Tab or Enter completes 
   assert.deepEqual(r.rows().map((x) => x.split(/\s/)[0]), ["opus", "sonnet"], "any part of a value");
   await r.type("/model so");
   assert.deepEqual(r.rows().map((x) => x.split(/\s/)[0]), ["sonnet"]);
-  await r.act("flockbook_slash_complete");
+  await r.act("herdr_contr_slash_complete");
   assert.equal(r.b.input.value(), "/model sonnet");
   r.b.input._h.submit({}, r.cx); await r.cx.settle();
   assert.equal(sent.at(-1)[sent.at(-1).indexOf("--text") + 1], "/model sonnet");

@@ -1,10 +1,10 @@
-// Flockbook PWA: pair, agent list (Needs you first), conversation, approval and question cards, composer (input only).
+// herdr-contr PWA: pair, agent list (Needs you first), conversation, approval and question cards, composer (input only).
 // Talks to the hub on the same origin (`/ws`). Plain DOM, no packages. Remote protocol v1.
 import type { Queue, Answer, Approval, HubMessage, Item, Level, Pane, Picture, QuestionRequest, Status, StatusLine, StyledRun, Tab, Workspace } from "./protocol.ts";
 import { inline, markdown } from "./markdown.ts";
 import { monogram } from "./monogram.ts";
 
-const TOKEN_KEY = "flockbook.token", SIDE_KEY = "flockbook.side";
+const TOKEN_KEY = "herdr-contr.token", SIDE_KEY = "herdr-contr.side";
 const app = document.getElementById("app") as HTMLElement;
 /** An iPad's width (portrait too) and up: two columns (see `split`). A phone on its side is as wide but low: one column. */
 const wideScreen = matchMedia("(min-width: 768px) and (min-height: 600px)");
@@ -144,7 +144,7 @@ function ack(id: string): void {
   void request({ type: "pulledAck", pulled: id });
 }
 
-/** The Rust helper (`flockbook-modfeed serve`, `/hub.json`): Tailscale says who the owner is, so there is no pairing,
+/** The Rust helper (`herdr-contr-feed serve`, `/hub.json`): Tailscale says who the owner is, so there is no pairing,
  *  and the requests that send keys go with `POST /api` (same origin) instead of the socket. Null: the Mac hub. */
 let helper: { post: string[] } | null = null;
 
@@ -175,7 +175,7 @@ function request(msg: Record<string, unknown>, id = `c${nextId++}`): Promise<{ o
 }
 
 async function hello(): Promise<void> {
-  const r = await request({ type: "hello", token: state.token, client: "flockbook-web", clientVersion: "1" });
+  const r = await request({ type: "hello", token: state.token, client: "herdr-contr-web", clientVersion: "1" });
   if (!r.ok && r.code === "unauthorized") {
     state.token = null;
     save(TOKEN_KEY, null);
@@ -320,7 +320,7 @@ async function syncPush(hubHasOne: boolean): Promise<void> {
 }
 async function togglePush(): Promise<void> {
   if (state.notify === "busy" || !state.pushKey) return;
-  if (iosTab()) { toast("On iPhone, add Flockbook to the Home Screen first. Then turn on notifications there."); return; }
+  if (iosTab()) { toast("On iPhone, add herdr-contr to the Home Screen first. Then turn on notifications there."); return; }
   if (!pushReady()) { toast("This browser cannot show notifications."); return; }
   const was = state.notify;
   state.notify = "busy";
@@ -641,7 +641,7 @@ function draw(): void {
   keepTopRow = false;
   const focused = document.activeElement?.id;   // read first: the list's rows are made anew below
   const count = blockedPanes(state.workspaces).length;
-  document.title = count ? `(${count}) Flockbook` : "Flockbook";
+  document.title = count ? `(${count}) herdr-contr` : "herdr-contr";
   const body: Child[] = [];
   const wide = split(), showSide = sideShown();
   app.classList.toggle("split", wide);
