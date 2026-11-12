@@ -450,6 +450,19 @@ test("echoes: a sent text shows after the rows until the log has it; a repeat wa
   assert.equal(dropEcho(f, c), true); assert.equal(dropEcho(f, c), false);
 });
 
+test("an echo with a pasted image path goes when the log shows the path as [Image #N]", () => {
+  const f = emptyFeed("t1");
+  const path = "~/.config/herdr-app/herdr-contr/paste/paste-20261112-120834-E3B9D8.png";
+  const a = addEcho(f, path, 1000), b = addEcho(f, `look at  this ${path}`, 1000), c = addEcho(f, "plain text", 1000);
+  applyFeed(f, parseAnswer(jl(header, logLine("c1"), { type: "splice", at: 0, count: 0 }, user("u1", "[Image #2]"), user("u2", "look at this [Image #1]"), user("u3", "plain  text?"), end).stdout));
+  assert.equal(settleEchoes(f, 2000), true);
+  assert.deepEqual(shownRows(f).map((r) => r.id), ["u1", "u2", "u3", c.id], "normal text still needs the same text");
+  const d = addEcho(f, `see ${path}`, 3000);
+  applyFeed(f, parseAnswer(jl(header, logLine("c2"), { type: "splice", at: 3, count: 0 }, user("u4", "look [Image #3]"), end).stdout));
+  assert.equal(settleEchoes(f, 4000), false, "the rest of the text must be equal");
+  assert.ok(shownRows(f).includes(d)); void a; void b;
+});
+
 test("a sent message shows at once, dimmed, and the chat reads the feed again and fast until the log has it", async () => {
   let logged = false, feeds = 0, sends = 0, result = "sent";
   fake.exec = (_c, args) => {
