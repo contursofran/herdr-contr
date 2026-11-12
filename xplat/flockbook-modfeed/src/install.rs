@@ -170,7 +170,7 @@ pub struct Sorted {
 /// A path a Flockbook install owns: only these are ever replaced or removed as an older Flockbook's.
 fn own_path(rel: &str) -> bool {
     !rel.split('/').any(|c| c == ".." || c.is_empty())
-        && (rel == "layouts/flockbook.json" || rel.starts_with("mods/flockbook/") || (rel.starts_with("themes/") && rel.matches('/').count() == 1))
+        && (rel == "layouts/flockbook.json" || rel == "layouts/flockbook-herdr.json" || rel.starts_with("mods/flockbook/") || (rel.starts_with("themes/") && rel.matches('/').count() == 1))
 }
 
 /// Sorts what is in `home` against this version's `files`, the install.json of an earlier install (`mine`) and

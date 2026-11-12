@@ -5,7 +5,7 @@ import { h_flex } from "gpui-base";
 import { theme, layout, window, settings, openOverlay, run, setAgentOrder, nextCommand, shared, setShared } from "herdr";
 import { openMenu, tabItems } from "./menu.js";
 import { spaceAgents, spaceTabs, activeTab, currentAgent, tabLabel, screenFor, showTab, closeTab, openTerminal, showNeeds, icon, tabAgents, shownScreen,
-  SPIN_MS, FADE, sidebarShown, toggleSidebar, loadSidebar, showScreen, showOverview, showSettings, watchEdge } from "./state.js";
+  SPIN_MS, FADE, sidebarShown, herdrSidebar, toggleSidebar, loadSidebar, showScreen, showOverview, showSettings, watchEdge } from "./state.js";
 import { loadConfig, pollUpdate, updateDot, stepTextSize } from "./config.js";
 import { dragger, dropPlace } from "./drag.js";
 
@@ -29,6 +29,8 @@ const SYNC_MS = 300;
 // Room left of the bar for the macOS window buttons (no title bar), else a plain margin.
 export function lightsRoom() {
   const root = layout(), w = window();
+  // Herdr's sidebar holds the window buttons when it shows.
+  if (herdrSidebar() && sidebarShown()) return 12;
   return w?.platform === "macos" && w.titlebar === "none" && !w.fullscreen && root?.traffic_lights
     ? (root.traffic_lights[0] + 60) / (settings().zoom ?? 1) : 12;
 }

@@ -26,7 +26,10 @@ fn walk(dir: &Path, base: &Path, out: &mut Vec<(String, PathBuf)>) {
 fn main() {
     let base = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../herdr-app");
     assert!(base.join("keys.json").is_file(), "herdr-app/ must sit next to xplat/");
-    let mut files = vec![("layouts/flockbook.json".to_string(), base.join("layouts/flockbook.json"))];
+    let mut files = vec![
+        ("layouts/flockbook.json".to_string(), base.join("layouts/flockbook.json")),
+        ("layouts/flockbook-herdr.json".to_string(), base.join("layouts/flockbook-herdr.json")),
+    ];
     let themes = base.join("themes");
     println!("cargo:rerun-if-changed={}", themes.display());
     let mut names: Vec<_> = fs::read_dir(&themes).unwrap().map(|e| e.unwrap().path()).filter(|p| p.extension().is_some_and(|x| x == "json")).collect();

@@ -19,7 +19,7 @@ test("every layout block shows the flockbook mod with a known view, or the shown
 test("keys.json binds only commands that exist, in the flockbook layout's section only", () => {
   const keys = JSON.parse(readFileSync(new URL("../keys.json", import.meta.url)));
   // Not mod:flockbook: with it, no key worked at all.
-  assert.deepEqual(Object.keys(keys), ["layout:flockbook"]);
+  assert.deepEqual(Object.keys(keys), ["layout:flockbook", "layout:flockbook-herdr"]);
   const mine = ["terminal", "needs", "move-left", "move-right", "sidebar", "overview", "settings", "text-smaller", "text-larger", "text-default"];
   for (const [key, action] of Object.entries(keys["layout:flockbook"])) {
     if (action.startsWith("flockbook.")) assert.ok(mine.includes(action.slice(10)), `${key}: ${action}`);

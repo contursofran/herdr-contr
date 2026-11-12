@@ -192,6 +192,14 @@ per 900 ms, as Herdr's own); done is a check
     `tab-panes` (`content: {tab: "active", pane: {gap 6, radius 8, border 1 border, focus 1 muted}}`,
     padding 8).
   - The ids `sidebar`, `screen`, `chat` and `tab` are what the mod switches.
+- **Layout** `layouts/flockbook-herdr.json`: the same `work` column and theme, but `sidebar` is
+  Herdr's own, as in Herdr's `main` layout (268 px, shown: the blocks `workspace-chrome`, `spaces`,
+  `agents` and the `workspace-chrome` footer), with `traffic_lights: [12, 16]`. The mod knows it by
+  `shared("layout") === "flockbook-herdr"`: there the left edge opens no floating sidebar, the
+  sidebar shows unless `layouts/.state/flockbook-herdr.json` hides it, and the bar leaves no room
+  for the window buttons while the sidebar shows. ⌘B hides and shows Herdr's sidebar. The mod's
+  bar stays: each screen draws it, with the tab capsule, Needs you and Overview. Herdr's `tabs`
+  block would show the tabs a second time and has no Needs you or Overview.
 - **Mod** `mods/flockbook/` (`mod.json`: `place: "none"`): one mod, one view per block, picked
   by `props.view`: `side`, `chat`, `needs`, `overview`, `top`; overlays use `settings` (the Flockbook
   settings dialog), `termbar` (the terminal window's bar), `menu` (right-click menus) and `side` with `peek: true` (the floating sidebar).
@@ -229,10 +237,10 @@ per 900 ms, as Herdr's own); done is a check
     the helper follows the same config.json. It keeps `<herdr-app home>/flockbook/cache.json`, `answered/` beside it, and pastes in
     `<herdr-app home>/flockbook/paste/`.
   - `osascript`, for the file dialog (macOS only; the + button shows only when `window().platform` is `macos`).
-  - It reads `<herdr-app home>/layouts/.state/flockbook.json` once, for whether the sidebar was open.
+  - It reads `<herdr-app home>/layouts/.state/<layout>.json` once (`flockbook` or `flockbook-herdr`), for whether the sidebar was open.
 - **Themes** `themes/flockbook.json`, `flockbook-light.json`, `flockbook-mac.json`,
   `flockbook-mac-light.json`.
-- **Keys** `keys.json`: one `layout:flockbook` section.
+- **Keys** `keys.json`: the sections `layout:flockbook` and `layout:flockbook-herdr`, with the same keys.
 - **Art** `mods/flockbook/icons/`: arrow-down, bell, branch, check, close, doc, folder, gear, grid,
   plus, search, send, sidebar, sliders, spinner, split, terminal, tool (16 × 16 SVG, 1.8 px round strokes, `currentColor`).
 
