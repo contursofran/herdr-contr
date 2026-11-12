@@ -407,7 +407,7 @@ export class Composer {
   }
 
   // `width`: the chat's column, so the box lines up with the messages.
-  render(agent, t, width = 800) {
+  render(agent, t, width = 800, work = null) {
     const tags = tagsFor(agent, agent ? this.status.get(agent.address) : null);
     const branch = tags.find((x) => x.kind === "branch");
     const b = this.box(agent);
@@ -454,12 +454,18 @@ export class Composer {
         : null;
     const showTags = setting("status_row") !== "hide";
     const ctxTag = tags.find((x) => x.kind === "context");
+    const below = tags.filter((x) => x.kind !== "context" && x.kind !== "branch");
     return v_flex().id("composer").w_full().px(16).pb(14).pt(6).gap(6).items_center()
       .key_context(PASTE_CONTEXT)
       .on_action(PASTE_ACTION, (_e, cx) => { const text = cx.read_from_clipboard?.(); cx.spawn((cx) => this.paste(cx, text)); })
-      // The context tag sits on the right, next to the pill (#40); the other tags stay on the left.
-      .when(showTags || Boolean(pill), (el) => el.child(h_flex().id("tags-row").w_full().max_w(width).gap(5).items_center()
-        .child(showTags ? h_flex().id("tags").flex_1().min_w(0).gap(5).items_center().overflow_x_scroll().children(tags.filter((x) => x.kind !== "context").map(tag)) : div().flex_1())
+      // Above the box: the agent's working line on the left (#47), the context tag and the pill on the right (#40).
+      .when(Boolean(work) || (showTags && Boolean(ctxTag)) || Boolean(pill), (el) => el.child(h_flex().id("tags-row").w_full().max_w(width).gap(5).items_center()
+        .child(work
+          ? h_flex().id("working").flex_1().min_w(0).gap(8).items_center().text_size(12.5)
+            .child(loader(12).flex_none().text_color(t.working))
+            .child(div().flex_none().text_color(t.foreground).child(work.text))
+            .when(Boolean(work.detail), (w) => w.child(div().min_w(0).truncate().text_color(t.muted).child(`(${work.detail})`)))
+          : div().flex_1())
         .when(showTags && Boolean(ctxTag), (r) => r.child(div().id("ctx-tag").flex_none().child(tag(ctxTag))))
         .when(Boolean(pill), (r) => r.child(pill))))
       .when(Boolean(s), (el) => el.child(v_flex().id("slash").w_full().max_w(width).p(4).gap(0).rounded(12).bg(t.raised)
@@ -485,6 +491,8 @@ export class Composer {
             .bg(empty || this.sending ? t.chrome : t.accent).text_color(empty || this.sending ? t.dim : t.background)
             .on_click((_e, cx) => cx.spawn((cx) => this.submit(cx)))
             .child(this.sending ? loader(13) : svg(icon("send")).size(14)))))
+      // Below the box: the status tags. The branch is in the box already, so it is not here.
+      .when(showTags && below.length > 0, (el) => el.child(h_flex().id("tags").w_full().max_w(width).gap(5).items_center().overflow_x_scroll().children(below.map(tag))))
       .when(Boolean(this.note), (el) => el.child(div().id("send-note").w_full().max_w(width).text_size(12)
         .text_color(this.note.bad ? t.blocked : t.muted).child(this.note.text)));
   }

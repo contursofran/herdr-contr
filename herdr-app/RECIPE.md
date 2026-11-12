@@ -63,8 +63,10 @@ Left to right:
      - Separators and footers in 11.5 px dim text.
      - A round 34 px ↓ button at the bottom center while you read older messages.
      - "Loading earlier messages" in a small capsule under the bar while older rows load.
-   - **Reply box** under the chat, at most 800 px wide: a row of 22 px round tags (model, effort,
-     context, cost, folder, branch, agent; a warning tag is an outline: `blocked` border, `foreground` text, no fill; the context tag is "ctx 120k / 250k"
+   - **Reply box** under the chat, at most 800 px wide. Above the box: while the agent works, its
+     working line on the left (12 px braille loader, the text, the detail in `muted`), and on the right the
+     context tag and the Orchestrating pill. Below the box: a row of 22 px round tags (model, effort,
+     cost, folder, agent; not the branch, which is in the box). A warning tag is an outline: `blocked` border, `foreground` text, no fill; the context tag is "ctx 120k / 250k"
      against Claude Code's `autoCompactWindow` when it is set, else "ctx 37%" of the model's window; without the wrapper, the tokens come from the session log and
      the tag shows only with `autoCompactWindow`), then a 16 px rounded `raised`
      box with a one-line text area ("Reply to the agent"), + to attach files on the left (macOS only), the
@@ -158,7 +160,7 @@ drawn by Herdr's `frames`; every loader of the mod is this one); done is a check
   nothing until the file is fixed or removed (it is never overwritten). A change keeps the other keys,
   is written against the text just read (someone else's change is read again, not lost), and every
   view shows it at once. The file is read again each minute and when the dialog opens.
-  - **Status row** Hide: no tags (model, context, cost, folder, branch) above the reply box (the branch beside the send button stays).
+  - **Status row** Hide: no tags (model, context, cost, folder) around the reply box (the branch beside the send button stays).
   - **Helper on other machines** Never: for a tab on another machine the chat says, in one line,
     "herdr-contr does not run its helper on other machines. To change it: herdr-contr settings, Helper
     on other machines: Ask." No install card; the tab menu has "Remove helper: choose Ask in herdr-contr

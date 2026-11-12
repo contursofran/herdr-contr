@@ -137,11 +137,8 @@ export class ChatView {
     if (Date.now() - this.lastPoll >= (f?.echoes?.length ? CHECK_MS : POLL_MS)) return this.poll(cx);
   }
 
-  // The rows drawn: the feed's, the sent messages that wait, then the agent's working line.
-  rowsOf(f) {
-    const rows = shownRows(f);
-    return this.work && this.work.address === f.address ? rows.concat(this.work) : rows;
-  }
+  // The rows drawn: the feed's and the sent messages that wait. The working line is in the composer (#47).
+  rowsOf(f) { return shownRows(f); }
 
   // The agent's working line ("Improvising… · 1m 16s · ↓ 6.0k tokens"), read from its screen while it works.
   // An older helper without the command: no line.
@@ -235,11 +232,6 @@ export class ChatView {
         return h_flex().w_full().h(SEP_H).items_center().justify_center().text_size(11.5).text_color(t.dim).child(row.text || "");
       case "footer":
         return div().w_full().h(FOOTER_H).pt(2).text_size(11.5).text_color(t.dim).child(row.text || "");
-      case "working":
-        return h_flex().w_full().h(STATUS_H).gap(8).items_center().text_size(12.5)
-          .child(loader(12).flex_none().text_color(t.working))
-          .child(div().flex_none().text_color(t.foreground).child(row.text))
-          .when(Boolean(row.detail), (el) => el.child(div().min_w(0).truncate().text_color(t.muted).child(`(${row.detail})`)));
       case "status":
         return h_flex().w_full().h(STATUS_H).items_center().justify_center().text_size(12).text_color(t.muted).child(row.text || "");
       case "perm": {
@@ -432,7 +424,7 @@ export class ChatView {
       .when(Boolean(f) && f.error?.code !== "not-agent" && !isRemoteProblem(f.error), (el) => {
         const card = this.cards.view(this.address, t, "chat-card");
         if (card) el.child(this.appear.wrap(h_flex().w_full().px(16).pt(8).justify_center().on_mouse_down("left", stop).child(card), "chat-card-in", `${this.address}:${this.cards.key?.(this.address) ?? ""}`, cx, 10));
-        return el.child(div().w_full().on_mouse_down("left", stop).child(this.composer.render(currentAgent(), t, this.colWidth())));
+        return el.child(div().w_full().on_mouse_down("left", stop).child(this.composer.render(currentAgent(), t, this.colWidth(), this.work?.address === this.address ? this.work : null)));
       })
       .child(overBar(t));
   }
