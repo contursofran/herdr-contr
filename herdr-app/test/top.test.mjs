@@ -271,6 +271,7 @@ test("the loader: braille frames, 80 ms apart, in a mono font, the same size eac
   assert.deepEqual(el._a.frames, [BRAILLE, 80]);
   assert.equal(el._a.font_family, "Menlo");
   assert.equal(el._a.w, 12); assert.equal(el._a.h, 12);
+  assert.equal(el._a.line_height, 1, "a bare number is a multiplier: the size here would push the glyph out of its box (#33)");
   assert.equal(el.kids[0], "⠋", "the first frame, before Herdr turns it");
 });
 
