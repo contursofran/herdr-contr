@@ -5,7 +5,7 @@ import { v_flex, h_flex } from "gpui-base";
 import { theme } from "herdr";
 import { needing, agentName, showAgent, icon, watchEdge, noteWindowHeight } from "./state.js";
 import { Cards } from "./cards.js";
-import { startTop, overBar, BAR_H } from "./top.js";
+import { startTop, overBar, barH } from "./top.js";
 
 export class NeedsView {
   constructor(cx) {
@@ -28,7 +28,7 @@ export class NeedsView {
     const t = theme();
     const stop = (_e, cx) => cx.stop_propagation();
     return v_flex().id("needs-screen").relative().size_full().bg(t.background).on_size_change((size) => noteWindowHeight(size))
-      .child(div().size_full().pt(BAR_H).on_mouse_down("left", stop).child(this.content(t)))
+      .child(div().size_full().pt(barH()).on_mouse_down("left", stop).child(this.content(t)))
       .child(overBar(t));
   }
 

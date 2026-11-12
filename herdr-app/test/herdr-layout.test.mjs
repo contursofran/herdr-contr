@@ -2,9 +2,10 @@
 import { test, beforeEach } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { fake, log, reset } from "./stub/herdr.mjs";
+import { fake, log, reset, theme } from "./stub/herdr.mjs";
+import { byId } from "./stub/ui.mjs";
 import { peekAtEdge, loadSidebar, sidebarShown, toggleSidebar, showScreen } from "../mods/herdr-contr/state.js";
-import { lightsRoom } from "../mods/herdr-contr/top.js";
+import { lightsRoom, herdrTabBar, barH, overBar, BAR_H } from "../mods/herdr-contr/top.js";
 
 const read = (n) => JSON.parse(readFileSync(new URL(`../${n}`, import.meta.url)));
 const layout = read("layouts/herdr-contr.json");
@@ -20,8 +21,31 @@ test("the sidebar is Herdr's, shown, and the work area is the mod's screen stack
   const screen = find(layout, "screen");
   assert.equal(screen.type, "stack");
   assert.deepEqual(screen.children.map((c) => c.id), ["chat", "needs", "overview", "tab"]);
-  assert.ok(!mods(layout).includes("tabs"), "the mod's own bar, not Herdr's tabs block");
   assert.ok(find(layout, "tab-panes"));
+});
+
+test("the top bar is Herdr's tabs block, with Herdr's Files and Changes panel beside the screens", () => {
+  const work = find(layout, "work");
+  assert.deepEqual(work.children.map((c) => c.id), ["tabs", "work-body"]);
+  assert.equal(find(layout, "tabs").content.mod, "tabs");
+  assert.deepEqual(find(layout, "work-body").children.map((c) => c.id), ["screen", "panel"]);
+  const panel = find(layout, "panel");
+  assert.equal(panel.hidden, true);
+  assert.deepEqual(mods(panel), ["files", "changes"]);
+  assert.ok(!find(layout, "top"), "no bar of the mod's own");
+  assert.ok(!JSON.stringify(layout).includes('"view":"top"'));
+});
+
+test("with Herdr's tab bar the screens draw no bar and leave no room for one", () => {
+  fake.layout = layout;
+  assert.equal(herdrTabBar(), true);
+  assert.equal(barH(), 0);
+  assert.ok(byId(overBar(theme()), "no-bar"));
+  assert.equal(byId(overBar(theme()), "over-bar"), null);
+  fake.layout = read("layouts/herdr-contr-own.json");
+  assert.equal(herdrTabBar(), false);
+  assert.equal(barH(), BAR_H);
+  assert.ok(byId(overBar(theme()), "over-bar"));
 });
 
 test("keys.json has the same keys for this layout", () => {

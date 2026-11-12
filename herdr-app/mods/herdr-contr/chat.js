@@ -20,7 +20,7 @@ import { textScale } from "./config.js";
 const appZoom = () => { const z = Number(settings?.()?.zoom); return z > 0 ? z : 1; };
 import { openMenu } from "./menu.js";
 import { Cards, wanted } from "./cards.js";
-import { startTop, overBar, BAR_H } from "./top.js";
+import { startTop, overBar, barH } from "./top.js";
 import { HelperUI, isRemoteProblem } from "./helpercard.js";
 
 export const POLL_MS = 2000;
@@ -264,7 +264,7 @@ export class ChatView {
     const w = this.colWidth();
     const at = typeof y0 !== "number" ? null : row.k === "assistant" ? { y: y0 - ROW_PAD_Y, w }
       : row.from == null ? { y: y0 - ROW_PAD_Y - BUBBLE_PAD_Y, w: bubbleTextWidth(w) } : null;
-    const code = at ? codeBlockAt(row.text || "", at.w, at.y - (i === 0 ? BAR_H : 0), textScale(), appZoom()) : null;
+    const code = at ? codeBlockAt(row.text || "", at.w, at.y - (i === 0 ? barH() : 0), textScale(), appZoom()) : null;
     if (code !== null) items.push({ label: "Copy code", act: "copy", args: { text: code } });
     items.push({ label: "Copy message", act: "copy", args: { text: row.text || "" } });
     return openMenu(items);
@@ -306,7 +306,7 @@ export class ChatView {
   list(t, f) {
     const rows = f.rows, n = rows.length;
     // The first row starts below the bar; the rest scroll up under it.
-    const sizes = rows.map((r, i) => this.height(r) + (i === 0 ? BAR_H : 0));
+    const sizes = rows.map((r, i) => this.height(r) + (i === 0 ? barH() : 0));
     const box = v_flex().relative().flex_1().min_h(0)
       .on_scroll_wheel((e, cx) => {
         const up = e?.delta?.y > 0;
@@ -324,7 +324,7 @@ export class ChatView {
           this.autoOlder++; this.wantOlder = true;
         }
         const out = [];
-        for (let i = range.start; i < range.end; i++) out.push(i === 0 ? div().w_full().pt(BAR_H).child(this.item(rows[i], t)) : this.item(rows[i], t));
+        for (let i = range.start; i < range.end; i++) out.push(i === 0 ? div().w_full().pt(barH()).child(this.item(rows[i], t)) : this.item(rows[i], t));
         record("chat.rows", now() - t0, range.end - range.start);
         return out;
       }).track_scroll(this.scroll).on_item_click((key, cx) => this.click(key, cx))
@@ -341,7 +341,7 @@ export class ChatView {
           .child(svg(icon("arrow-down")).size(15))));
     }
     // While older rows load: a small note under the bar's tabs. Drawn only then: a hidden spinner still costs frames.
-    if (this.olderBusy) box.child(h_flex().absolute().top(BAR_H + 6).left(0).right(0).justify_center()
+    if (this.olderBusy) box.child(h_flex().absolute().top(barH() + 6).left(0).right(0).justify_center()
       .child(h_flex().id("older").h(26).px(12).gap(6).items_center().rounded(13).bg(t.raised).border(1).border_color(t.border)
         .text_size(12).text_color(t.muted)
         .child(svg(icon("spinner")).size(11).spin(SPIN_MS)).child("Loading earlier messages")));
