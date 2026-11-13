@@ -101,6 +101,10 @@ export async function cacheFavicon(src) {
   return typeof p === "string" && p.startsWith(`${home}/`) ? p.slice(home.length + 1) : null;
 }
 
+// The width the hover controls take in an agent row's title line: two 22 px buttons and their 2 px gap, less the
+// 4 px they stand nearer to the row's edge than the line does.
+export const CONTROLS_W = 42;
+
 export default class Spaces extends View {
   init(_props, cx) {
     const Part = PARTS[props()?.view];
@@ -590,7 +594,9 @@ export default class Spaces extends View {
           .when(!on && !unread, (el) => el.text_color(t.muted))
           .child(this.labels.get(a.address) ?? ""))
         .when(!hot && Boolean(when) && a.status !== "working", (el) => el.child(div().flex_none().font_family("Menlo").text_size(11).text_color(t.muted).child(duration(this.now - when))))
-        .when(!hot && (a.status === "working" || a.status === "blocked"), (el) => el.child(this.mark(t, a.status, 15))))
+        .when(!hot && (a.status === "working" || a.status === "blocked"), (el) => el.child(this.mark(t, a.status, 15)))
+        // The hover controls draw over this line's right end: keep their place free, so the title ends before them.
+        .when(hot, (el) => el.child(div().id(`ctl-space-${a.address}`).w(CONTROLS_W).flex_none())))
       .when(workers.length > 0, (el) => el.child(h_flex().h(16).gap(8).items_center()
         .child(div().w(15).flex_none())
         .child(div().flex_1().min_w(0).truncate().text_size(12).text_color(t.muted).child(countLine(workers.length)))))
