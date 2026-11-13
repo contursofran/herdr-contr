@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { linkRefs, slugOf, repoFor, forgetRepos, refsVersion } from "../mods/herdr-contr/refs.js";
+import { linkRefs, slugOf, repoFor, forgetRepos, refsVersion, lookupNames } from "../mods/herdr-contr/refs.js";
 import { markdownView } from "../mods/herdr-contr/mdblocks.js";
 import { fake, log, reset } from "./stub/herdr.mjs";
 
@@ -97,4 +97,43 @@ test("the kept cuts and fits of a text use the new link when a repository become
     assert.ok(after.includes("q/other"), after);
     assert.ok(!after.includes("o/r/issues/7") && !after.includes("o/r#7"), after);
   } finally { delete fake.shared[KEY_CONFIG]; }
+});
+
+const tick = () => new Promise((r) => setTimeout(r, 0));
+
+test("an unknown name before #n is asked on GitHub once; a yes links it and raises the version (#104)", async () => {
+  reset(); forgetRepos();
+  fake.exec = async (_c, args) => ({ code: args[1] === "repos/o/tools" ? 0 : 1, stdout: "o/tools\n", stderr: "" });
+  assert.equal(linkRefs("tools #5", R), `tools [#5](${G}/o/r/issues/5)`);
+  assert.equal(linkRefs("nothere #6", R), `nothere [#6](${G}/o/r/issues/6)`);
+  const v = refsVersion();
+  lookupNames(); await tick();
+  assert.deepEqual(log.exec.map((e) => [e[0], e[1][1]]), [["gh", "repos/o/tools"], ["gh", "repos/o/nothere"]]);
+  assert.equal(refsVersion(), v + 1);
+  assert.equal(linkRefs("tools #5", R), `tools [#5](${G}/o/tools/issues/5)`);
+  // The no is kept: no second ask.
+  assert.equal(linkRefs("nothere #7", R), `nothere [#7](${G}/o/r/issues/7)`);
+  lookupNames(); await tick();
+  assert.equal(log.exec.length, 2);
+});
+
+test("common words and no agent repository are not asked (#104)", async () => {
+  reset(); forgetRepos();
+  fake.exec = async () => ({ code: 1, stdout: "", stderr: "" });
+  linkRefs("Fixes #5, see #6, issue #7, PR #8 and #9", R);
+  linkRefs("tools #5");
+  lookupNames(); await tick();
+  assert.equal(log.exec.length, 0);
+});
+
+test("at most 2 lookups run at a time (#104)", async () => {
+  reset(); forgetRepos();
+  const done = [];
+  fake.exec = () => new Promise((r) => done.push(() => r({ code: 1, stdout: "", stderr: "" })));
+  linkRefs("aa #1 bb #2 cc #3", R);
+  lookupNames(); lookupNames();
+  assert.equal(log.exec.length, 2);
+  done.forEach((f) => f()); await tick();
+  lookupNames();
+  assert.deepEqual(log.exec.map((e) => e[1][1]), ["repos/o/aa", "repos/o/bb", "repos/o/cc"]);
 });

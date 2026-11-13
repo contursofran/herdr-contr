@@ -3,6 +3,7 @@
 // opens it in the browser. Not inside code spans, links, URLs or words; "#fff" is not a number.
 // A bare "#51" needs the repository of the agent's folder (repoFor); without one it stays text.
 // "name #51" with the name of a known repository (any folder read by repoFor) links there (#101).
+// An unknown name is asked on GitHub as <owner of the agent's repository>/<name>, from the chat's tick (#104).
 import { exec } from "herdr";
 
 const GH = "https://github.com";
@@ -25,7 +26,7 @@ function linkPlain(s, repo) {
     if ((m = at(URL_RE, s, i))) put(i + m[0].length, `[${m[0]}](${m[0]})`);
     else if ((m = at(SKIP_RE, s, i))) i += m[0].length;
     else if (!/[\w/#&.-]/.test(prev) && (m = at(SLUG_RE, s, i))) put(i + m[0].length, `[${m[0]}](${GH}/${m[1]}/${m[2]}/issues/${m[3]})`);
-    else if (!/[\w/#&.-]/.test(prev) && (m = at(NAMED_RE, s, i)) && (slug = slugByName(m[1], repo))) {
+    else if (!/[\w/#&.-]/.test(prev) && (m = at(NAMED_RE, s, i)) && (slug = slugByName(m[1], repo, true))) {
       i += m[1].length + m[2].length; // the name stays text
       const kind = m[3].startsWith("PR") ? "pull" : "issues";
       put(i + m[3].length, `[${m[3]}](${GH}/${slug}/${kind}/${m[4]})`);
@@ -61,13 +62,42 @@ let version = 0;
 export const refsVersion = () => version;
 
 // The known repository with this name: the one of the agent's own owner when two have it; else null.
-function slugByName(name, repo) {
+// With note, a name that is not known is kept for lookupNames.
+function slugByName(name, repo, note = false) {
   const n = name.toLowerCase(), own = repo ? repo.split("/")[0].toLowerCase() : null;
   const hits = new Set();
-  for (const s of [repo, ...repos.values()]) if (s && s.split("/")[1].toLowerCase() === n) hits.add(s);
+  for (const s of [repo, ...repos.values(), ...found]) if (s && s.split("/")[1].toLowerCase() === n) hits.add(s);
   if (hits.size === 1) return [...hits][0];
   for (const s of hits) if (s.split("/")[0].toLowerCase() === own) return s;
+  if (note && !hits.size && own && !COMMON.has(n) && /^[a-z0-9_.-]{1,100}$/.test(n) && /[a-z0-9]/.test(n) && !/^\d+$/.test(n)) {
+    const key = `${own}/${n}`;
+    if (!asked.has(key)) unknown.add(key);
+  }
   return null;
+}
+
+// Names before a reference that no folder gave (#104): asked once per owner and name for the app's run.
+const COMMON = new Set(["issue", "issues", "pr", "pull", "request", "bug", "fix", "fixes", "closes", "see", "and", "or", "to", "in", "of"]);
+const MAX_ASK = 2;
+const unknown = new Set(), asked = new Map(), found = new Set();
+let asking = 0;
+// Starts up to MAX_ASK lookups (gh, off the UI thread); a repository that exists raises the version.
+export function lookupNames() {
+  for (const key of unknown) {
+    if (asking >= MAX_ASK) return;
+    unknown.delete(key);
+    if (asked.has(key)) continue;
+    asked.set(key, null); asking++;
+    exec("gh", ["api", `repos/${key}`, "--jq", ".full_name"], { timeout: 15000 })
+      .then((r) => {
+        const s = r.code === 0 ? r.stdout.trim() : "";
+        const yes = s.toLowerCase() === key;
+        asked.set(key, yes);
+        if (yes) { found.add(s); version++; }
+      })
+      .catch(() => asked.set(key, false))
+      .finally(() => { asking--; });
+  }
 }
 export function repoFor(cwd, machine = null, onKnown = null) {
   if (!cwd) return null;
@@ -79,4 +109,4 @@ export function repoFor(cwd, machine = null, onKnown = null) {
     .catch(() => {});
   return null;
 }
-export function forgetRepos() { repos.clear(); version++; }
+export function forgetRepos() { repos.clear(); unknown.clear(); asked.clear(); found.clear(); version++; }
