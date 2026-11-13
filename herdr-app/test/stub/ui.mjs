@@ -17,6 +17,7 @@ const mk = (tag) => {
         }
         else if (k === "when") return a[0] ? a[1](p) : p;
         else if (k === "track_scroll") t.track = a[0];
+        else if (k === "trigger" || k === "content") { t[`_${k}`] = a[0]; t.kids.push(a[0]); }   // walkable slots
         else t._a[k] = a.length <= 1 ? a[0] : a;
         return p;
       };
@@ -37,6 +38,7 @@ export const image = (path) => { const e = mk("image"); e._a.path = path; return
 export const v_flex = () => mk("v");
 export const h_flex = () => mk("h");
 export class View {}
+export const Popover = { new: (id) => { const e = mk("popover"); e._a.id = id; return e; } };
 export const TextView = { markdown: (id, text) => { const e = mk("md"); e._a.text = text; e._a.id = id; return e; } };
 export const Scrollbar = { vertical: () => mk("sb") };
 export const Link = { new: (id) => { const e = mk("link"); e._a.id = id; return e; } };
