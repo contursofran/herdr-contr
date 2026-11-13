@@ -15,6 +15,7 @@ export const appHome = () => fake.appHome;
 export const props = () => fake.props ?? {};
 export const shared = (k) => fake.shared[k];
 export const setShared = (k, v) => { fake.shared[k] = v; log.shared.push([k, v]); return null; };
+export const updates = () => fake.updates ?? { app: {} };
 export const run = (name, args) => { log.run.push([name, args]); return null; };
 export const notify = (n) => { log.notify.push(n); return null; };
 export const setAgentOrder = (list) => { log.order = list; return null; };
