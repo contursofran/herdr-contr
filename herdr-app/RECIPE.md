@@ -180,7 +180,7 @@ drawn by Herdr's `frames`; every loader of the mod is this one); done is a check
   switches are off. A missing file shows the defaults;
   the first change creates it (and its folder). A file that is not JSON shows an error and is never
   written.
-- **herdr-contr settings** (a right-click on the sidebar's Settings, or ⌘⇧,): saved in `<herdr-app home>/herdr-contr/config.json`
+- **herdr-contr settings** (the sidebar's Settings menu, a right-click on Settings, or ⌘⇧,): saved in `<herdr-app home>/herdr-contr/config.json`
   as `{"status_row": "show", "remote_helper": "ask"}`. The install never
   creates the file; a missing file or key is the default, and so is a value that is not one of the
   choices. A file that is not JSON is the defaults too: the dialog says so, and its switches do
@@ -248,8 +248,10 @@ drawn by Herdr's `frames`; every loader of the mod is this one); done is a check
     apart: one 16 px row per plan (Claude, then Codex): the name in a 52 px column (12 px, `muted`), a 4 px bar
     (2 px corners, `hover` track, the used part in `dim`) and the value (Menlo 11, `muted`): the most used window
     as "41% wk · 4d" (percent used, window, time to its reset). Then, padding 4 10 10, gap 4: Settings (30 px, 8 px
-    corners, padding 0 10, 16 px gear, gap 8, 13 px `muted`) fills the width and opens Herdr's settings; a dot
-    (`accent`) when an app update is ready; a right-click opens the herdr-contr settings, and its tooltip says so.
+    corners, padding 0 10, 16 px gear, gap 8, 13 px `muted`) fills the width; a dot (`accent`) when an app update is
+    ready. A press opens a menu above it (#120; a mod cannot add a section to Herdr's settings window): the look of
+    the model menu (240 px, `raised`, border, 12 px corners), two 32 px rows "Herdr settings" (⌘,) and
+    "herdr-contr settings" (⌘⇧,), the key in 13 px `muted`. A right-click opens the herdr-contr settings too.
     At its right the add machine button (28 px square, 8 px corners, 16 px +, tooltip "Add machine") opens Herdr's
     `machine-add` dialog. The block is as tall as its rows (`layout.resize` on a change of the plan count: 45 px
     with no plan, 79 px with one, 105 px with two). On the rail: the bars only, the name and value in a tooltip,
