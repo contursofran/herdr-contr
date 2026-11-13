@@ -168,8 +168,8 @@ export default class Spaces extends View {
   spaceIcon(w, t) {
     const path = w.machine ? null : this.icons[place(w, panes())];
     return path
-      ? image(path).size(18).flex_none().rounded(4)
-      : h_flex().size(18).flex_none().items_center().justify_center().child(svg("mods/workspace-chrome/folder.svg").size(15).text_color(t.muted));
+      ? image(path).size(16).flex_none().rounded(4)
+      : h_flex().size(16).flex_none().items_center().justify_center().child(svg("mods/workspace-chrome/folder.svg").size(15).text_color(t.muted));
   }
 
   // `key` and the other places in its repo (a commit there moves their ahead/behind).
@@ -421,27 +421,33 @@ export default class Spaces extends View {
     });
   }
 
-  // After the name: the branch in mono and dim, and at the right the commits ahead and behind ("\u21914").
-  gitTail(g, t) {
+  // After the name: the branch (mono 11, muted); at the right, on a shut project its agents' state marks,
+  // then the commits ahead and behind ("\u21934", mono 11, muted).
+  gitTail(w, g, t) {
+    const shut = this.closed.has(w.id) ? this.agentsOf.get(w.id) ?? [] : [];
     return h_flex()
       .flex_1()
       .min_w(0)
-      .gap(5)
+      .gap(6)
       .items_center()
-      .text_size(11.5)
-      .text_color(t.dim)
-      .child(div().flex_1().min_w(0).truncate().font_family("Menlo").child(g.branch ?? "detached"))
-      .when(g.ahead > 0, (el) => el.child(div().flex_none().child(`\u2191${g.ahead}`)))
-      .when(g.behind > 0, (el) => el.child(div().flex_none().child(`\u2193${g.behind}`)));
+      .font_family("Menlo")
+      .text_size(11)
+      .text_color(t.muted)
+      .child(div().flex_1().min_w(0).truncate().child(g?.branch ?? ""))
+      .children(shut.map((x) => this.mark(t, x.a.status, 13)))
+      .when(g?.ahead > 0, (el) => el.child(div().flex_none().child(`\u2191${g.ahead}`)))
+      .when(g?.behind > 0, (el) => el.child(div().flex_none().child(`\u2193${g.behind}`)));
   }
 
   row({ w, i, g, tree }, t) {
-    const on = w.active;
+    // The shown space: its selected agent row says it, else the project row.
+    const on = w.active && !(this.agentsOf.has(w.id) && !this.closed.has(w.id));
     const fromIndex = this.pressed === null ? -1 : spaces().findIndex(s => s.id === this.pressed);
     return v_flex()
       .relative()
       .id(`space-${w.id}`)
-      .px(8)
+      .pl(6)
+      .pr(10)
       .h(rowHeight({ tree }))
       .flex_none()
       .justify_center()
@@ -480,13 +486,13 @@ export default class Spaces extends View {
       .on_mouse_down("right", () => this.menu(w))
       .child(
         h_flex()
-          .gap(8)
+          .gap(6)
           .items_center()
           .child(this.chevron(w, t))
           .when(Boolean(tree), el => el.pl(22).child(svg("mods/workspace-chrome/branch.svg").size(13).text_color(t.dim)))
           .when(!tree, el => el.child(this.spaceIcon(w, t)))
           .child(div().flex_shrink(0).max_w(150).truncate().font_medium().text_color(t.foreground).child(w.name))
-          .child(g ? this.gitTail(g, t) : div().flex_1()),
+          .child(this.gitTail(w, g, t)),
       );
   }
 
@@ -508,13 +514,15 @@ export default class Spaces extends View {
   // One machine's projects: each with its agents under it, then the "N more projects, no agents" row.
   projects(rows, m, t) {
     const { shown, idle } = split(rows, (id) => this.agentsOf.has(id));
-    const out = shown.flatMap((r) => [this.row(r, t), ...(this.closed.has(r.w.id) ? [] : (this.agentsOf.get(r.w.id) ?? []).flatMap((x) =>
-      [this.agentRow(x, t), ...(x.workers.length ? [this.workersBox(x.workers, t)] : [])]))]);
+    // A project and its agents, 2 px apart, 10 px under the group.
+    const out = shown.map((r) => v_flex().flex_none().gap(2).pb(8).child(this.row(r, t))
+      .children(this.closed.has(r.w.id) ? [] : (this.agentsOf.get(r.w.id) ?? []).flatMap((x) =>
+        [this.agentRow(x, t), ...(x.workers.length ? [this.workersBox(x.workers, t)] : [])])));
     if (!idle.length) return out;
     const key = m ?? "";
     const open = this.more.has(key);
-    const more = h_flex().id(`more-${m ?? "local"}`).h(30).flex_none().mt(6).px(8).gap(8).items_center().rounded(8)
-      .text_color(t.muted).cursor_pointer().hover((s) => s.bg(t.hover).text_color(t.foreground))
+    const more = h_flex().id(`more-${m ?? "local"}`).h(30).flex_none().pl(6).pr(10).gap(6).items_center().rounded(8)
+      .text_size(12).text_color(t.muted).cursor_pointer().hover((s) => s.bg(t.hover).text_color(t.foreground))
       .on_click((_e, cx) => { open ? this.more.delete(key) : this.more.add(key); cx.notify(); })
       .child(div().size(14).flex_none().flex().items_center().justify_center()
         .child(svg(`mods/workspace-chrome/chevron-${open ? "down" : "right"}.svg`).size(11)))
@@ -522,54 +530,60 @@ export default class Spaces extends View {
     return [...out, more, ...(open ? idle.map((r) => this.row(r, t)) : [])];
   }
 
-  // An agent under its project: its icon tinted by its state, the title, the time, the state mark. An
-  // orchestrator's title is bold, with "Orchestrating · N workers" under it.
+  // An agent under its project: its icon (45%, full on the shown row), the title, and at the right the age
+  // (when it does not work) and the state mark (when it works or waits). Under the title of an agent with
+  // live workers: "Orchestrating · N workers". The shown row is raised, with a 1 px ring; its title is full
+  // ink, 500. A finished agent not looked at yet (done) is full ink, 600; any other is muted, 400.
   agentRow({ a, workers }, t) {
-    const orch = workers.length > 0;
     const when = this.changed[a.address]?.at ?? 0;
-    const quiet = a.status === "idle" && !a.focused;
-    return v_flex().id(`ag-${a.address}`).pl(INDENT + 8).pr(8).py(orch ? 4 : 0).flex_none().justify_center().rounded(8)
-      .when(a.focused, (el) => el.bg(t.selected).border_1().border_color(t.border))
-      .when(!a.focused, (el) => el.hover((s) => s.bg(t.hover)))
+    const on = a.focused;
+    const unread = !on && a.status === "done";
+    return v_flex().id(`ag-${a.address}`).py(6).pl(26).pr(10).gap(2).flex_none().rounded(8)
+      .when(on, (el) => el.bg(t.raised).border_1().border_color(t.border))
+      .when(!on, (el) => el.hover((s) => s.bg(t.hover)))
       .cursor_pointer()
       .on_click(() => run("pane.focus", { pane: a.pane }))
-      .child(h_flex().h(28).gap(9).items_center()
-        .child(agentIcon(a.program, 15, t[a.status] ?? t.muted))
-        .child(div().flex_1().min_w(0).truncate().when(orch, (el) => el.font_semibold())
-          .text_color(quiet ? t.muted : t.foreground).child(this.labels.get(a.address) ?? ""))
-        .when(Boolean(when), (el) => el.child(div().flex_none().font_family("Menlo").text_size(11).text_color(t.dim).child(duration(this.now - when))))
-        .child(this.mark(t, a.status)))
-      .when(orch, (el) => el.child(h_flex().h(18).gap(9).items_center()
+      .child(h_flex().h(18).gap(8).items_center()
+        .child(agentIcon(a.program, 15, t[a.status] ?? t.muted).when(!on, (el) => el.opacity(0.45)))
+        .child(div().flex_1().min_w(0).truncate().text_size(13)
+          .when(on, (el) => el.font_medium().text_color(t.foreground))
+          .when(unread, (el) => el.font_semibold().text_color(t.foreground))
+          .when(!on && !unread, (el) => el.text_color(t.muted))
+          .child(this.labels.get(a.address) ?? ""))
+        .when(Boolean(when) && a.status !== "working", (el) => el.child(div().flex_none().font_family("Menlo").text_size(11).text_color(t.muted).child(duration(this.now - when))))
+        .when(a.status === "working" || a.status === "blocked", (el) => el.child(this.mark(t, a.status, 15))))
+      .when(workers.length > 0, (el) => el.child(h_flex().h(16).gap(8).items_center()
         .child(div().w(15).flex_none())
         .child(div().flex_1().min_w(0).truncate().text_size(12).text_color(t.muted).child(countLine(workers.length)))));
   }
 
-  // An orchestrator's workers, indented, with a thin guide line at the left.
+  // An orchestrator's workers: 32 px in, with a 1 px guide line at the left.
   workersBox(list, t) {
     const shown = focused()?.agent;
-    return v_flex().flex_none().ml(INDENT + 15).my(2).border_l(1).border_color(t.border)
+    return v_flex().flex_none().ml(32).pl(9).gap(2).border_l(1).border_color(t.border)
       .children(list.map(({ t: k, depth }) => {
         const st = this.listed.get(k.address) ?? (k.status === "error" ? "blocked" : k.status);
         const on = k.address === shown;
-        return h_flex().id(`sub-${k.address}`).h(26).flex_none().ml(4).pl(10 + 14 * depth).pr(8).gap(8).items_center().rounded(8)
-          .text_size(12.5)
-          .when(on, (el) => el.bg(t.selected))
+        return h_flex().id(`sub-${k.address}`).h(26).flex_none().pl(8 + 14 * depth).pr(8).gap(8).items_center().rounded(6)
+          .text_size(12)
+          .when(on, (el) => el.bg(t.raised))
           .when(!on, (el) => el.hover((s) => s.bg(t.hover)))
           .cursor_pointer()
           .on_click(() => run(this.listed.has(k.address) ? "pane.focus" : "terminal.peek", { terminal: k.address }))
-          .child(agentIcon(k.program, 14, t[st] ?? t.muted))
-          .child(div().flex_1().min_w(0).truncate().text_color(st === "idle" && !on ? t.muted : t.foreground).child(workerText(k)))
-          .child(this.mark(t, st));
+          .child(agentIcon(k.program, 13, t[st] ?? t.muted))
+          .child(div().flex_1().min_w(0).truncate().text_color(on ? t.foreground : st === "done" ? t.dim : t.muted).child(workerText(k)))
+          .child(this.mark(t, st, 12));
       }));
   }
 
-  // The state mark at the far right: the braille loader while it works, a check when done, "Needs you"
-  // when it waits for the owner; idle shows nothing.
-  mark(t, status) {
-    if (status === "working") return loader(12).mx(1).text_color(t.working);
-    if (status === "done") return h_flex().size(14).flex_none().justify_center().child(svg("mods/workspace-chrome/check.svg").size(12).text_color(t.done));
-    if (status === "blocked") return div().flex_none().px(6).h(18).rounded(5).bg(t.blocked + "26").text_size(10.5).font_semibold().text_color(t.blocked).flex().items_center().child("Needs you");
-    return div().w(14).flex_none();
+  // A state mark, mono: the braille loader in full ink while it works, "\u283f" pulsing in the blocked color
+  // while it waits for the owner, "\u2836" when idle and "\u2713" when done (muted).
+  mark(t, status, size) {
+    if (status === "working") return loader(size).text_color(t.foreground);
+    const glyph = (c, color) => div().flex_none().font_family("Menlo").text_size(size).line_height(1).text_color(color).child(c);
+    if (status === "blocked") return glyph("\u283f", t.blocked).loop("opacity", { from: 0.35, to: 1, period: 1400 });
+    if (status === "done") return glyph("\u2713", t.muted);
+    return glyph("\u2836", t.muted);
   }
 
   // Stamps agents whose state changed. Done and idle count as one: looking at a finished agent turns
@@ -636,12 +650,12 @@ export default class Spaces extends View {
     this.readAgents();
     const rows = this.grouped(t, collapsed);
     return v_flex().size_full().min_h(0).bg(t.chrome).text_size(13)
-      .child(h_flex().h(34).pl(16).pr(10).items_center().justify_between().text_size(12.5).text_color(t.muted)
+      .child(h_flex().pt(6).pr(10).pb(4).pl(20).flex_none().items_center().justify_between().text_size(12).font_medium().text_color(t.muted)
         .when(collapsed, el => el.pl(0).pr(0).justify_center())
         .when(!collapsed, el => el.child("Projects"))
-        .child(div().id("space-new").size(26).flex_none().flex().items_center().justify_center().rounded(6).hover(s => s.bg(t.hover).text_color(t.foreground))
+        .child(div().id("space-new").size(24).flex_none().flex().items_center().justify_center().rounded(8).hover(s => s.bg(t.hover).text_color(t.foreground))
           .on_click(() => run("space.new")).child(svg("mods/workspace-chrome/plus.svg").size(14))))
-      .child(v_flex().flex_1().min_h(0).px(collapsed ? 0 : 8).pb(14).overflow_y_scrollbar().mode("always")
+      .child(v_flex().flex_1().min_h(0).px(collapsed ? 0 : 10).gap(collapsed ? 0 : 2).pb(14).overflow_y_scrollbar().mode("always")
         .on_mouse_up("left", (_e, cx) => { this.pressed = null; cx.notify(); })
         .children(rows));
   }

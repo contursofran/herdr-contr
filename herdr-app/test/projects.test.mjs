@@ -46,33 +46,61 @@ test("grouping: each project, then its agents; an orchestrator's workers under i
   assert.deepEqual(order, ["space-s1", "ag-a1", "sub-w1", "sub-w2", "sub-w3", "ag-a2", "space-s2", "ag-a3"]);
   assert.ok(!ids(el).includes("ag-w1"), "a worker with a pane is not an agent row of its own");
   assert.ok(!ids(el).includes("sub-w4"), "an exited worker is not shown");
-  assert.equal(textOf(byId(el, "sub-w1")), "Question card");
-  assert.equal(textOf(byId(el, "sub-w3")), "builder");
+  assert.equal(textOf(byId(el, "sub-w1").kids[1]), "Question card");
+  assert.equal(textOf(byId(el, "sub-w3").kids[1]), "builder");
   assert.equal(textOf(el.kids[0]), "Projects");
 });
 
-test("the count line: an orchestrator has a bold title and 'Orchestrating · N workers'; others have none", () => {
+test("the count line: only an agent with live workers has 'Orchestrating · N workers'", () => {
   const el = make().render();
   const a1 = byId(el, "ag-a1");
   assert.equal(a1.kids.length, 2);
   assert.equal(textOf(a1.kids[1]), "Orchestrating · 3 workers");
-  assert.ok("font_semibold" in a1.kids[0].kids[1]._a);
-  assert.ok(!("font_semibold" in byId(el, "ag-a2").kids[0].kids[1]._a));
   assert.equal(byId(el, "ag-a2").kids.length, 1);
   assert.equal(countLine(1), "Orchestrating · 1 worker");
   assert.equal(countLine(4), "Orchestrating · 4 workers");
 });
 
-test("the shown agent's row is raised; the working mark is the loader, done a check", () => {
+test("the title's ink and weight: shown 500 full, done and not seen 600 full, else muted 400", () => {
+  const el = make().render();
+  const title = (id) => byId(el, id).kids[0].kids[1]._a;
+  assert.ok("font_medium" in title("ag-a1") && title("ag-a1").text_color === "#foreground");
+  assert.ok("font_semibold" in title("ag-a2") && title("ag-a2").text_color === "#foreground");
+  assert.ok(!("font_medium" in title("ag-a3")) && !("font_semibold" in title("ag-a3")) && title("ag-a3").text_color === "#muted");
+  assert.equal(byId(el, "ag-a3").kids[0].kids[0]._a.opacity, 0.45, "the icon is dim off the shown row");
+  assert.equal(byId(el, "ag-a1").kids[0].kids[0]._a.opacity, undefined);
+});
+
+test("the shown agent's row is raised; marks: loader working, a pulsing ⠿ waiting, ✓ done, ⠶ idle", () => {
+  fake.agents[3].status = "blocked";
+  store.set("changed", JSON.stringify({ a1: { s: "working", at: Date.now() - 600000 } }));
   const el = make().render();
   const a1 = byId(el, "ag-a1");
-  assert.equal(a1._a.bg, "#selected");
+  assert.equal(a1._a.bg, "#raised");
+  assert.equal(a1._a.border_color, "#border");
   assert.equal(byId(el, "ag-a2")._a.bg, undefined);
-  assert.equal(byId(el, "sub-w2")._a.bg, "#selected", "the focused worker");
+  assert.equal(byId(el, "sub-w2")._a.bg, "#raised", "the focused worker");
   const line = a1.kids[0];
   assert.deepEqual(line.kids.at(-1)._a.frames[1], 80);
+  assert.equal(line.kids.at(-1)._a.text_color, "#foreground");
+  assert.ok(!textOf(line).includes("10m"), "no age while it works");
   assert.equal(line.kids[0]._a.text_color, "#working", "the icon is tinted by the state");
-  assert.equal(byId(el, "ag-a2").kids[0].kids.at(-1).kids[0]._a.path, "mods/workspace-chrome/check.svg");
+  const a3 = byId(el, "ag-a3").kids[0].kids.at(-1);
+  assert.equal(textOf(a3), "⠿");
+  assert.deepEqual(a3._a.loop, ["opacity", { from: 0.35, to: 1, period: 1400 }]);
+  assert.equal(a3._a.text_color, "#blocked");
+  assert.ok(!["✓", "⠶"].includes(textOf(byId(el, "ag-a2").kids[0].kids.at(-1))), "an agent row shows no done or idle mark");
+  assert.equal(textOf(byId(el, "sub-w3").kids.at(-1)), "✓");
+  assert.equal(textOf(byId(el, "sub-w1").kids.at(-1)), "⠶");
+});
+
+test("a shut project shows its agents' state marks before the commits behind", () => {
+  const v = make();
+  v.closed.add("s1");
+  v.git = {};
+  const el = v.render();
+  const tail = byId(el, "space-s1").kids[0].kids.at(-1);
+  assert.deepEqual(tail.kids.slice(1).map((k) => k._a.frames ? "loader" : textOf(k)), ["loader", "✓"]);
 });
 
 test("projects with no agent: one closed row at the end; open, it lists them as project rows", () => {
