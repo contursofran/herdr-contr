@@ -624,3 +624,21 @@ test("the reply box is as wide as the chat's column", async () => {
     v.cards.entry(v.address).card = null;
   }
 });
+
+test("each tick reads the repository of every agent's folder once, and draws again when one becomes known (#101)", async () => {
+  const { forgetRepos } = await import("../mods/herdr-contr/refs.js");
+  forgetRepos();
+  fake.agents = [agent("t1", "idle"), agent("t2", "idle")];
+  fake.panes = [{ terminal: "t1", cwd: "/a" }, { terminal: "t2", cwd: "/b" }];
+  fake.exec = (cmd, args, opts) => args[0] === "remote" ? Promise.resolve({ code: 0, stdout: `git@github.com:o/${opts.cwd.slice(1)}.git`, stderr: "" }) : jl(header, end);
+  const cx = fakeCx();
+  const v = new ChatView(cx); await cx.settle();
+  v.tick(cx); await cx.settle(); await new Promise((r) => setTimeout(r, 0));
+  const n = cx.notified;
+  v.tick(cx); await cx.settle();
+  const git = log.exec.filter(([c]) => c === "git").map(([, , o]) => o.cwd).sort();
+  assert.deepEqual(git, ["/a", "/b"], "git once per folder, also the agent not shown");
+  assert.ok(cx.notified > n, "a new known repository draws again");
+  v.tick(cx); await cx.settle();
+  assert.equal(log.exec.filter(([c]) => c === "git").length, 2);
+});

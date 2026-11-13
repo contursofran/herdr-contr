@@ -6,7 +6,7 @@
 import { div, svg } from "gpui-kit";
 import { h_flex, Link } from "gpui-base";
 import { exec } from "herdr";
-import { linkRefs } from "./refs.js";
+import { linkRefs, refsVersion } from "./refs.js";
 import { icon } from "./state.js";
 import { proseLines, lineHeight, FS } from "./estimate.js";
 
@@ -190,7 +190,7 @@ export function inlinePiece(key, rowId, md, repo, t, width, k, h) {
 // each shown row again on each frame, and this work is the slow part (#83).
 const fits = new Map();
 export function inlineFit(md, repo, width, k, h) {
-  const key = `${width}|${k}|${h}|${repo ?? ""}|${md}`;
+  const key = `${width}|${k}|${h}|${repo ?? ""}|${refsVersion()}|${md}`;
   if (fits.has(key)) return fits.get(key);
   const content = inlineContent(md, repo);
   const words = content && inlineLines(content, width, k) * lineHeight(FS * k) <= h + 0.5 ? inlineWords(inlineRuns(md, repo)) : null;
