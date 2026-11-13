@@ -83,12 +83,13 @@ export function contextPercent(tag) {
   return Number.isFinite(p) ? Math.max(0, Math.min(100, Math.round(p))) : null;
 }
 
-// "ctx 149k / 250k" → "149k of 250k tokens"; else "37% of the context".
+// "ctx 149k / 250k" → "149k of 250k tokens · auto-compact at 250k": the helper writes "used / limit" only
+// against Claude Code's autoCompactWindow (protocol.md). Else "ctx 37%" is against the model's window.
 export function contextTip(tag) {
   const m = /([\d.]+[kKmM]?)\s*\/\s*([\d.]+[kKmM]?)/.exec(tag?.text ?? "");
-  if (m) return `${m[1]} of ${m[2]} tokens`;
+  if (m) return `${m[1]} of ${m[2]} tokens · auto-compact at ${m[2]}`;
   const p = contextPercent(tag);
-  return p === null ? "" : `${p}% of the context`;
+  return p === null ? "" : `${p}% of the model's context window`;
 }
 
 // The ring: a track and an arc file for each 5% (icons/ring), so a draw only picks a path. 0% has no arc;
@@ -513,7 +514,8 @@ export class Composer {
     cx.notify();
   }
 
-  async pick(cx) {
+  // Not `pick`: that name is the slash list's chosen row (`this.pick = 0`), which would hide the method.
+  async pickFiles(cx) {
     const r = await chooseFiles();
     if (r.error) this.note = { text: r.error, bad: true };
     this.addFiles(r.files, cx);
@@ -662,7 +664,7 @@ export class Composer {
         .child(h_flex().id("box-row").w_full().min_w(0).gap(4).items_center()
           .when(canPick(), (el) => el.child(div().id("attach").size(28).flex_none().flex().items_center().justify_center().rounded(8).text_color(t.muted)
             .hover((s) => s.bg(t.hover).text_color(t.foreground))
-            .on_click((_e, cx) => cx.spawn((cx) => this.pick(cx))).child(svg(icon("plus")).size(16))))
+            .on_click((_e, cx) => cx.spawn((cx) => this.pickFiles(cx))).child(svg(icon("plus")).size(16))))
           .when(showTags, (el) => el.child(modelBtn))
           .child(div().flex_1())
           .when(showTags && Boolean(context), (el) => el.child(context))

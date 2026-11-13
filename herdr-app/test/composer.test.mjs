@@ -197,8 +197,8 @@ test("context: a ring by 5% steps and the percent; its tooltip says the tokens; 
   for (let p = 5; p <= 100; p += 5) assert.ok(existsSync(new URL(`../mods/herdr-contr/icons/ring/arc-${String(p).padStart(3, "0")}.svg`, import.meta.url)), `arc ${p}`);
   assert.ok(existsSync(new URL("../mods/herdr-contr/icons/ring/track.svg", import.meta.url)));
   assert.ok(existsSync(new URL("../mods/herdr-contr/icons/chevron-down.svg", import.meta.url)));
-  assert.equal(contextTip({ text: "ctx 149k / 250k", percent: 60 }), "149k of 250k tokens");
-  assert.equal(contextTip({ text: "ctx 37%", percent: 37 }), "37% of the context");
+  assert.equal(contextTip({ text: "ctx 149k / 250k", percent: 60 }), "149k of 250k tokens · auto-compact at 250k");
+  assert.equal(contextTip({ text: "ctx 37%", percent: 37 }), "37% of the model's context window");
   assert.equal(contextPercent({ text: "ctx 37%" }), 37);
   assert.equal(contextPercent({ text: "ctx" }), null);
 
@@ -206,7 +206,7 @@ test("context: a ring by 5% steps and the percent; its tooltip says the tokens; 
   c.status.set("t1", { type: "status", tags: [{ kind: "context", text: "ctx 149k / 250k", percent: 60, warn: false }] });
   let ctx = byId(c.render(fake.agents[0], TH), "context");
   assert.equal(textOf(ctx), "60%");
-  assert.equal(ctx._a.tooltip, "149k of 250k tokens");
+  assert.equal(ctx._a.tooltip, "149k of 250k tokens · auto-compact at 250k");
   const ring = byId(ctx, "ctx-ring");
   assert.equal(ring._a.size, 14);
   assert.equal(ring.kids[0]._a.text_color, "#border", "the track is faint");
@@ -846,6 +846,19 @@ test("an image under the app home shows as a 56 px picture with ×; a text file 
   el = c.render(fake.agents[0], t);
   assert.deepEqual(pics(el), []);
   assert.deepEqual(chips(el), ["notes.txt", "far.png"]);
+});
+
+test("a press on + opens the file dialog and attaches the picked files, also after the slash list set its pick", async () => {
+  fake.exec = (cmd) => cmd === "osascript" ? { code: 0, stdout: "/tmp/a.txt\n/tmp/b.png\n", stderr: "" } : { code: 127, stdout: "", stderr: "" };
+  const cx = fakeCx(); const c = new Composer(cx);
+  const b = c.box(fake.agents[0]);
+  b.pick = 0;
+  byId(c.render(fake.agents[0], TH), "attach")._h.on_click({}, cx);
+  await cx.settle();
+  assert.ok(log.exec.some(([cmd]) => cmd === "osascript"));
+  const el = c.render(fake.agents[0], TH);
+  assert.match(textOf(byId(el, "file-0")), /a\.txt/);
+  assert.match(textOf(byId(el, "file-1")), /b\.png/);
 });
 
 test("the placeholder names the agent by its own title when no tab is named (#106)", async () => {
