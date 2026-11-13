@@ -27,10 +27,16 @@ function title(tab, l) {
   return (tab.name === l?.program?.name || !tab.named) && live ? live : tab.name;
 }
 
-// The name the owner gave the tab, else its lead's title (as the sidebar cleans it), else the
-// program's name, else the tab's number. `lead`: the tab's pane from leadPanes(), or undefined.
+// A tab's automatic name: its number ("3", "tb3") or its terminal's address ("t2n9").
+const AUTO = /^(tb)?\d+$|^t\d+[a-z0-9]{1,4}$/;
+// The last part of a folder: "/a/b/contr/" → "contr"; "" for none or the root.
+const folderName = (cwd) => String(cwd ?? "").replace(/[\\/]+$/, "").split(/[\\/]/).pop() ?? "";
+
+// The name the owner gave the tab, else its lead's title (as the sidebar cleans it), else for a plain terminal
+// its folder's name (#139), else the program's name, else "Terminal". `lead`: the tab's pane from leadPanes().
 export function tabLabel(tab, lead) {
-  const auto = /^(tb)?\d+$/.test(tab.name ?? "");
+  const auto = AUTO.test(tab.name ?? "");
   const l = title(auto ? { ...tab, named: false } : tab, lead) ?? "";
-  return /^(tb)?\d+$/.test(l) || !l ? lead?.program?.name || l || "Terminal" : l;
+  if (!AUTO.test(l) && l) return l;
+  return (!lead?.program?.agent && folderName(lead?.cwd)) || lead?.program?.name || l || "Terminal";
 }
