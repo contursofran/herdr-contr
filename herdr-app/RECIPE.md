@@ -269,8 +269,13 @@ drawn by Herdr's `frames`; every loader of the mod is this one); done is a check
     same data the agents copy used for sub-agents. Under its title: "Orchestrating · N workers" (12 px,
     `muted`); N counts all its live sub-agents, depth first. Under it, its workers in a block 32 px in, 9 px
     padding, with a 1 px `border` guide line at the left, rows 2 px apart: a 26 px row (6 px corners, padding
-    0 8, gap 8) with the icon (13 px), what it works on (12 px; its name, else its template or program;
-    `muted`, `dim` when done, `foreground` when shown) and its state mark (12 px). A deeper sub-agent is 14 px
+    0 8, gap 8) with the icon (13 px), what it works on (12 px; `muted`, `dim` when done, `foreground` when shown) and its state mark
+    (12 px). What it works on: the session's own title (the title that the agent sets, cleaned as on an
+    agent row), when it is not the program's name, a path, user@host or the worker's name; then its name
+    stays at the right as a short muted mono text (10 px, `dim`, at most 72 px, truncates last), and the
+    tooltip starts with "name · work". Else its name, else its template or program. The titles are kept in
+    a Map when the agents change, not worked out on each draw. contr keeps no issue number on the hc
+    terminal, so the issue's title is not used. A deeper sub-agent is 14 px
     further in. The shown worker's row is `raised`. A click focuses its pane, or peeks a worker without one. A
     sub-agent with a pane is in `agents()` too and shows only under its parent.
   - The projects with no agent go into one closed row at the end of each machine's group, "N more projects,

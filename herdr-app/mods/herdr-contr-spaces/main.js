@@ -10,7 +10,7 @@
 import { View, div, svg, image } from "gpui-kit";
 import { v_flex, h_flex } from "gpui-base";
 import { spaces, machines, panes, agents, terminals, focused, setAgentOrder, run, openOverlay, exec, hc, theme, shared, setShared, watchFolder, window, layout, appHome } from "herdr";
-import { bySpace, split, countLine, moreLine, workerText, leadPanes, agentLabel, duration, modelTip, modelDue, MODEL_MS } from "./projects.js";
+import { bySpace, split, countLine, moreLine, workerText, workerWork, leadPanes, agentLabel, duration, modelTip, modelDue, MODEL_MS } from "./projects.js";
 
 // herdr-contr's helper (its `model` command; docs/protocol.md). A mod cannot import another mod, so this is
 // a small copy of herdr-contr's sidecar call.
@@ -593,6 +593,7 @@ export default class Spaces extends View {
       .children(list.map(({ t: k, depth }) => {
         const st = this.listed.get(k.address) ?? (k.status === "error" ? "blocked" : k.status);
         const on = k.address === shown;
+        const work = this.works?.get(k.address) ?? "";
         return this.withModel(h_flex().id(`sub-${k.address}`).h(26).flex_none().pl(8 + 14 * depth).pr(8).gap(8).items_center().rounded(6)
           .text_size(12)
           .when(on, (el) => el.bg(t.raised))
@@ -600,8 +601,9 @@ export default class Spaces extends View {
           .cursor_pointer()
           .on_click(() => run(this.listed.has(k.address) ? "pane.focus" : "terminal.peek", { terminal: k.address }))
           .child(agentIcon(k.program, 13, t[st] ?? t.muted))
-          .child(div().flex_1().min_w(0).truncate().text_color(on ? t.foreground : st === "done" ? t.dim : t.muted).child(workerText(k)))
-          .child(this.mark(t, st, 12)), k.address);
+          .child(div().flex_1().min_w(0).truncate().text_color(on ? t.foreground : st === "done" ? t.dim : t.muted).child(work || workerText(k)))
+          .when(Boolean(work), (el) => el.child(div().flex_shrink_0().max_w(72).truncate().font_family("Menlo").text_size(10).text_color(t.dim).child(workerText(k))))
+          .child(this.mark(t, st, 12)), k.address, work && `${workerText(k)} · ${work}`);
       }));
   }
 
@@ -663,8 +665,9 @@ export default class Spaces extends View {
   }
 
   // Sets the tooltip of a row when the model is known.
-  withModel(el, address) {
-    const tip = this.models.get(address)?.tip;
+  // `pre`: a first tooltip line (a worker's name and work), or "".
+  withModel(el, address, pre = "") {
+    const tip = [pre, this.models.get(address)?.tip].filter(Boolean).join("\n");
     return tip ? el.tooltip(tip) : el;
   }
 
@@ -698,6 +701,10 @@ export default class Spaces extends View {
     const perTab = new Map();
     for (const a of list) perTab.set(a.tab, (perTab.get(a.tab) ?? 0) + 1);
     this.labels = new Map(list.map((a) => [a.address, agentLabel(a, tabs, leads, perTab.get(a.tab) > 1)]));
+    // What each worker works on, from its own title: kept here, not worked out on each draw.
+    const byAddr = new Map(list.map((a) => [a.address, a]));
+    this.works = new Map([...this.agentsOf.values()].flat().flatMap((x) => x.workers)
+      .map(({ t: k }) => [k.address, workerWork(k, byAddr.get(k.address)?.title)]));
   }
 
   compact({ w, i }, t) {
