@@ -643,3 +643,30 @@ test("each tick reads the repository of every agent's folder once, and draws aga
   v.tick(cx); await cx.settle();
   assert.equal(log.exec.filter(([c]) => c === "git").length, 2);
 });
+
+test("a panel in the terminal shows as a card above the reply box while the agent is idle, not while it works or a card shows (#141)", async () => {
+  forgetCommands();
+  let card = { type: "card" };
+  fake.exec = (_c, args) => {
+    if (args[0] === "version") return jl({ ...header, command: "version" }, { type: "version", commands: ["feed", "panel", "keys"] }, end);
+    if (args[0] === "panel") return jl({ ...header, command: "panel" }, { type: "panel", lines: [" Select model", " ❯ 1. Default"] }, end);
+    if (args[0] === "card") return jl({ ...header, command: "card" }, card, end);
+    if (args[0] === "feed") return jl(header, logLine("c1"), { type: "splice", at: 0, count: 1 }, user("u1", "hi"), end);
+    return jl({ ...header, command: args[0] }, end);
+  };
+  fake.agents = [agent("t1", "idle")];
+  const cx = fakeCx(); const v = new ChatView(cx); await cx.settle(); v.width = 900;
+  await v.tick(cx); await cx.settle();
+  assert.match(textOf(byId(v.render(cx), "chat-panel")), /Select model.*1\. Default/s);
+  // The agent works: the card goes.
+  fake.agents = [agent("t1", "working")];
+  await v.tick(cx); await cx.settle();
+  assert.equal(byId(v.render(cx), "chat-panel"), null);
+  // An approval card shows: no panel card.
+  fake.agents = [agent("t1", "blocked")]; card = { type: "card", kind: "approval", request: "r1", title: "Bash command", command: "ls", tool: "Bash" };
+  v.panel.entry("t1").lines = [" Select model"];
+  await v.tick(cx); await cx.settle();
+  assert.ok(byId(v.render(cx), "chat-card"));
+  assert.equal(byId(v.render(cx), "chat-panel"), null);
+  forgetCommands();
+});
