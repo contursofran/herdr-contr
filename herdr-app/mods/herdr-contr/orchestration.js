@@ -24,6 +24,11 @@ export const FLOW_CHOICES = {
 export const STEP_MAX = 99;
 export const MODELS = [["opus", "Opus 5.5", "opus"], ["sonnet", "Sonnet 5.5", "sonnet"], ["haiku", "Haiku 5.5", "haiku"], ["claude-fable-5-2", "Fable 5.2", "fable"]];
 export const EFFORTS = ["low", "medium", "high", "xhigh", "max"].map((e) => [e, e, e]);
+// The owner's recommended setup (#90): [model, effort] per role.
+export const RECOMMENDED = {
+  orchestrator: ["claude-fable-5-2", "medium"], builder: ["opus", "low"], reviewer: ["claude-fable-5-2", "low"],
+  planner: ["claude-fable-5-2", "low"], debugger: ["claude-fable-5-2", "high"],
+};
 export const ROLES = [
   ["orchestrator", "Orchestrator", "Plans and lands work."], ["planner", "Planner", "Writes PLAN.md."],
   ["builder", "Builder", "Builds, opens the PR."], ["reviewer", "Reviewer", "Reviews the PR head."],
@@ -158,6 +163,26 @@ export function setRole(name, what, value) {
   });
 }
 
+// True when each role is claude and has the recommended model and effort. A role that is not claude
+// keeps the setup from being complete.
+export const recommendedInUse = () => Object.entries(RECOMMENDED)
+  .every(([name, [m, e]]) => roleValue(name, "model") === m && roleValue(name, "effort") === e);
+
+// Sets the model and effort of each role to RECOMMENDED in one write. Roles that are not claude, the
+// other arguments, the other profile keys and the flow stay.
+export function useRecommended() {
+  return update((f) => {
+    if (!f.profiles || typeof f.profiles !== "object" || Array.isArray(f.profiles)) f.profiles = {};
+    for (const [name, [m, e]] of Object.entries(RECOMMENDED)) {
+      const p = f.profiles[name] && typeof f.profiles[name] === "object" ? f.profiles[name] : {};
+      let argv = Array.isArray(p.argv) && p.argv.length ? p.argv : DEFAULT_PROFILES[name];
+      if (claudeAt(argv) < 0) continue;
+      argv = setFlag(setFlag(argv, "--model", m), "--effort", e);
+      f.profiles[name] = { ...p, argv };
+    }
+  });
+}
+
 // The section's body. `ui`: { seg, small, heading, about, t } from settings.js.
 export function orchestrationBody({ t, seg, small, heading, about, div, h_flex, v_flex }, view) {
   const bad = agentsBad();
@@ -191,6 +216,13 @@ export function orchestrationBody({ t, seg, small, heading, about, div, h_flex, 
     .child(line("set-flow-workers", "Workers at once", "The most workers at once, reviewers included.", step("workers", "workers")))
     .child(line("set-flow-merge", "Merge", "Ask each time, or merge when CI and review pass.", pick("merge")));
   body.child(heading("ROLES"));
+  const inUse = recommendedInUse();
+  body.child(h_flex().id("set-recommended").w_full().pt(12).gap(12).items_center()
+    .child(inUse || bad
+      ? div().id("set-recommended-use").h(24).px(9).flex().items_center().rounded(6).text_size(12)
+        .text_color(t.dim).bg(t.chrome).border(1).border_color(t.border).child("Use recommended setup")
+      : small("set-recommended-use", "Use recommended setup", (cx) => run(() => useRecommended(), cx)))
+    .child(inUse ? div().id("set-recommended-note").text_size(12).text_color(t.dim).child("Recommended setup in use") : div()));
   for (const [name, title, does] of ROLES) {
     // A command that is not claude: its text shows and the switches are off; it is never replaced (#80).
     const custom = !roleIsClaude(name);
