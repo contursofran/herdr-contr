@@ -45,7 +45,8 @@ test("no plan with data: no usage rows, only Settings and the add machine button
   const el = new FootView(null).render();
   assert.equal(byId(el, "foot-usage-claude"), null);
   assert.equal(el.kids.length, 1);
-  assert.deepEqual(el.kids[0].kids.map((k) => k._a.id), ["settings-popover", "foot-add-machine"]);
+  assert.deepEqual(el.kids[0].kids.map((k) => k._a.id), ["foot-settings-fill", "foot-add-machine"]);
+  assert.equal(el.kids[0].kids[0].kids[0]._a.id, "settings-popover");
 });
 
 test("Settings fills the width; the Popover owns the press; a right-click opens the herdr-contr settings", () => {

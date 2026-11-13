@@ -44,6 +44,9 @@ export function digit(e) {
   return /^[1-9]$/.test(e?.key ?? "") ? Number(e.key) : null;
 }
 
+// The head of an owner question (ownerq.js): its id, and how many more wait after it.
+const ownerHead = (c) => `${c.request} · The coordinator asks${c.more > 0 ? ` · ${c.more} more after this` : ""}`;
+
 export class Cards {
   // The "other answer" boxes are made here, once: a view may not make input state while it draws.
   // `cx`: for the card's own focus, so 1-9 and Enter reach it and not the reply box.
@@ -230,7 +233,7 @@ export class Cards {
     // One question at a time, as in herdr-contr: "Question 1 of 2", Back and Next, Send on the last.
     const count = q.questions.length, step = Math.min(e.step ?? 0, Math.max(0, count - 1));
     box.child(h_flex().gap(10).items_center()
-      .child(head(count > 1 ? `The agent asks · question ${step + 1} of ${count}` : "The agent asks"))
+      .child(head(c.owner ? ownerHead(c) : count > 1 ? `The agent asks · question ${step + 1} of ${count}` : "The agent asks"))
       .when(count > 1, (el) => el.child(div().flex_1()).child(h_flex().gap(5).children(q.questions.map((_x, i) =>
         div().id(`${id}-dot-${i}`).size(7).rounded(4).bg(i === step ? t.accent : answered(e, i) ? t.muted : t.border)
           .on_click((_ev, cx) => { e.step = i; cx.notify(); }))))));
@@ -268,6 +271,8 @@ export class Cards {
         .when((qq.options ?? []).length < 9, (el) => el.child(hint((qq.options ?? []).length + 1))));
       box.child(sec);
     });
+    // An owner question (ownerq.js) names what helps to decide.
+    if (c.refs?.length) box.child(div().id(`${id}-refs`).text_size(12).text_color(t.muted).child(`Refs: ${c.refs.join(" · ")}`));
     if (c.unread > 0) {
       const total = q.questions.length + c.unread;
       box.child(h_flex().gap(10).items_center()
