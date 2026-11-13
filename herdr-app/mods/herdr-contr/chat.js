@@ -17,6 +17,7 @@ import { switchStrip } from "./viewswitch.js";
 import { markdownView, codeBlockAt } from "./mdblocks.js";
 import { repoFor } from "./refs.js";
 import { inlineTick } from "./inline.js";
+import { mermaidTick, mermaidVersion } from "./mermaid.js";
 import { textScale, setting } from "./config.js";
 
 // Herdr's zoom: line heights round in zoomed px (estimate.js lineHeight).
@@ -149,6 +150,9 @@ export class ChatView {
     // Inline PR icons (inline.js): gh states read here, not while drawing, for the shown rows. Off: none.
     const ids = new Set(setting("inline_icons") === "on" ? (f ? this.rowsOf(f) : []).map((r) => r.id) : []);
     cx.spawn(async (cx) => { if (await inlineTick(ids)) cx.notify(); });
+    // Mermaid diagrams (mermaid.js): the blocks the last draw showed, drawn by the helper here. A new one changes
+    // the row heights (mermaidVersion is in the height cache's key).
+    cx.spawn(async (cx) => { if (await mermaidTick()) cx.notify(); });
     const status = agent?.status;
     if (status === "working") { if (Date.now() - this.lastWork >= WORK_MS) cx.spawn((cx) => this.pollWorking(cx, agent.address)); }
     else {
@@ -238,11 +242,11 @@ export class ChatView {
   colWidth() { return columnWidth(this.width); }
 
   height(row) {
-    const w = this.colWidth(), open = this.open.has(row.id), k = textScale(), zoom = appZoom();
+    const w = this.colWidth(), open = this.open.has(row.id), k = textScale(), zoom = appZoom(), mv = mermaidVersion();
     const c = this.heights.get(row);
-    if (c && c.w === w && c.open === open && c.k === k && c.zoom === zoom) return c.h;
+    if (c && c.w === w && c.open === open && c.k === k && c.zoom === zoom && c.mv === mv) return c.h;
     const h = rowHeight(row, w, open, k, zoom);
-    this.heights.set(row, { w, open, k, zoom, h });
+    this.heights.set(row, { w, open, k, zoom, mv, h });
     return h;
   }
 

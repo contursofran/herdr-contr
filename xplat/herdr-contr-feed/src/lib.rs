@@ -9,6 +9,7 @@ pub mod config;
 pub mod feed;
 pub mod install;
 pub mod locate;
+pub mod mermaid;
 pub mod models;
 pub mod paste;
 pub mod protocol;

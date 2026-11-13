@@ -1,13 +1,14 @@
 // Markdown with our own code boxes and tables: herdr's TextView draws them square and takes no CSS,
 // so the text is split into blocks (blocks.js, the same split estimate.js counts); code fences and tables
 // are drawn here (rounded), the rest stays TextView markdown.
-import { div } from "gpui-kit";
+import { div, image } from "gpui-kit";
 import { v_flex, h_flex, TextView } from "gpui-base";
 import { colWidths, markdownHeight, markdownRaw, lineHeight } from "./estimate.js";
 import { splitBlocks, splitPieces, tableCells } from "./blocks.js";
 import { linkRefs } from "./refs.js";
 import { inlinePiece, inlineFit, inlineContent } from "./inline.js";
 import { setting } from "./config.js";
+import { isMermaid, mermaidOf, mermaidSize } from "./mermaid.js";
 
 export { splitBlocks, tableCells };
 
@@ -36,7 +37,15 @@ export function codeBlockAt(text, width, y, k = 1, zoom = 1) {
   return s ? s.lines.join("\n") : null;
 }
 
-function codeBox(key, b, t, k) {
+// A mermaid block with its diagram (mermaid.js): the same box, with the image in it at the size estimate.js
+// counts (no wider than the text). Else the code as written.
+function codeBox(key, b, t, k, width) {
+  const d = isMermaid(b) ? mermaidOf(b.text, t) : null;
+  if (d) {
+    const s = mermaidSize(d, width);
+    return v_flex().w_full().my(6).px(14).py(10).rounded(12).bg(t.raised).border(1).border_color(t.border)
+      .child(image(d.path).w(s.w).h(s.h).flex_none());
+  }
   return v_flex().w_full().my(6).px(14).py(10).rounded(12).bg(t.raised).border(1).border_color(t.border)
     .font_family("Menlo").text_size(13 * k).text_color(t.foreground)
     .child(TextView.markdown(key, codeMarkdown(b.text)).selectable(true));
@@ -78,7 +87,7 @@ export function markdownView(id, text, t, width, k = 1, repo = null) {
   const prose = (key, md, next) => (inline && safeSplit(key, id, md, next, repo, t, width, k)) || textView(key, md, repo, k);
   if (blocks.length === 1 && blocks[0].k === "md") return prose(`md-${id}-0`, blocks[0].text, null);
   return v_flex().w_full().children(blocks.map((b, i) =>
-    b.k === "code" ? codeBox(`md-${id}-k${i}`, b, t, k)
+    b.k === "code" ? codeBox(`md-${id}-k${i}`, b, t, k, width)
       : b.k === "table" ? table(`md-${id}-t${i}`, b, t, width, k)
         : prose(`md-${id}-${i}`, b.text, blocks[i + 1]?.k ?? null)));
 }
