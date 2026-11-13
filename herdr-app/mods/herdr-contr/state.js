@@ -127,16 +127,18 @@ export function tabLabel(tab) {
 
 // The screen for a tab: the chat when an agent runs in it, else the tab's own terminals.
 // The chat for a tab with an agent in one pane; the tab's panes once it is split (or for a shell).
-// The owner's pick (the Chat | Terminal switch, its key, the tab menu) wins, per tab, for a tab with an agent.
+// The owner's pick (the Chat | Terminal switch, its key, the tab menu) wins for each tab with an agent (#126).
 export const screenFor = (tab) => {
   if (!tab || !tabAgents(tab.id).length) return "tab";
-  return shared(KEY_VIEW)?.[tab.id] ?? ((tab.panes ?? 1) <= 1 ? "chat" : "tab");
+  return viewPick() ?? ((tab.panes ?? 1) <= 1 ? "chat" : "tab");
 };
-// The owner's pick of chat or terminal, per tab id.
+// The owner's pick of chat or terminal: one for the window, kept over a restart (shared() persists).
+// Only a press or a key writes it. An older value (a map per tab) counts as no pick.
 export const KEY_VIEW = "herdr-contr.view";
-// Shows the chat or the tab's terminal for the shown tab, and keeps that pick for the tab.
+const viewPick = () => { const v = shared(KEY_VIEW); return v === "chat" || v === "tab" ? v : null; };
+// Shows the chat or the tab's terminal for the shown tab, and keeps that pick for all tabs with an agent.
 export function setView(child, tab = activeTab()) {
-  if (tab) setShared(KEY_VIEW, { ...(shared(KEY_VIEW) ?? {}), [tab.id]: child });
+  if (tab) setShared(KEY_VIEW, child);
   showScreen(child);
   // The terminal gets the keys at once.
   const a = child === "tab" ? currentAgent() : null;

@@ -1,4 +1,4 @@
-// The Chat | Terminal switch: the per-tab pick, its key, the block over the terminal, the strip over the chat.
+// The Chat | Terminal switch: the window's pick, its key, the block over the terminal, the strip over the chat.
 import { test, beforeEach } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
@@ -21,7 +21,7 @@ beforeEach(() => {
   fake.spaces = [space("sp1", { tabs: [tab("tb1", 1, { active: true }), tab("tb2", 2)] })];
 });
 
-test("the key switches the agent's tab between chat and terminal, focuses the terminal, and the tab keeps the pick", () => {
+test("the key switches the agent's tab between chat and terminal, focuses the terminal, and the pick is kept", () => {
   const [tb1, tb2] = fake.spaces[0].tabs;
   assert.equal(screenFor(tb1), "chat");
   command("view");
@@ -37,6 +37,25 @@ test("the key switches the agent's tab between chat and terminal, focuses the te
   // A split tab with an agent can show the chat too.
   setView("chat", tab("tb1", 1, { panes: 2 }));
   assert.equal(screenFor(tab("tb1", 1, { panes: 2 })), "chat");
+});
+
+test("the pick is one for the window: another agent, a moved agent and an old per-tab value (#126)", () => {
+  fake.agents = [agent("t1", "idle", { tab: "tb1" }), agent("t2", "idle", { tab: "tb2" })];
+  const [tb1, tb2] = fake.spaces[0].tabs;
+  setView("tab", tb1);
+  assert.equal(fake.shared["herdr-contr.view"], "tab");
+  assert.equal(screenFor(tb2), "tab", "another agent's tab shows the terminal too");
+  // The agent moves to another tab: the pick stays.
+  fake.agents = [agent("t1", "idle", { tab: "tb3" })];
+  assert.equal(screenFor(tab("tb3", 3)), "tab");
+  // A tab without an agent shows its terminal and does not change the pick.
+  fake.agents = [];
+  command("view");
+  assert.equal(fake.shared["herdr-contr.view"], "tab");
+  // An old value (a map per tab) counts as no pick.
+  fake.agents = [agent("t1", "idle", { tab: "tb1" })];
+  fake.shared["herdr-contr.view"] = { tb1: "tab" };
+  assert.equal(screenFor(tb1), "chat");
 });
 
 test("the key does nothing on a tab without an agent", () => {

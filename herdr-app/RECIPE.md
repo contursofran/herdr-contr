@@ -212,7 +212,9 @@ drawn by Herdr's `frames`; every loader of the mod is this one); done is a check
   "Terminal", a round close button). ⌃` again closes it.
 - **Chat | Terminal switch** (`herdr-contr` layout): a tab with an agent shows a switch on the right
   of a 36 px strip, over the chat and over the tab's terminal (block `view-switch`, view `switch`).
-  ⌘⇧T does the same. The tab keeps the pick. A tab without an agent hides the block.
+  ⌘⇧T does the same. The pick is one for the window: it stays when another agent shows or an agent
+  moves to another pane or tab, and over a restart (shared state). A tab without an agent hides the
+  block and does not change the pick.
 - **Keys** (while this layout shows): ⌘T new tab, ⌘W close tab, ⌘⇧N new space, ⌘1-⌘9 a tab,
   ⌘⇧[ / ⌘⇧] or ⌃Tab / ⌃⇧Tab the tab before or after, ⌘⌥↑ / ⌘⌥↓ the space before or after,
   ⌘⌃⇧← / ⌘⌃⇧→ move the tab, ⌘⇧I Needs you, ⌘⇧\ Overview, ⌘B sidebar, ⌃` terminal, ⌘⇧T chat or terminal,
