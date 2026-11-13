@@ -2,12 +2,15 @@
 // bottom row (+, the model button, the context ring, the branch, send). Enter sends through the sidecar's `send`;
 // "+" or a drop attaches files.
 import { div, svg, image } from "gpui-kit";
-import { v_flex, h_flex, Textarea, TextareaState } from "gpui-base";
+import { v_flex, h_flex, Textarea, TextareaState, Popover } from "gpui-base";
 import { theme, panes, home, exec, window } from "herdr";
 import { agentName, icon, loader, orchestration } from "./state.js";
 import * as sidecar from "./sidecar.js";
 import { setting } from "./config.js";
 import { appRel } from "./phone.js";
+import { modelName, hasModelMenu, menuPanel } from "./modelmenu.js";
+
+export { modelName };
 
 export const STATUS_MS = 5000;
 export const MODEL_MS = 15000;   // the helper's `model` is asked again after this long
@@ -39,33 +42,15 @@ export function tagsFor(agent, status) {
   return out.filter((t) => t.text && !seen.has(t.text) && seen.add(t.text));
 }
 
-// A model id as people say it: "claude-opus-5-5" → "Opus 5.5", "claude-fable-5-2" → "Fable 5.2", "gpt-6" → "GPT-6".
-// A name that is short already ("Opus 5.5", from the status line) stays. Kept by id: each draw asks.
-const CLAUDE_ID = /^claude-(?:(\d+)-(\d+)-)?([a-z]+)(?:-(\d+)(?:-(\d{1,2}))?)?(?:-\d{8})?$/;
-const names = new Map();
-export function modelName(id) {
-  const m = String(id ?? "").trim();
-  if (names.has(m)) return names.get(m);
-  let out = m;
-  const c = m.match(CLAUDE_ID);
-  if (c) {
-    const ver = c[1] ? `${c[1]}.${c[2]}` : c[4] ? (c[5] ? `${c[4]}.${c[5]}` : c[4]) : "";
-    out = [c[3][0].toUpperCase() + c[3].slice(1), ver].filter(Boolean).join(" ");
-  } else if (/^gpt-\d/i.test(m)) out = `GPT-${m.split("-")[1]}`;
-  else if (/^(opus|sonnet|haiku|fable)$/i.test(m)) out = m[0].toUpperCase() + m.slice(1).toLowerCase();
-  if (names.size >= 100) names.clear();
-  names.set(m, out);
-  return out;
-}
-
 // The model button's text: { name, effort }. The helper's `model` line first (the session log, the settings), then
 // the status line's tags. A model not known yet: the app's name alone ("Claude Code").
 export function modelInfo(agent, status, line) {
   const tag = (k) => (status?.tags ?? []).find((t) => t.kind === k)?.text || "";
-  const name = modelName(line?.model || tag("model"));
+  const id = String(line?.model || tag("model") || "").trim();
+  const name = modelName(id);
   const effort = String(line?.effort || tag("effort") || "").trim();
   if (!name) return { name: agent?.program?.name || agent?.app || "Agent", effort: "", known: false };
-  return { name, effort, known: true };
+  return { id, name, effort, known: true };
 }
 
 // The model button's tooltip: "Opus 5.5 · medium effort · Claude Code", and the folder on a second line.
@@ -299,6 +284,7 @@ export class Composer {
     this.modelBusy = false;
     this.cmds = new Map();      // address → { at, list } of a Claude Code agent's "/" commands
     this.cmdsBusy = false;
+    this.menu = null;           // the model menu: { address, page } while open
     this.agent = null;          // the agent the box is for (its kind decides the list)
     this.pick = 0;              // the chosen match of the list
     this.top = 0;               // the first shown match
@@ -361,12 +347,60 @@ export class Composer {
     return true;
   }
 
-  // The model button in a Claude Code session: "/model " in the box, and its values in the list. Nothing is sent.
-  askModel(cx) {
-    this.setText("/model "); this.empty = false; this.slashClosed = null; this.pick = 0; this.top = 0;
-    this.input.focus?.();
-    cx.spawn((cx) => this.loadCommands(cx));
+  // The model menu (#112) for the shown agent: { address, page } while it is open, else null. `page`: "main",
+  // "effort" or "models". Another agent shown closes it.
+  menuOpen(address) { return Boolean(address) && this.menu?.address === address; }
+
+  // Whether the model button opens the menu: the agent's `/model` takes values (the helper's commands), or a
+  // Claude Code session whose commands are not read yet (it always has them).
+  hasMenu(agent) {
+    const had = agent && this.cmds.get(agent.address);
+    return had ? hasModelMenu(had.list) : agent?.app === "claude-code";
+  }
+
+  // The Popover's open state changed (a press on the button, a press outside, Escape).
+  openMenu(open, cx) {
+    this.menu = open && this.address ? { address: this.address, page: "main" } : null;
+    if (this.menu) cx.spawn((cx) => this.loadCommands(cx));
     cx.notify();
+  }
+
+  // A row with a sub menu shows that page; null closes the menu.
+  menuPage(page, cx) {
+    this.menu = page && this.menu ? { ...this.menu, page } : null;
+    cx.notify();
+  }
+
+  // A press on a model or an effort: the menu closes and `text` ("/model <id>", "/effort <level>") goes to the agent
+  // through the helper's `send`, as a typed command does. The box keeps its text. After it, the model and the status
+  // are read again at the next poll, so the button shows the new value.
+  choose(text, cx) {
+    this.menu = null;
+    cx.notify();
+    cx.spawn((cx) => this.sendCommand(text, cx));
+  }
+
+  async sendCommand(text, cx) {
+    const a = this.address;
+    if (!a || this.sending) return;
+    this.sending = true; this.note = null;
+    cx.notify();
+    try {
+      const r = await sidecar.send(a, text, [], this.seen?.(a) ?? null);
+      const done = r.lines.find((l) => l.type === "done");
+      const moved = sidecar.agentChanged(done), fresh = sidecar.newConversation(done);
+      if (r.error || !done || (done.result !== "sent" && done.result !== "unconfirmed")) {
+        this.note = { text: fresh ? sidecar.NEW_CONVERSATION : moved ? sidecar.AGENT_CHANGED : (r.error?.message ?? done?.message) || `${text} was not sent.`, bad: true };
+        if (fresh) this.onNewConversation?.(a, cx);
+      } else {
+        const m = this.models.get(a);
+        if (m) m.at = 0;
+        if (this.address === a) this.statusAt = 0;
+      }
+    } finally {
+      this.sending = false;
+      cx.notify();
+    }
   }
 
   // The helper's `model` answer for the shown agent, at most every MODEL_MS. An older helper has none: the
@@ -376,6 +410,7 @@ export class Composer {
     if (!a || this.modelBusy) return;
     const had = this.models.get(a);
     if (had && Date.now() - had.at < MODEL_MS) return;
+    if (!this.cmds.has(a)) await this.loadCommands(cx);   // once: does the model button open a menu
     this.modelBusy = true;
     try {
       this.models.set(a, { at: Date.now(), line: had?.line ?? null });
@@ -612,12 +647,20 @@ export class Composer {
     // A 28 px button of the bottom row: radius 8, side padding 8, a fill on hover.
     const btn = (id) => h_flex().id(id).h(28).px(8).gap(6).flex_none().items_center().rounded(8).hover((st) => st.bg(t.hover));
     const mark = agentMark(agent, 13, t);
-    const modelBtn = btn("model").min_w(0).flex_shrink(1).tooltip(modelTip(agent, model))
-      .when(agent.app === "claude-code", (el) => el.on_click((_e, cx) => this.askModel(cx)))
+    const modelBtn = btn("model").min_w(0).flex_shrink(1).when(!this.menuOpen(agent.address), (el) => el.tooltip(modelTip(agent, model)))
+      .when(this.menuOpen(agent.address), (el) => el.bg(t.hover))
       .when(Boolean(mark), (el) => el.child(mark))
       .child(div().min_w(0).truncate().text_size(12).text_color(t.foreground).child(model.name))
       .when(Boolean(model.effort), (el) => el.child(div().flex_none().text_size(12).text_color(t.muted).child(model.effort)))
       .child(svg(icon("chevron-down")).size(11).flex_none().text_color(t.muted));
+    // The model menu opens above the button (#112); the Popover owns the press, a press outside and Escape.
+    const menuOn = { page: (p, cx) => this.menuPage(p, cx), choose: (text, cx) => this.choose(text, cx) };
+    const modelEl = !model.known || !this.hasMenu(agent) ? modelBtn
+      : Popover.new("model-popover").anchor("bottom_left").open(this.menuOpen(agent.address))
+        .on_open_change((open, cx) => this.openMenu(open, cx))
+        .trigger(modelBtn)
+        .content(div().pb(6)
+          .child(menuPanel(this.menu ?? { page: "main" }, model, this.cmds.get(agent.address)?.list ?? [], t, menuOn)));
     const ctxColor = ctxTag?.warn ? t.blocked : t.muted;
     const ring = ctxPct === null ? null : div().id("ctx-ring").relative().size(14).flex_none()
       .child(svg(RING_TRACK).size(14).text_color(t.border))
@@ -665,7 +708,7 @@ export class Composer {
           .when(canPick(), (el) => el.child(div().id("attach").size(28).flex_none().flex().items_center().justify_center().rounded(8).text_color(t.muted)
             .hover((s) => s.bg(t.hover).text_color(t.foreground))
             .on_click((_e, cx) => cx.spawn((cx) => this.pickFiles(cx))).child(svg(icon("plus")).size(16))))
-          .when(showTags, (el) => el.child(modelBtn))
+          .when(showTags, (el) => el.child(modelEl))
           .child(div().flex_1())
           .when(showTags && Boolean(context), (el) => el.child(context))
           .when(Boolean(branch), (el) => el.child(mono(h_flex().id("branch").h(28).px(8).gap(6).min_w(0).flex_shrink(1).items_center())

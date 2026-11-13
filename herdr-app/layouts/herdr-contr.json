@@ -27,7 +27,10 @@
           },
           "window_drag": true,
           "content": {
-            "mod": "workspace-chrome"
+            "mod": "herdr-contr-spaces",
+            "props": {
+              "view": "head"
+            }
           }
         },
         {
@@ -39,42 +42,15 @@
           }
         },
         {
-          "id": "usage",
+          "id": "foot",
           "type": "block",
           "size": {
-            "px": 56
-          },
-          "hidden": true,
-          "content": {
-            "mod": "herdr-contr",
-            "props": {
-              "view": "usage"
-            }
-          }
-        },
-        {
-          "id": "settings-row",
-          "type": "block",
-          "size": {
-            "px": 32
+            "px": 45
           },
           "content": {
             "mod": "herdr-contr",
             "props": {
-              "view": "settings-row"
-            }
-          }
-        },
-        {
-          "id": "sidebar-footer",
-          "type": "block",
-          "size": {
-            "px": 69
-          },
-          "content": {
-            "mod": "workspace-chrome",
-            "props": {
-              "footer": true
+              "view": "foot"
             }
           }
         }

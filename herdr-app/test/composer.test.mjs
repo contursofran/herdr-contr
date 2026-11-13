@@ -6,6 +6,7 @@ import { fakeCx } from "./fake-cx.mjs";
 import { agent, space } from "./fixtures.mjs";
 import { Composer, tagsFor, shortPath, quoted, withFiles, slashQuery, matchCommands, screenNote, argItems, matchArgs, thumbPath, THUMB_PX, modelName, modelInfo, modelTip, ringIcon, contextTip, contextPercent, MODEL_MS } from "../mods/herdr-contr/composer.js";
 import { ChatView } from "../mods/herdr-contr/chat.js";
+import { FAMILY_LINES, modelLine, otherModels, effortValues, hasModelMenu, titleCase } from "../mods/herdr-contr/modelmenu.js";
 import { forgetCommands } from "../mods/herdr-contr/sidecar.js";
 import { KEY_CONFIG } from "../mods/herdr-contr/config.js";
 
@@ -173,18 +174,6 @@ test("the helper's model is asked with the status, at most every MODEL_MS, only 
   c.models.get("t1").at -= MODEL_MS; c.statusAt = 0; await c.pollStatus(cx);
   assert.equal(asked, 2);
   forgetCommands();
-});
-
-test("a press on the model button in a Claude Code session puts /model in the box; nothing is sent; other apps get no press", async () => {
-  const cx = fakeCx(); const c = new Composer(cx);
-  const b = c.box(fake.agents[0]);
-  byId(c.render(fake.agents[0], TH), "model")._h.on_click({}, cx);
-  await cx.settle();
-  assert.equal(b.input.value(), "/model ");
-  assert.equal(sent.length, 0);
-  const pi = { ...fake.agents[1], app: "pi" };
-  c.box(pi);
-  assert.equal(byId(c.render(pi, TH), "model")._h.on_click, undefined);
 });
 
 test("context: a ring by 5% steps and the percent; its tooltip says the tokens; a warning keeps the blocked color (#99)", async () => {
@@ -518,6 +507,12 @@ const CMDS = [
   { name: "deploy", description: "Deploy the app", source: "project" },
 ];
 const TH = new Proxy({}, { get: (_t, k) => `#${k}` });
+const MENU_CMDS = [...CMDS,
+  { name: "effort", description: "Set effort level for model usage", source: "builtin", hint: "low|medium|high|xhigh|max", args: [{ value: "low" }, { value: "medium" }, { value: "high" }, { value: "xhigh" }, { value: "max" }], screen: true },
+  { name: "model", description: "Set the AI model for Claude Code", source: "builtin", hint: "<model>", screen: true, args: [
+    { value: "claude-fable-5-2", label: "Fable 5.2" }, { value: "claude-opus-5-5", label: "Opus 5.5" }, { value: "claude-sonnet-5-5", label: "Sonnet 5.5" },
+    { value: "opus", label: "The latest Opus" }, { value: "sonnet", label: "Sonnet 5.5" }, { value: "my-model" }] },
+];
 function slashRig({ hasCommands = true, list = CMDS, screens = [] } = {}) {
   const asked = [];
   forgetCommands();
@@ -870,4 +865,137 @@ test("the placeholder names the agent by its own title when no tab is named (#10
   assert.equal(replyName({ program: prog, title: "Claude Code" }), "Claude Code");
   assert.equal(placeholderFor({ program: prog, title: "\u2733 Flockbook layout" }), "Reply to Flockbook layout");
   assert.equal(placeholderFor(null), "Reply to the agent");
+});
+
+// The model menu (#112). At the end: its rigs bind the "/" keys, which the paste test above sees bound once.
+test("model menu: the helpers (family lines, other models, efforts) (#112)", () => {
+  assert.equal(modelLine("claude-opus-5-5"), FAMILY_LINES.opus);
+  assert.equal(modelLine("Sonnet 5.5"), FAMILY_LINES.sonnet);
+  assert.equal(modelLine("fable"), FAMILY_LINES.fable);
+  assert.equal(modelLine("gpt-6-codex"), "", "an unknown family has no line");
+  assert.equal(modelLine("claude-constructor-1"), "", "no line from the object's own names");
+  assert.equal(titleCase("xhigh"), "Xhigh");
+  assert.ok(hasModelMenu(MENU_CMDS)); assert.ok(!hasModelMenu(CMDS)); assert.ok(!hasModelMenu(null));
+  assert.deepEqual(effortValues(MENU_CMDS), ["low", "medium", "high", "xhigh", "max"]);
+  assert.deepEqual(effortValues(CMDS), []);
+  const o = otherModels(MENU_CMDS, "claude-opus-5-5");
+  assert.deepEqual(o.map((x) => x.value), ["claude-fable-5-2", "claude-sonnet-5-5", "opus", "my-model"], "not the current one; each name once");
+  assert.deepEqual(o[0], { value: "claude-fable-5-2", name: "Fable 5.2", line: FAMILY_LINES.fable });
+  assert.equal(o[3].line, "");
+  assert.equal(otherModels(MENU_CMDS, "claude-opus-5-5"), o, "kept: the same list and model give the same answer");
+  assert.deepEqual(otherModels(MENU_CMDS, "Opus 5.5").map((x) => x.value), o.map((x) => x.value), "the current model by its name too");
+});
+
+function menuRig(opts = {}) {
+  const r = slashRig({ list: MENU_CMDS, ...opts });
+  r.c.models.set("t1", { at: Date.now(), line: { type: "model", model: "claude-opus-5-5", effort: "medium" } });
+  r.pop = () => byId(r.view(), "model-popover");
+  r.open = async () => { r.pop()._h.on_open_change(true, r.cx); await r.cx.settle(); };
+  r.press = async (id) => { byId(r.view(), id)._h.on_click({}, r.cx); await r.cx.settle(); };
+  return r;
+}
+
+test("model menu: a press on the model button opens a menu above it: the model with its line and a check, Effort, More models (#112)", async () => {
+  const r = menuRig();
+  const pop = r.pop();
+  assert.equal(pop._a.anchor, "bottom_left", "above the button");
+  assert.equal(pop._a.open, false);
+  assert.equal(pop._trigger._a.id, "model", "the model button is the trigger");
+  assert.equal(byId(r.view(), "model")._h.on_click, undefined, "the Popover owns the press");
+  await r.open();
+  assert.equal(r.pop()._a.open, true);
+  assert.equal(r.asked.length, 1, "the commands are read when it opens");
+  const menu = byId(r.view(), "model-menu");
+  assert.equal(menu._a.rounded, 12); assert.equal(menu._a.bg, "#raised"); assert.equal(menu._a.border_color, "#border");
+  const cur = byId(menu, "menu-current");
+  assert.equal(textOf(cur), `Opus 5.5 ${FAMILY_LINES.opus}`);
+  const [names, check] = cur.kids;
+  assert.equal(names.kids[0]._a.text_size, 15); assert.equal(names.kids[1]._a.text_size, 13); assert.equal(names.kids[1]._a.text_color, "#muted");
+  assert.match(check._a.path, /check\.svg$/); assert.equal(check._a.text_color, "#accent");
+  assert.equal(textOf(byId(menu, "menu-effort")), "Effort Medium");
+  assert.match(byId(menu, "menu-effort").kids.at(-1)._a.path, /chevron-right\.svg$/);
+  assert.equal(textOf(byId(menu, "menu-more")), "More models");
+  assert.ok(byId(menu, "menu-div-effort") && byId(menu, "menu-div-more"), "dividers");
+  assert.equal(byId(r.view(), "model")._a.tooltip, undefined, "no tooltip over the open menu");
+  // A press outside or Escape: the Popover reports it closed.
+  r.pop()._h.on_open_change(false, r.cx);
+  assert.equal(r.pop()._a.open, false);
+  assert.equal(r.c.menu, null);
+  assert.equal(sent.length, 0, "nothing is sent by opening or closing");
+});
+
+test("model menu: Effort opens the efforts with a check on the current one; a press sends /effort and closes (#112)", async () => {
+  const r = menuRig();
+  r.b.input.set_value("half a reply");
+  await r.open();
+  await r.press("menu-effort");
+  const menu = byId(r.view(), "model-menu");
+  assert.equal(textOf(byId(menu, "menu-back")), "Effort");
+  assert.deepEqual(["low", "medium", "high", "xhigh", "max"].map((v) => textOf(byId(menu, `menu-effort-${v}`))), ["Low", "Medium", "High", "Xhigh", "Max"]);
+  assert.match(byId(menu, "menu-effort-medium").kids.at(-1)._a.path, /check\.svg$/);
+  assert.equal(byId(menu, "menu-effort-high").kids.length, 1, "no check on the others");
+  await r.press("menu-effort-high");
+  assert.equal(r.c.menu, null, "closed");
+  assert.equal(sent.length, 1);
+  assert.equal(sent[0][sent[0].indexOf("--text") + 1], "/effort high");
+  assert.equal(r.b.input.value(), "half a reply", "the box keeps its text");
+  assert.equal(r.c.models.get("t1").at, 0, "the model is read again at the next poll");
+  assert.equal(r.c.statusAt, 0);
+  // The back row goes to the first page.
+  await r.open(); await r.press("menu-effort"); await r.press("menu-back");
+  assert.ok(byId(r.view(), "menu-current"));
+});
+
+test("model menu: More models lists the others; a press sends /model <id> (#112)", async () => {
+  const r = menuRig();
+  await r.open();
+  await r.press("menu-more");
+  const menu = byId(r.view(), "model-menu");
+  assert.equal(textOf(byId(menu, "menu-back")), "More models");
+  assert.equal(textOf(byId(menu, "menu-model-0")), `Fable 5.2 ${FAMILY_LINES.fable}`);
+  assert.equal(textOf(byId(menu, "menu-model-3")), "my-model", "an unknown model has no line");
+  assert.equal(byId(menu, "menu-models")._a.max_h, 320);
+  await r.press("menu-model-1");
+  assert.equal(sent[0][sent[0].indexOf("--text") + 1], "/model claude-sonnet-5-5");
+  assert.equal(r.c.menu, null);
+});
+
+test("model menu: a refused send shows its note; no /effort: the row shows the value with no sub menu (#112)", async () => {
+  const noEffort = MENU_CMDS.filter((c) => c.name !== "effort");
+  const r = menuRig({ list: noEffort });
+  await r.open();
+  const row = byId(r.view(), "menu-effort");
+  assert.equal(textOf(row), "Effort Medium");
+  assert.equal(row._h.on_click, undefined);
+  assert.ok(!row.kids.some((k) => /chevron/.test(k._a?.path ?? "")));
+  fake.exec = (cmd, args) => args[0] === "send" ? jl(header("send"), { type: "done", result: "busy", message: "The agent is busy." }, end) : jl(header(args[0]), end);
+  await r.press("menu-more"); await r.press("menu-model-0");
+  assert.deepEqual(r.c.note, { text: "The agent is busy.", bad: true });
+  assert.notEqual(r.c.models.get("t1").at, 0, "not read again early");
+});
+
+test("model menu: no menu while the model is not known, or for an agent whose /model has no values (#112)", async () => {
+  const r = slashRig({ list: MENU_CMDS });
+  assert.equal(byId(r.view(), "model-popover"), null, "model not known yet");
+  const pi = { ...fake.agents[1], app: "pi" };
+  r.c.box(pi);
+  r.c.models.set(pi.address, { at: Date.now(), line: { type: "model", model: "gpt-6", effort: null } });
+  r.c.cmds.set(pi.address, { at: Date.now(), list: CMDS, screens: [] });
+  const el = r.c.render(pi, TH);
+  assert.equal(byId(el, "model-popover"), null);
+  assert.equal(byId(el, "model")._h.on_click, undefined);
+  // Another agent with values in its /model gets the menu.
+  r.c.cmds.set(pi.address, { at: Date.now(), list: MENU_CMDS, screens: [] });
+  assert.ok(byId(r.c.render(pi, TH), "model-popover"));
+});
+
+test("model menu: the model poll reads the commands once per agent, so the button knows its menu (#112)", async () => {
+  const r = slashRig({ list: MENU_CMDS });
+  fake.exec = ((inner) => (cmd, args) => args[0] === "version"
+    ? jl(header("version"), { type: "version", commands: ["version", "send", "commands", "model", "status"] }, end) : inner(cmd, args))(fake.exec);
+  forgetCommands();
+  await r.c.pollModel(r.cx);
+  r.c.models.get("t1").at -= MODEL_MS;
+  await r.c.pollModel(r.cx);
+  assert.equal(r.asked.length, 1);
 });

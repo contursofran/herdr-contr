@@ -40,7 +40,7 @@ stay ours. The top bar is our copy of Herdr's `tabs` mod.
 |---|---|
 | `herdr-app/layouts`, `herdr-app/themes`, `herdr-app/keys.json` | the layouts (`herdr-contr` with Herdr's sidebar, and `herdr-contr-own` with the mod's own sidebar), the themes and the keys that the mod installs |
 | `herdr-app/mods/herdr-contr` | the mod: one file for each screen or part |
-| `herdr-app/mods/herdr-contr-spaces` | the sidebar's Projects list (#96): a copy of Herdr's `spaces` mod that also draws each project's agents and their workers, with the hover controls and the model tooltip (#98) |
+| `herdr-app/mods/herdr-contr-spaces` | the sidebar's Projects list (#96): a copy of Herdr's `spaces` mod that also draws each project's agents and their workers, with the hover controls and the model tooltip (#98); also the sidebar's head with the machine switch (#97) |
 | `herdr-app/mods/herdr-contr-tabs` | a copy of Herdr's `tabs` mod, with the braille loader (the agents copy went in #98) |
 | `herdr-app/test` | the mod's tests, with a stub of Herdr's UI in `test/stub` |
 | `herdr-app/RECIPE.md` | each part of the mod in words: sizes, colors, behavior |

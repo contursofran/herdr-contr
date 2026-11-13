@@ -62,7 +62,7 @@ pub fn run(argv: &[String]) -> String {
     r.out.emit_value(json!({"type": "header", "protocol": PROTOCOL_VERSION, "sidecar": SIDECAR_VERSION, "cmd": cmd}));
     match cmd.as_str() {
         "version" => {
-            r.out.emit_value(json!({"type": "version", "commands": ["version", "feed", "status", "card", "approve", "answer", "send", "paste-image", "mermaid", "pictures", "helper", "queue", "phone", "commands", "working", "model", "usage"], "release": update::release()}));
+            r.out.emit_value(json!({"type": "version", "commands": ["version", "feed", "status", "card", "approve", "answer", "send", "paste-image", "mermaid", "pictures", "helper", "queue", "phone", "commands", "working", "model", "usage", "favicon"], "release": update::release()}));
             r.finish(true)
         }
         "usage" => {
@@ -90,6 +90,18 @@ pub fn run(argv: &[String]) -> String {
                     r.finish(true)
                 }
                 Err(e) => r.fail("write", &format!("cannot save the image: {e}")),
+            }
+        }
+        "favicon" => {
+            let (Some(path), Some(dir)) = (opt("--path"), opt("--dir")) else {
+                return r.fail("usage", "favicon needs --path <file> and --dir <folder>");
+            };
+            match crate::favicon::copy(Path::new(&path), Path::new(&dir)) {
+                Ok(p) => {
+                    r.out.emit_value(json!({"type": "favicon", "path": p}));
+                    r.finish(true)
+                }
+                Err(e) => r.fail("write", &format!("cannot copy the favicon: {e}")),
             }
         }
         "pictures" => {

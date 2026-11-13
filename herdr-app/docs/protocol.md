@@ -55,6 +55,7 @@ does not download; `install-isolated.sh` copies the sidecar in.
 | `commands` | `--terminal <addr>` `[--cache <file>]` (Rust sidecar only) | `commands` |
 | `usage` | — (Rust sidecar only; read only) | `usage` |
 | `pictures` | `--path <log> --dir <folder> --pics <json>` (Rust sidecar only) | `picture` for each entry of `--pics` |
+| `favicon` | `--path <file> --dir <folder>` (Rust sidecar only) | `favicon` |
 | `helper install` | `--machine <m> --sha256 <hex> [--cache <file>]` | `installed` |
 | `helper remove` | `--machine <m> [--cache <file>]` | `removed` |
 | `phone status` / `on` / `off` | `--home <herdr-app home>` (Rust sidecar only) | `phone` |
@@ -164,7 +165,7 @@ Targets: `x86_64-unknown-linux-musl`, `aarch64-unknown-linux-musl`, `universal-a
 ### `version`
 
 ```json
-{"commands":["version","feed","status","card","approve","answer","send","paste-image","mermaid","pictures","helper","queue","phone","commands","working","model","usage"],"release":"0.9.0","type":"version"}
+{"commands":["version","feed","status","card","approve","answer","send","paste-image","mermaid","pictures","helper","queue","phone","commands","working","model","usage","favicon"],"release":"0.9.0","type":"version"}
 ```
 
 `commands`: the commands this sidecar has. The mod hides actions whose command is missing.
@@ -243,6 +244,18 @@ written once to the folder as `pic-<digest>.png` or `.jpg`; one that is there is
 `<herdr-app home>/herdr-contr/pics`. `width`, `height`: the picture's size in px. `path: null`: the picture is not
 in the log any more, or it is WebP or GIF (the mod draws only PNG and JPEG). When a new file is written, pictures
 not written or asked for in 7 days are removed from the folder; other files never.
+
+### `favicon` (`favicon --path <file> --dir <folder>`)
+
+```json
+{"path":"/home/you/.config/herdr-app/herdr-contr/favicons/fav-00ff00ff00ff00ff.png","type":"favicon"}
+```
+
+A project's favicon as a file the sidebar can draw: `image()` reads only files under the app home. `--path` is
+the favicon in the project's folder, `--dir` the cache folder; the sidebar passes
+`<herdr-app home>/herdr-contr/favicons`. The copy's name is a digest of `--path` and its extension (PNG, SVG,
+JPEG). It is copied when it is not there, and again when the source is newer or another size. `path: null`: no
+such file, or another format.
 
 ### `log` (`feed`)
 
