@@ -62,7 +62,7 @@ pub fn run(argv: &[String]) -> String {
     r.out.emit_value(json!({"type": "header", "protocol": PROTOCOL_VERSION, "sidecar": SIDECAR_VERSION, "cmd": cmd}));
     match cmd.as_str() {
         "version" => {
-            r.out.emit_value(json!({"type": "version", "commands": ["version", "feed", "status", "card", "approve", "answer", "send", "paste-image", "mermaid", "helper", "queue", "phone", "commands", "working", "model", "usage"], "release": update::release()}));
+            r.out.emit_value(json!({"type": "version", "commands": ["version", "feed", "status", "card", "approve", "answer", "send", "paste-image", "mermaid", "pictures", "helper", "queue", "phone", "commands", "working", "model", "usage"], "release": update::release()}));
             r.finish(true)
         }
         "usage" => {
@@ -90,6 +90,23 @@ pub fn run(argv: &[String]) -> String {
                     r.finish(true)
                 }
                 Err(e) => r.fail("write", &format!("cannot save the image: {e}")),
+            }
+        }
+        "pictures" => {
+            let (Some(log), Some(dir), Some(pics)) = (opt("--path"), opt("--dir"), opt("--pics")) else {
+                return r.fail("usage", "pictures needs --path <log>, --dir <folder> and --pics <json>");
+            };
+            let Some(pics) = serde_json::from_str::<Vec<serde_json::Value>>(&pics).ok().filter(|p| p.len() <= crate::pictures::MAX) else {
+                return r.fail("usage", &format!("--pics is a JSON list of at most {} pictures", crate::pictures::MAX));
+            };
+            match crate::pictures::lines(Path::new(&log), &pics, Path::new(&dir), SystemTime::now()) {
+                Ok(lines) => {
+                    for l in lines {
+                        r.out.emit_value(l);
+                    }
+                    r.finish(true)
+                }
+                Err(e) => r.fail("write", &format!("cannot write the pictures: {e}")),
             }
         }
         "mermaid" => {
@@ -172,6 +189,8 @@ pub fn run(argv: &[String]) -> String {
                 // exec gives the sidecar 30 s; a send that waits longer reports `unconfirmed`.
                 Ok(Some((machine, there))) => {
                     let client = HcClient::new(session, 8, 22);
+                    // The pictures stay in that machine's log: its rows say only how many there are.
+                    let args: Vec<String> = args.iter().filter(|a| *a != "--pictures").cloned().collect();
                     return remote::forward(&client, &cmd, &args, &machine, &there, cache_url);
                 }
                 Ok(None) => {}

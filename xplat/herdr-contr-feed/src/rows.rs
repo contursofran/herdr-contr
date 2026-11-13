@@ -28,7 +28,7 @@ pub struct FeedRow {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub images: Option<usize>,
     /// Where the item's pictures are in the log (`Hub.pictures(of:)` order). Only for items read with line offsets
-    /// (`feed --pictures`, what `serve` asks for); the mod's rows never have it.
+    /// (`feed --pictures`: what `serve` asks for, and the mod for a terminal on this machine).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub pics: Option<Vec<FeedPic>>,
     #[serde(skip_serializing_if = "Option::is_none")]
