@@ -143,7 +143,12 @@ pub fn is_claude(argv: &[String]) -> bool {
 }
 
 /// Claude Code names itself by its version as foreground program, such as 2.1.30.
+<<<<<<< HEAD
 pub(crate) fn is_version(name: &str) -> bool {
+||||||| eb09bcd
+=======
+fn is_version(name: &str) -> bool {
+>>>>>>> origin/main
     let mut rest = name;
     for part in 0..3 {
         let digits = rest.len() - rest.trim_start_matches(|c: char| c.is_ascii_digit()).len();
