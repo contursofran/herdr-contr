@@ -555,7 +555,7 @@ fn claude_width(screen: &str) -> Option<i64> {
     screen.split('\n').rfind(|l| is_rule(l)).map(|l| trim(l).chars().count() as i64 - 4)
 }
 
-fn is_rule(line: &str) -> bool {
+pub(crate) fn is_rule(line: &str) -> bool {
     let t = trim(line);
     t.chars().count() >= 10 && t.chars().all(|c| c == '─')
 }
