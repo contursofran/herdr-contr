@@ -73,6 +73,7 @@ export class FootView {
       .when(plans.length > 0, (el) => el.child(v_flex().flex_none().pt(12).px(collapsed ? 8 : 20).pb(6).gap(10).children(plans)))
       .child(h_flex().flex_none().pt(4).px(10).pb(10).gap(4).items_center()
         .when(collapsed, (el) => el.px(0).justify_center().child(settingsEl))
-        .when(!collapsed, (el) => el.child(settingsEl).child(add)));
+        // The Popover does not grow by itself: a box that fills the row holds it, so the + stays at the right edge.
+        .when(!collapsed, (el) => el.child(div().id("foot-settings-fill").flex_1().min_w(0).child(settingsEl)).child(add)));
   }
 }
