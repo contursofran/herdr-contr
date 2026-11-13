@@ -33,7 +33,7 @@ export function pickedMachine(names = knownMachines().map((m) => m.name)) {
 }
 
 // As Herdr's workspace-chrome: to the rail (on macOS wide enough for the traffic lights), or back.
-function toggleSidebar() {
+export function toggleSidebar() {
   const width = find(layout(), "sidebar")?.size?.px;
   if (!narrow()) setShared("sidebar.width", width);
   setShared("sidebar.collapsed", !narrow());
@@ -73,7 +73,7 @@ export class HeadView {
           .child(svg(`${ICON}chevron-down.svg`).size(12).flex_none()))
         .child(div().flex_1())
         .child(this.button("search", "search", "Search", () => run("mod.open", { name: "picker" }), t)))
-      // On the macOS rail the traffic lights fill the row.
+      // On the macOS rail the traffic lights fill the row: the Projects list shows the toggle there (#144).
       .when(!(collapsed && mac), (el) => el.child(this.button("sidebar-toggle", "sidebar", "Hide sidebar", toggleSidebar, t)));
   }
 }
