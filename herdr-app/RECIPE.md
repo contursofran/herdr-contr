@@ -212,12 +212,13 @@ drawn by Herdr's `frames`; every loader of the mod is this one); done is a check
   "Terminal", a round close button). ⌃` again closes it.
 - **Chat | Terminal switch** (`herdr-contr` layout): a tab with an agent shows a switch on the right
   of a 36 px strip, over the chat and over the tab's terminal (block `view-switch`, view `switch`).
-  ⌘J (and ⌘⇧T) does the same; each side's tooltip names ⌘J ("Chat (⌘J)"). The tab keeps the pick. A tab
-  without an agent hides the block.
+  ⌘J (and ⌘⇧T) does the same; each side's tooltip names ⌘J ("Chat (⌘J)"). The pick is one for the window:
+  it stays when another agent shows or an agent moves to another pane or tab, and over a restart (shared
+  state). A tab without an agent hides the block and does not change the pick.
 - **Main agent keys** (#117): ⌃1-⌃9 show the 1st-9th main agent (an agent that is not a worker of another)
   in the order of the sidebar's Projects list: this computer's projects first, then each other machine's by
   name; in a machine, the spaces in order; in a space, the agents in order. Workers have no number. A number
-  with no agent does nothing. The key runs `agent.focus` and the tab's screen follows the tab's pick. The
+  with no agent does nothing. The key runs `agent.focus` and the tab's screen follows the window's pick. The
   order is in `mainagents.js`, with one copy in `herdr-contr` and one in `herdr-contr-spaces` (a test keeps
   them equal). These keys win over Herdr's global ⌃1-⌃9 (`space.select`) while this layout shows.
 - **Keys** (while this layout shows): ⌘T new tab, ⌘W close tab, ⌘⇧N new space, ⌘1-⌘9 a tab,
