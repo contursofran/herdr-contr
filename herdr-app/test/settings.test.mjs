@@ -262,14 +262,16 @@ test("no update check: no setting, no dot, no line, and the helper is not asked"
   assert.equal(log.exec.filter(([, a]) => a[0] === "update-check").length, 0);
 });
 
-test("status row: Show by default, Hide leaves out the chips above the reply box", async () => {
-  const status = { type: "status", tags: [{ kind: "model", text: "Opus 5.5" }] };
+test("status row: Show by default, Hide leaves out the model button and the context (#99)", async () => {
+  const status = { type: "status", tags: [{ kind: "model", text: "Opus 5.5" }, { kind: "context", text: "ctx 40%", percent: 40 }] };
   const c = new Composer(fakeCx());
   c.status.set("t1", status);
   await loadConfig();
-  assert.ok(byId(c.render(fake.agents[0], t), "tags"));
+  assert.ok(byId(c.render(fake.agents[0], t), "model"));
+  assert.ok(byId(c.render(fake.agents[0], t), "context"));
   await setSetting("status_row", "hide");
-  assert.equal(byId(c.render(fake.agents[0], t), "tags"), null);
+  assert.equal(byId(c.render(fake.agents[0], t), "model"), null);
+  assert.equal(byId(c.render(fake.agents[0], t), "context"), null);
   assert.ok(byId(c.render(fake.agents[0], t), "box"), "the reply box stays");
 });
 
@@ -317,8 +319,8 @@ test("helper on other machines, Never: the tab menu has no Remove helper", async
   assertDialog(log.overlays.at(-1));
 });
 
-test("the words: Status row names cost; Never says how to remove a helper", () => {
+test("the words: Status row names the model button and the context; Never says how to remove a helper", () => {
   const about = Object.fromEntries(SETTINGS.map((s) => [s.key, s.about]));
-  assert.match(about.status_row, /model, context, cost, folder and branch/);
+  assert.match(about.status_row, /model button and the context ring/);
   assert.match(about.remote_helper, /To remove a helper that is already there, choose Ask first\./);
 });
