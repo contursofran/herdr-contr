@@ -6,7 +6,7 @@ import { v_flex, h_flex, TextView } from "gpui-base";
 import { colWidths, markdownHeight, markdownRaw, lineHeight } from "./estimate.js";
 import { splitBlocks, splitPieces, tableCells } from "./blocks.js";
 import { linkRefs } from "./refs.js";
-import { inlinePiece } from "./inline.js";
+import { inlinePiece, inlineFit, inlineContent } from "./inline.js";
 import { setting } from "./config.js";
 
 export { splitBlocks, tableCells };
@@ -99,34 +99,60 @@ function safeSplit(key, rowId, md, next, repo, t, width, k) {
 // with the gap the estimate counts above it as top padding, so the rows neither clip nor leave a gap.
 // null when no piece has icons (yet): the block is one TextView, as with the setting off.
 // `next`: the kind of the block after it; the estimate drops a blank line's gap above a code box.
-export function inlineSplit(key, rowId, md, next, repo, t, width, k = 1) {
+// The cut of a text block, kept for each text (#83): the parts with their heights, or null when no piece
+// has icons. The chat draws each shown row again on each frame; only the elements are built then.
+const plans = new Map();
+function splitPlan(md, next, repo, width, k) {
+  const id = `${width}|${k}|${next ?? ""}|${repo ?? ""}|${md}`;
+  if (plans.has(id)) return plans.get(id);
+  const plan = cutPlan(md, next, repo, width, k);
+  if (plans.size >= 1000) plans.clear();
+  plans.set(id, plan);
+  return plan;
+}
+function cutPlan(md, next, repo, width, k) {
+  // No reference in the whole block: nothing to cut.
+  if (!inlineContent(md, repo)) return null;
   const text = next === "code" ? md.replace(/(\n[ \t]*)+$/, "") : md;
   const pieces = splitPieces(text);
   const raw = (lines) => markdownRaw(lines.join("\n"), width, k);
-  const up = Math.max(1, k), lh = lineHeight(16 * k);
+  const up = Math.max(1, k);
   const parts = []; let src = [], group = null, any = false;
   for (const [j, p] of pieces.entries()) {
     const before = raw(src);
     src = src.concat(p.lines);
-    const lead = Math.max(0, raw(src) - before - raw(p.lines));
+    const own = raw(p.lines);
+    const lead = Math.max(0, raw(src) - before - own);
     src = src.concat(p.tail);
     const slot = raw(src) - before;
-    let el = null;
     if (p.k === "para" || p.k === "item") {
       const w = p.k === "item" ? width - 22 * up : width;
-      const body = inlinePiece(pieces.length === 1 ? key : `${key}-p${j}`, rowId, p.body.join("\n"), repo, t, w, k, raw(p.lines));
-      if (body) el = p.k === "para" ? body
-        : h_flex().w_full().items_start()
-          .child(div().w(22 * up).flex_none().h(lh).text_size(16 * k).child(/^\d/.test(p.mark) ? p.mark : "\u2022"))
-          .child(div().flex_1().min_w(0).child(body));
+      const body = p.body.join("\n");
+      if (inlineFit(body, repo, w, k, own)) {
+        any = true; group = null;
+        parts.push({ j, item: p.k === "item", mark: p.mark, body, w, own, h: slot, lead });
+        continue;
+      }
     }
-    if (el) { any = true; group = null; parts.push({ el, h: slot, lead }); continue; }
-    if (group) { group.lines.push(...p.lines, ...p.tail); group.h += slot; continue; }
-    parts.push(group = { key: `${key}-g${j}`, lines: [...p.lines, ...p.tail], h: slot, lead });
+    if (group) { group.text += "\n" + [...p.lines, ...p.tail].join("\n"); group.h += slot; continue; }
+    parts.push(group = { j, text: [...p.lines, ...p.tail].join("\n"), h: slot, lead });
   }
   if (!any) return null;
   // One plain paragraph: the drawn row itself, with no slot around it.
-  if (parts.length === 1 && pieces[0].k === "para" && parts[0].lead === 0 && !pieces[0].tail.length) return parts[0].el;
-  return v_flex().w_full().children(parts.map((q) => div().w_full().h(q.h).pt(q.lead).overflow_hidden()
-    .child(q.el ?? textView(q.key, q.lines.join("\n"), repo, k))));
+  const bare = parts.length === 1 && pieces[0].k === "para" && parts[0].lead === 0 && !pieces[0].tail.length;
+  return { parts, one: pieces.length === 1, bare };
+}
+export function inlineSplit(key, rowId, md, next, repo, t, width, k = 1) {
+  const plan = splitPlan(md, next, repo, width, k);
+  if (!plan) return null;
+  const up = Math.max(1, k), lh = lineHeight(16 * k);
+  const draw = (q) => {
+    if (q.body == null) return textView(`${key}-g${q.j}`, q.text, repo, k);
+    const body = inlinePiece(plan.one ? key : `${key}-p${q.j}`, rowId, q.body, repo, t, q.w, k, q.own);
+    return !q.item ? body : h_flex().w_full().items_start()
+      .child(div().w(22 * up).flex_none().h(lh).text_size(16 * k).child(/^\d/.test(q.mark) ? q.mark : "\u2022"))
+      .child(div().flex_1().min_w(0).child(body));
+  };
+  if (plan.bare) return draw(plan.parts[0]);
+  return v_flex().w_full().children(plan.parts.map((q) => div().w_full().h(q.h).pt(q.lead).overflow_hidden().child(draw(q))));
 }
