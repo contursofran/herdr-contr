@@ -83,13 +83,40 @@ test("steppers: +1 and −1, and never below 1", async () => {
   assert.equal(JSON.parse(file).flow.workers, 3);
 });
 
-test("a role that is not claude starts again from its default; a custom one shows its command", async () => {
+test("a role that is not claude: its command shows, a pick changes nothing (#80)", async () => {
   file = JSON.stringify({ profiles: { reviewer: { argv: ["codex", "-m", "x"] } } });
   const { el } = await open();
   assert.equal(roleValue("reviewer", "model"), "");
   assert.match(textOf(byId(el, "set-role-reviewer")), /Custom: codex -m x/);
   await click(byId(el, "set-role-reviewer-model-sonnet"));
-  assert.deepEqual(JSON.parse(file).profiles.reviewer.argv, ["claude", "--model", "sonnet", "--effort", "low", "--permission-mode", "auto"]);
+  assert.deepEqual(JSON.parse(file).profiles.reviewer.argv, ["codex", "-m", "x"]);
+  assert.equal(log.writes.length, 0);
+});
+
+test("claude after env, or by its path, is claude: a pick sets only its flag (#80)", async () => {
+  const orch = ["env", "CLAUDE_CODE_PLUGIN_DIRS=", "claude", "--plugin-dir", "/k", "--model", "opus", "--effort", "medium", "--permission-mode", "auto"];
+  const build = ["/home/u/.local/bin/claude", "--model", "opus", "--permission-mode", "auto"];
+  file = JSON.stringify({ kit: "/k", profiles: { orchestrator: { argv: orch }, builder: { argv: build, note: "x" } } });
+  const { el } = await open();
+  assert.equal(roleValue("orchestrator", "model"), "opus");
+  assert.equal(roleValue("orchestrator", "effort"), "medium");
+  assert.doesNotMatch(textOf(byId(el, "set-role-orchestrator")), /Custom/);
+  await click(byId(el, "set-role-orchestrator-model-sonnet"));
+  await click(byId(el, "set-role-builder-effort-high"));
+  const f = JSON.parse(file);
+  assert.deepEqual(f.profiles.orchestrator.argv, orch.map((a) => a === "opus" ? "sonnet" : a));
+  assert.deepEqual(f.profiles.builder.argv, ["/home/u/.local/bin/claude", "--model", "opus", "--effort", "high", "--permission-mode", "auto"]);
+  assert.equal(f.profiles.builder.note, "x"); assert.equal(f.kit, "/k");
+});
+
+test("a change works without structuredClone, which Herdr's runtime does not have (#80)", async () => {
+  const was = globalThis.structuredClone; globalThis.structuredClone = undefined;
+  try {
+    file = JSON.stringify({ flow: { plan: "never" } });
+    const { el } = await open();
+    await click(byId(el, "set-flow-workers-more"));
+    assert.equal(JSON.parse(file).flow.workers, 5);
+  } finally { globalThis.structuredClone = was; }
 });
 
 test("setFlag puts a missing --effort after --model", () => {

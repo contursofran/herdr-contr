@@ -194,8 +194,10 @@ drawn by Herdr's `frames`; every loader of the mod is this one); done is a check
   DefaultConfig): flow `when-needed`, `code`, 2, 4, `ask`; orchestrator opus medium, builder sonnet
   medium, planner and reviewer opus low, debugger opus xhigh. A change reads the file, sets one field
   and writes it against the text just read: all other keys stay; the flow is written whole; a
-  role sets `--model` or `--effort` in its `argv` (a missing `--effort` goes after `--model`), and a
-  role that does not start `claude` starts again from its default. A missing file shows the defaults;
+  role sets `--model` or `--effort` in its `argv` (a missing `--effort` goes after `--model`), and the
+  rest of the command stays. claude is the first argument whose base name is `claude`, after an
+  optional `env` with `NAME=value` arguments; a command that is not claude is never replaced and its
+  switches are off. A missing file shows the defaults;
   the first change creates it (and its folder). A file that is not JSON shows an error and is never
   written.
 - **herdr-contr settings** (the herdr-contr row, or ⌘⇧,): saved in `<herdr-app home>/herdr-contr/config.json`
