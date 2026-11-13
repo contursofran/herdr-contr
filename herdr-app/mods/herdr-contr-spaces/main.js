@@ -92,6 +92,15 @@ export async function findFavicon(folder) {
   return r.code === 0 && r.stdout ? `${folder.replace(/\/+$/, "")}/${r.stdout}` : null;
 }
 
+// `src` (a favicon from findFavicon) as a path under the app home that image() draws, or null. image() reads only
+// files under the app home (#116), so the helper copies it to herdr-contr/favicons. One exec, off the UI thread.
+export async function cacheFavicon(src) {
+  const home = appHome().replace(/\/+$/, "");
+  const ls = await helper("favicon", ["--path", src, "--dir", `${home}/herdr-contr/favicons`]);
+  const p = ls.find((l) => l.type === "favicon")?.path;
+  return typeof p === "string" && p.startsWith(`${home}/`) ? p.slice(home.length + 1) : null;
+}
+
 export default class Spaces extends View {
   init(_props, cx) {
     const Part = PARTS[props()?.view];
@@ -104,7 +113,7 @@ export default class Spaces extends View {
     this.ready = {}; // machine -> its layout was readable at the last look
     this.at = {}; // space -> its where() at the last look
     this.watching = new Set(); // local repos' git folders
-    this.icons = {}; // local folder -> its favicon's path, null: none (looked for once per folder)
+    this.icons = {}; // local folder -> its favicon's copy, relative to the app home, null: none (looked for once per folder)
     // Spaces made while this runs wait (at most a moment) for their git, so a
     // worktree appears under its repo instead of jumping there.
     this.shown = new Set(spaces().map((s) => s.id));
@@ -182,7 +191,10 @@ export default class Spaces extends View {
       if (!folder || folder in this.icons) continue;
       this.icons[folder] = null;
       cx.spawn(async (cx) => {
-        try { this.icons[folder] = await findFavicon(folder); } catch { this.icons[folder] = null; }
+        try {
+          const src = await findFavicon(folder);
+          this.icons[folder] = src ? await cacheFavicon(src) : null;
+        } catch { this.icons[folder] = null; }
         if (this.icons[folder]) cx.notify();
       });
     }

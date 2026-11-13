@@ -6,6 +6,7 @@ pub mod cards;
 pub mod cli;
 pub mod commands;
 pub mod config;
+pub mod favicon;
 pub mod feed;
 pub mod install;
 pub mod locate;
