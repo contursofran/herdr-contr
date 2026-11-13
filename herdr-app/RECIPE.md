@@ -113,7 +113,18 @@ Left to right:
      arrow when empty or sending, else `accent`). The model comes from the helper's `model` (asked with the
      status, at most every 15 s), else the status line's tags; not known yet, the button shows the app's name
      alone. Its tooltip: "Opus 5.5 · medium effort · Claude Code" and the folder; the context's: "149k of 250k
-     tokens". A press on the model button in Claude Code puts `/model ` in the box (nothing is sent). No tags
+     tokens · auto-compact at 250k" (the limit is Claude Code's `autoCompactWindow`), else "37% of the model's
+     context window". A press on the model button opens the model menu above it (#112; a gpui-base `Popover`, anchored
+     `bottom_left`, 6 px over the button): a 280 px `raised` panel, 1 px `border`, 12 px corners, 4 px padding,
+     rows of 15 px text with 8 px corners and a hover fill. Row 1: the current model and its family's fixed line
+     (13 px `muted`; none for an unknown family), a 14 px check in `accent`. A 1 px `border` divider, then
+     "Effort" with its value in `muted` ("Medium") and a 12 px chevron; a divider, then "More models" with a
+     chevron. A chevron row shows its values in the same panel, under a back row: the efforts with a check on the
+     current one, or the other models (at most 320 px high, it scrolls). A press on a value sends `/model <id>`
+     or `/effort <level>` through the helper's `send` (the box keeps its text), closes the menu and reads the
+     model and the status again at the next poll. A press outside or Esc closes it. The values are the helper's
+     `commands` answer (`/model`'s and `/effort`'s values, read once per agent with the model): an agent whose
+     `/model` has none has no menu, and with no `/effort` values the Effort row shows the value only. No tags
      row under the box. File chips above the text: a PNG, JPEG
      or SVG under the app home (a pasted image is in `herdr-contr/paste`) shows as a 56 px high picture
      (8 px corners, `border` frame, × on its top right corner); any other file, and an image from another
@@ -357,8 +368,8 @@ drawn by Herdr's `frames`; every loader of the mod is this one); done is a check
 - **Themes** `themes/herdr-contr.json`, `herdr-contr-light.json`, `herdr-contr-mac.json`,
   `herdr-contr-mac-light.json`.
 - **Keys** `keys.json`: the sections `layout:herdr-contr-own` and `layout:herdr-contr`, with the same keys.
-- **Art** `mods/herdr-contr/icons/`: arrow-down, bell, branch, check, close, doc, folder, gear, grid,
-  plus, search, send, sidebar, sliders, split, terminal, tool (16 × 16 SVG, 1.8 px round strokes, `currentColor`).
+- **Art** `mods/herdr-contr/icons/`: arrow-down, bell, branch, check, chevron-down, chevron-left, chevron-right,
+  close, doc, folder, gear, grid, plus, search, send, sidebar, sliders, split, terminal, tool (16 × 16 SVG, 1.8 px round strokes, `currentColor`).
 
 ## Watch out
 
