@@ -52,6 +52,7 @@ does not download; `install-isolated.sh` copies the sidecar in.
 | `queue` | `--terminal <addr>` `[--cache <file>]` (Rust sidecar only; `serve` and other machines) | `queued` |
 | `working` | `--terminal <addr>` `[--cache <file>]` (Rust sidecar only; read only) | `working`, `background` |
 | `model` | `--terminal <addr>` `[--cache <file>]` (Rust sidecar only; read only) | `model` |
+| `suggestion` | `--terminal <addr>` `[--cache <file>]` (Rust sidecar only; read only: an observer attach, no input) | `suggestion` |
 | `commands` | `--terminal <addr>` `[--cache <file>]` (Rust sidecar only) | `commands` |
 | `usage` | — (Rust sidecar only; read only) | `usage` |
 | `pictures` | `--path <log> --dir <folder> --pics <json>` (Rust sidecar only) | `picture` for each entry of `--pics` |
@@ -165,7 +166,7 @@ Targets: `x86_64-unknown-linux-musl`, `aarch64-unknown-linux-musl`, `universal-a
 ### `version`
 
 ```json
-{"commands":["version","feed","status","card","approve","answer","send","paste-image","mermaid","pictures","helper","queue","phone","commands","working","model","usage","favicon"],"release":"0.9.0","type":"version"}
+{"commands":["version","feed","status","card","approve","answer","send","paste-image","mermaid","pictures","helper","queue","phone","commands","working","model","usage","favicon","suggestion"],"release":"0.9.0","type":"version"}
 ```
 
 `commands`: the commands this sidecar has. The mod hides actions whose command is missing.
@@ -404,6 +405,19 @@ while a Claude Code, Codex or Grok Build agent works. No queue: `agent` is `""` 
 - `items`: oldest first; `null` is a queued message whose text neither the log nor the screen shows.
 - `pullable`: the agent's input box is empty, so the queue can be pulled back now.
 - `pullsAll`: Claude Code (Up takes back every queued message as one text).
+
+### `suggestion` (`suggestion`)
+
+```json
+{"type":"suggestion","text":"run the tests"}
+```
+
+- Claude Code's suggested prompt: the dim (faint, SGR 2) text in its empty input box. `terminal.read` gives no
+  styles, so the helper attaches to the terminal as an observer (`hello` with `framed`, `terminal.attach` with
+  `observe`), takes the first paint (it waits up to 300 ms) and detaches. It sends no input, no size and no focus.
+- `text` is `""` when there is no suggestion: the owner typed text, the agent works, no input box shows (a dialog),
+  only the box's placeholder shows, or the agent is not Claude Code.
+- An attach that fails gives an `error` line with the code `attach`, then `end` with `ok:false`.
 
 ### `working` (`working`)
 

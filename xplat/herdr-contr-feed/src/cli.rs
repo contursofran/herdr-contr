@@ -23,7 +23,7 @@
 //! A terminal `m/tN` on another machine: the command runs there, in the helper there (`remote`). Rust only.
 
 use crate::protocol::{JsonLines, PROTOCOL_VERSION, SIDECAR_VERSION};
-use crate::{agentmodel, cards, config, feed, locate, mermaid, paste, phone, queue, remote, status, update, usage, working};
+use crate::{agentmodel, cards, config, feed, locate, mermaid, paste, phone, queue, remote, status, suggestion, update, usage, working};
 use herdr_core::hc::{HcClient, HcSession};
 use herdr_core::PaneScreen;
 use herdr_core::resolver::SessionResolver;
@@ -62,7 +62,7 @@ pub fn run(argv: &[String]) -> String {
     r.out.emit_value(json!({"type": "header", "protocol": PROTOCOL_VERSION, "sidecar": SIDECAR_VERSION, "cmd": cmd}));
     match cmd.as_str() {
         "version" => {
-            r.out.emit_value(json!({"type": "version", "commands": ["version", "feed", "status", "card", "approve", "answer", "send", "paste-image", "mermaid", "pictures", "helper", "queue", "phone", "commands", "working", "model", "usage", "favicon"], "release": update::release()}));
+            r.out.emit_value(json!({"type": "version", "commands": ["version", "feed", "status", "card", "approve", "answer", "send", "paste-image", "mermaid", "pictures", "helper", "queue", "phone", "commands", "working", "model", "usage", "favicon", "suggestion"], "release": update::release()}));
             r.finish(true)
         }
         "usage" => {
@@ -183,7 +183,7 @@ pub fn run(argv: &[String]) -> String {
                 Err((code, message)) => r.fail(code, &message),
             }
         }
-        "feed" | "status" | "card" | "approve" | "answer" | "send" | "queue" | "commands" | "working" | "model" => {
+        "feed" | "status" | "card" | "approve" | "answer" | "send" | "queue" | "commands" | "working" | "model" | "suggestion" => {
             let Some(terminal) = opt("--terminal") else { return r.fail("usage", &format!("{cmd} needs --terminal <addr>")) };
             let cache_path = opt("--cache").map(PathBuf::from);
             let cache_url = cache_path.as_deref();
@@ -251,6 +251,20 @@ pub fn run(argv: &[String]) -> String {
                     if let Some(b) = screen.as_deref().and_then(working::background) {
                         r.out.emit_value(working::background_line(&b));
                     }
+                    return r.finish(true);
+                }
+                "suggestion" => {
+                    // Claude Code's dim suggested prompt; only while it waits for the owner. Observe only: no input.
+                    let waits = found.pane.agent.as_ref().is_some_and(|a| a.kind == "claude" && matches!(a.status, herdr_core::AgentStatus::Idle | herdr_core::AgentStatus::Done));
+                    let address = herdr_core::hc::mapper::address_from_pane_id(&found.pane.id).filter(|a| !a.is_empty());
+                    let text = match address.filter(|_| waits) {
+                        Some(a) => match crate::framed::first_paint(&HcSession::resolve_env().socket_path, &a, suggestion::COLS, suggestion::ROWS, crate::framed::WAITS) {
+                            Ok(p) => suggestion::pick(&suggestion::screen(&p)),
+                            Err(e) => return r.fail("attach", &e),
+                        },
+                        None => String::new(),
+                    };
+                    r.out.emit_value(suggestion::line(&text));
                     return r.finish(true);
                 }
                 "model" => {
