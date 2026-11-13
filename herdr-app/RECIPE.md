@@ -116,11 +116,12 @@ Left to right:
      tokens · auto-compact at 250k" (the limit is Claude Code's `autoCompactWindow`), else "37% of the model's
      context window". A press on the model button opens the model menu above it (#112; a gpui-base `Popover`, anchored
      `bottom_left`, 6 px over the button): a 280 px `raised` panel, 1 px `border`, 12 px corners, 4 px padding,
-     rows of 15 px text with 8 px corners and a hover fill. Row 1: the current model and its family's fixed line
-     (13 px `muted`; none for an unknown family), a 14 px check in `accent`. A 1 px `border` divider, then
+     rows of 15 px text with 8 px corners and a hover fill. Row 1: the current model's name alone (no line
+     that says what a model is good for; owner, 2026-11-13) and a 14 px check in `accent`. A 1 px `border` divider, then
      "Effort" with its value in `muted` ("Medium") and a 12 px chevron; a divider, then "More models" with a
      chevron. A chevron row shows its values in the same panel, under a back row: the efforts with a check on the
-     current one, or the other models (at most 320 px high, it scrolls). A press on a value sends `/model <id>`
+     current one, or the other models (at most 320 px high, it scrolls; rows keep their height; a family alias such as
+     "The latest Opus" is left out when that family has a model with a version, #137). A press on a value sends `/model <id>`
      or `/effort <level>` through the helper's `send` (the box keeps its text), closes the menu and reads the
      model and the status again at the next poll. A press outside or Esc closes it. The values are the helper's
      `commands` answer (`/model`'s and `/effort`'s values, read once per agent with the model): an agent whose

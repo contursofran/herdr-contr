@@ -6,7 +6,7 @@ import { fakeCx } from "./fake-cx.mjs";
 import { agent, space } from "./fixtures.mjs";
 import { Composer, tagsFor, shortPath, quoted, withFiles, slashQuery, matchCommands, screenNote, argItems, matchArgs, thumbPath, THUMB_PX, modelName, modelInfo, modelTip, ringIcon, contextTip, contextPercent, MODEL_MS } from "../mods/herdr-contr/composer.js";
 import { ChatView } from "../mods/herdr-contr/chat.js";
-import { FAMILY_LINES, modelLine, otherModels, effortValues, hasModelMenu, titleCase } from "../mods/herdr-contr/modelmenu.js";
+import { otherModels, effortValues, hasModelMenu, titleCase } from "../mods/herdr-contr/modelmenu.js";
 import { forgetCommands } from "../mods/herdr-contr/sidecar.js";
 import { KEY_CONFIG } from "../mods/herdr-contr/config.js";
 
@@ -869,19 +869,13 @@ test("the placeholder names the agent by its own title when no tab is named (#10
 
 // The model menu (#112). At the end: its rigs bind the "/" keys, which the paste test above sees bound once.
 test("model menu: the helpers (family lines, other models, efforts) (#112)", () => {
-  assert.equal(modelLine("claude-opus-5-5"), FAMILY_LINES.opus);
-  assert.equal(modelLine("Sonnet 5.5"), FAMILY_LINES.sonnet);
-  assert.equal(modelLine("fable"), FAMILY_LINES.fable);
-  assert.equal(modelLine("gpt-6-codex"), "", "an unknown family has no line");
-  assert.equal(modelLine("claude-constructor-1"), "", "no line from the object's own names");
   assert.equal(titleCase("xhigh"), "Xhigh");
   assert.ok(hasModelMenu(MENU_CMDS)); assert.ok(!hasModelMenu(CMDS)); assert.ok(!hasModelMenu(null));
   assert.deepEqual(effortValues(MENU_CMDS), ["low", "medium", "high", "xhigh", "max"]);
   assert.deepEqual(effortValues(CMDS), []);
   const o = otherModels(MENU_CMDS, "claude-opus-5-5");
   assert.deepEqual(o.map((x) => x.value), ["claude-fable-5-2", "claude-sonnet-5-5", "my-model"], "not the current one; each name once; no alias of a family with a version");
-  assert.deepEqual(o[0], { value: "claude-fable-5-2", name: "Fable 5.2", line: FAMILY_LINES.fable });
-  assert.equal(o[2].line, "");
+  assert.deepEqual(o[0], { value: "claude-fable-5-2", name: "Fable 5.2" });
   assert.equal(otherModels(MENU_CMDS, "claude-opus-5-5"), o, "kept: the same list and model give the same answer");
   assert.deepEqual(otherModels(MENU_CMDS, "Opus 5.5").map((x) => x.value), o.map((x) => x.value), "the current model by its name too");
 });
@@ -916,9 +910,9 @@ test("model menu: a press on the model button opens a menu above it: the model w
   const menu = byId(r.view(), "model-menu");
   assert.equal(menu._a.rounded, 12); assert.equal(menu._a.bg, "#raised"); assert.equal(menu._a.border_color, "#border");
   const cur = byId(menu, "menu-current");
-  assert.equal(textOf(cur), `Opus 5.5 ${FAMILY_LINES.opus}`);
+  assert.equal(textOf(cur), "Opus 5.5");
   const [names, check] = cur.kids;
-  assert.equal(names.kids[0]._a.text_size, 15); assert.equal(names.kids[1]._a.text_size, 13); assert.equal(names.kids[1]._a.text_color, "#muted");
+  assert.equal(names._a.text_size, 15);
   assert.match(check._a.path, /check\.svg$/); assert.equal(check._a.text_color, "#accent");
   assert.equal(textOf(byId(menu, "menu-effort")), "Effort Medium");
   assert.match(byId(menu, "menu-effort").kids.at(-1)._a.path, /chevron-right\.svg$/);
@@ -960,8 +954,8 @@ test("model menu: More models lists the others; a press sends /model <id> (#112)
   await r.press("menu-more");
   const menu = byId(r.view(), "model-menu");
   assert.equal(textOf(byId(menu, "menu-back")), "More models");
-  assert.equal(textOf(byId(menu, "menu-model-0")), `Fable 5.2 ${FAMILY_LINES.fable}`);
-  assert.equal(textOf(byId(menu, "menu-model-2")), "my-model", "an unknown model has no line");
+  assert.equal(textOf(byId(menu, "menu-model-0")), "Fable 5.2", "the name alone, no line");
+  assert.equal(textOf(byId(menu, "menu-model-2")), "my-model");
   assert.equal("flex_none" in byId(menu, "menu-model-0")._a, true, "a row keeps its height in the list (#137)");
   assert.equal(byId(menu, "menu-models")._a.max_h, 320);
   await r.press("menu-model-1");
