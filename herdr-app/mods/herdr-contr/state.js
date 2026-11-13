@@ -3,6 +3,7 @@
 import { agents, terminals, focused, shared, setShared, run, spaces, openOverlay, closeOverlay, appHome, readTextFile } from "herdr";
 import { div } from "gpui-kit";
 import { loadConfig } from "./config.js";
+import { mainAgents } from "./mainagents.js";
 
 export const KEY_AGENT = "herdr-contr.agent";
 // The screen in the stack, as this mod last selected it (layout() is the file, not the live tree).
@@ -172,6 +173,16 @@ export function showAgent(address) {
   setShared(KEY_AGENT, address);
   run("agent.focus", { terminal: address });
   showScreen("chat");
+}
+
+// Control+N: the Nth main agent in the sidebar's order (mainagents.js). Its tab's screen follows the
+// tab's pick (syncScreen). A number with no agent does nothing (false).
+export function showMain(n) {
+  const a = mainAgents(spaces(), agents(), terminals())[n - 1];
+  if (!a) return false;
+  setShared(KEY_AGENT, a.address);
+  run("agent.focus", { terminal: a.address });
+  return true;
 }
 
 export function showNeeds() { showScreen("needs"); }
