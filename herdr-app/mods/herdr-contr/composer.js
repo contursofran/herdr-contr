@@ -1,11 +1,12 @@
 // Under the chat: the status tag row (model, effort, context, cost, folder, branch, agent) and the
 // box to reply in. Enter sends through the sidecar's `send`; "+" or a drop attaches files.
-import { div, svg } from "gpui-kit";
+import { div, svg, image } from "gpui-kit";
 import { v_flex, h_flex, Textarea, TextareaState } from "gpui-base";
 import { theme, panes, home, exec, window } from "herdr";
 import { agentName, icon, loader, orchestration } from "./state.js";
 import * as sidecar from "./sidecar.js";
 import { setting } from "./config.js";
+import { appRel } from "./phone.js";
 
 export const STATUS_MS = 5000;
 
@@ -54,6 +55,20 @@ export async function chooseFiles() {
 }
 
 const base = (p) => p.split("/").pop();
+
+// An attached file that shows as a picture: a PNG, JPEG or SVG under the app home (pasted images are in
+// herdr-contr/paste there). image() reads a path relative to the app home, and may refuse one outside it,
+// so a file from another folder keeps its chip. The path for image(), or null. Kept by path: each draw asks.
+export const THUMB_PX = 56;
+const IMAGE_EXT = /\.(png|jpe?g|svg)$/i;
+const thumbs = new Map();
+export function thumbPath(path) {
+  if (thumbs.has(path)) return thumbs.get(path);
+  const rel = typeof path === "string" && IMAGE_EXT.test(path) ? appRel(path) : null;
+  if (thumbs.size >= 200) thumbs.clear();
+  thumbs.set(path, rel);
+  return rel;
+}
 
 // A path as the agent reads it: in single quotes when it has a space or a shell character.
 export function quoted(path) {
@@ -434,10 +449,20 @@ export class Composer {
       .when(x.kind === "branch", (el) => el.child(svg(icon("branch")).size(11)))
       .when(x.kind === "cwd", (el) => el.child(svg(icon("folder")).size(11)))
       .child(div().max_w(220).truncate().child(x.text));
-    const fileChip = (p, i) => h_flex().id(`file-${i}`).h(24).pl(8).pr(4).gap(4).items_center().rounded(8).bg(t.chrome).text_size(12).text_color(t.foreground)
-      .child(div().max_w(180).truncate().child(base(p)))
-      .child(div().id(`file-x-${i}`).size(16).flex().items_center().justify_center().rounded(4).text_color(t.muted).hover((s) => s.bg(t.hover))
-        .on_click((_e, cx) => { this.files = this.files.filter((f) => f !== p); cx.notify(); }).child("×"));
+    const unattach = (p, i) => div().id(`file-x-${i}`).size(16).flex().items_center().justify_center().rounded(4).text_color(t.muted).hover((s) => s.bg(t.hover))
+      .on_click((_e, cx) => { this.files = this.files.filter((f) => f !== p); cx.notify(); }).child("×");
+    // An image under the app home: a THUMB_PX high picture (its width follows the image), the × on its corner.
+    // The frame has a fixed height, so the box does not grow when the image loads.
+    const thumb = (p, i, rel) => div().id(`file-${i}`).relative().flex_none().h(THUMB_PX + 2).rounded(8).border(1).border_color(t.border).bg(t.chrome).overflow_hidden()
+      .child(image(rel).h(THUMB_PX).max_w(THUMB_PX * 4).rounded(7))
+      .child(div().absolute().top(2).right(2).rounded(4).bg(t.raised).child(unattach(p, i)));
+    const fileChip = (p, i) => {
+      const rel = thumbPath(p);
+      if (rel) return thumb(p, i, rel);
+      return h_flex().id(`file-${i}`).h(24).pl(8).pr(4).gap(4).items_center().rounded(8).bg(t.chrome).text_size(12).text_color(t.foreground)
+        .child(div().max_w(180).truncate().child(base(p)))
+        .child(unattach(p, i));
+    };
     // Top right of the box: contr's orchestration. Orchestrating with the worker count, or for a
     // Claude Code session an Orchestrate button that starts /contr:orchestrate in the box.
     const orch = orchestration(agent);
@@ -475,7 +500,7 @@ export class Composer {
         .border(1).border_color(t.border).shadow_sm().on_scroll_wheel((e, cx) => this.slashWheel(e, cx))
         .children(shown.map(row)).when(Boolean(more), (l) => l.child(more))))
       .child(v_flex().id("box").w_full().max_w(width).rounded(16).bg(t.raised).border(1).border_color(t.border).shadow_sm().px(12).pt(10).pb(8).gap(6)
-        .when(this.files.length > 0, (el) => el.child(h_flex().gap(6).flex_wrap().children(this.files.map(fileChip))))
+        .when(this.files.length > 0, (el) => el.child(h_flex().gap(6).flex_wrap().items_center().children(this.files.map(fileChip))))
         .child(div().id("slash-keys").w_full()
           .when(Boolean(s), (el) => el.key_context(SLASH_CONTEXT))
           .on_action(SLASH.up, (_e, cx) => this.slashKey("up", cx))

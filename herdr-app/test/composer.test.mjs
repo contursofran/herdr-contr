@@ -4,7 +4,7 @@ import { fake, log, reset } from "./stub/herdr.mjs";
 import { textOf, byId } from "./stub/ui.mjs";
 import { fakeCx } from "./fake-cx.mjs";
 import { agent, space } from "./fixtures.mjs";
-import { Composer, tagsFor, shortPath, quoted, withFiles, slashQuery, matchCommands, screenNote, argItems, matchArgs } from "../mods/herdr-contr/composer.js";
+import { Composer, tagsFor, shortPath, quoted, withFiles, slashQuery, matchCommands, screenNote, argItems, matchArgs, thumbPath, THUMB_PX } from "../mods/herdr-contr/composer.js";
 import { ChatView } from "../mods/herdr-contr/chat.js";
 import { forgetCommands } from "../mods/herdr-contr/sidecar.js";
 import { KEY_CONFIG } from "../mods/herdr-contr/config.js";
@@ -176,6 +176,9 @@ function pasteRig(answer) {
   return { asked, cx, v, typed, press };
 }
 const chips = (el) => [0, 1, 2].map((i) => byId(el, `file-${i}`)).filter(Boolean).map((c) => textOf(c).replace(/\s*×$/, ""));
+// The image() paths of the attached files that show as pictures.
+const findTag = (el, tag) => (!el || typeof el !== "object" ? null : el.tag === tag ? el : (el.kids || []).reduce((f, k) => f || findTag(k, tag), null));
+const pics = (el) => [0, 1, 2].map((i) => findTag(byId(el, `file-${i}`), "image")).filter(Boolean).map((x) => x._a.path);
 
 test("paste: the mod binds ⌘V (Ctrl+V on Linux) for its own box only, once", async () => {
   const cx = fakeCx(); const bound = [];
@@ -194,7 +197,7 @@ test("paste: a screenshot (image, no text) is attached, nothing typed", async ()
   const r = pasteRig([{ type: "image", path: `${PASTE_DIR}/paste-1.png` }]);
   const { el } = await r.press(undefined);
   assert.deepEqual(r.asked[0].slice(0, 3), ["paste-image", "--dir", PASTE_DIR]);
-  assert.deepEqual(chips(el), ["paste-1.png"]);
+  assert.deepEqual(pics(el), ["herdr-contr/paste/paste-1.png"]);
   assert.deepEqual(r.typed, []);
 });
 
@@ -640,4 +643,50 @@ test("other agents get no Orchestrate button, and a hidden status row still show
   const el = c.render(a, TH);
   assert.equal(byId(el, "tags"), null);
   assert.ok(byId(el, "orchestrating"));
+});
+
+// #85: an attached image under the app home shows as a small picture; any other file keeps its chip.
+const HOME = "/home/test/.config/herdr-app";
+test("thumbPath: a PNG, JPEG or SVG under the app home, relative to it; else null", () => {
+  assert.equal(thumbPath(`${HOME}/herdr-contr/paste/paste-9.png`), "herdr-contr/paste/paste-9.png");
+  assert.equal(thumbPath(`${HOME}/a/Shot.JPG`), "a/Shot.JPG");
+  assert.equal(thumbPath(`${HOME}/a/b.jpeg`), "a/b.jpeg");
+  assert.equal(thumbPath(`${HOME}/a/logo.svg`), "a/logo.svg");
+  assert.equal(thumbPath(`${HOME}/herdr-contr/paste/notes.txt`), null, "not an image");
+  assert.equal(thumbPath(`${HOME}/a/movie.mov`), null);
+  assert.equal(thumbPath("/home/you/Desktop/shot.png"), null, "outside the app home: image() may refuse it");
+  assert.equal(thumbPath(`${HOME}-other/shot.png`), null, "a folder that only starts like the home");
+  assert.equal(thumbPath(undefined), null);
+});
+
+test("thumbPath keeps its answer by path: a draw does not work it out again", () => {
+  const p = `${HOME}/herdr-contr/paste/cached-1.png`;
+  assert.equal(thumbPath(p), "herdr-contr/paste/cached-1.png");
+  const was = fake.appHome;
+  fake.appHome = "/elsewhere";
+  try { assert.equal(thumbPath(p), "herdr-contr/paste/cached-1.png"); } finally { fake.appHome = was; }
+});
+
+test("an image under the app home shows as a 56 px picture with ×; a text file and an outside image keep chips", async () => {
+  const c = new Composer(fakeCx()); const cx = fakeCx();
+  c.box(fake.agents[0]);
+  c.addFiles([`${HOME}/herdr-contr/paste/paste-4.png`, "/home/you/notes.txt", "/home/you/Desktop/far.png"], cx);
+  const t = { border: "#border", chrome: "#chrome", raised: "#raised", foreground: "#fg", muted: "#m", hover: "#h" };
+  let el = c.render(fake.agents[0], t);
+  assert.deepEqual(pics(el), ["herdr-contr/paste/paste-4.png"]);
+  const frame = byId(el, "file-0"), img = findTag(frame, "image");
+  assert.equal(THUMB_PX, 56);
+  assert.equal(img._a.h, 56);
+  assert.equal(frame._a.h, 58, "the frame has a fixed height (picture and border), so the box does not grow when it loads");
+  assert.equal(frame._a.border_color, "#border");
+  assert.ok(frame._a.rounded > 0 && img._a.rounded > 0, "rounded");
+  assert.ok(!/paste-4/.test(textOf(frame)), "no name over the picture");
+  assert.deepEqual(chips(el).slice(1), ["notes.txt", "far.png"]);
+  assert.ok(!findTag(byId(el, "file-1"), "image") && !findTag(byId(el, "file-2"), "image"));
+  // The × on the picture removes it; the chips stay.
+  byId(el, "file-x-0")._h.on_click({}, cx);
+  assert.deepEqual(c.files, ["/home/you/notes.txt", "/home/you/Desktop/far.png"]);
+  el = c.render(fake.agents[0], t);
+  assert.deepEqual(pics(el), []);
+  assert.deepEqual(chips(el), ["notes.txt", "far.png"]);
 });
