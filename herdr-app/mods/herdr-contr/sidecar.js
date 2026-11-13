@@ -74,6 +74,10 @@ export const phone = (what) => call("phone", [what]);
 export const working = (terminal) => call("working", ["--terminal", terminal, "--cache", cachePath()]);
 export const model = (terminal) => call("model", ["--terminal", terminal, "--cache", cachePath()]);
 export const commands = (terminal) => call("commands", ["--terminal", terminal, "--cache", cachePath()]);
+// The panel the agent's terminal shows in place of its input box, as plain text (read only), and the keys the panel
+// card sends (arrows, Enter, Tab, Space, Escape, digits; on the owner's key or press only).
+export const panel = (terminal) => call("panel", ["--terminal", terminal, "--cache", cachePath()]);
+export const keys = (terminal, list) => call("keys", ["--terminal", terminal, "--keys", JSON.stringify(list), "--cache", cachePath()]);
 export const pasteImage = () => call("paste-image", ["--dir", `${appHome()}/herdr-contr/paste`]);
 // `seen`: the agent kind and the log the chat last showed; the sidecar refuses another agent or conversation.
 // `--cache`: the sidecar looks the log up again and writes it there, so the next `feed` reads a new conversation at once.

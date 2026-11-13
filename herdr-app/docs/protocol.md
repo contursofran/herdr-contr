@@ -53,6 +53,8 @@ does not download; `install-isolated.sh` copies the sidecar in.
 | `working` | `--terminal <addr>` `[--cache <file>]` (Rust sidecar only; read only) | `working`, `background` |
 | `model` | `--terminal <addr>` `[--cache <file>]` (Rust sidecar only; read only) | `model` |
 | `suggestion` | `--terminal <addr>` `[--cache <file>]` (Rust sidecar only; read only: an observer attach, no input) | `suggestion` |
+| `panel` | `--terminal <addr>` `[--cache <file>]` (Rust sidecar only; read only) | `panel` |
+| `keys` | `--terminal <addr> --keys <json>` `[--cache <file>]` (Rust sidecar only) | `done` |
 | `commands` | `--terminal <addr>` `[--cache <file>]` (Rust sidecar only) | `commands` |
 | `usage` | — (Rust sidecar only; read only) | `usage` |
 | `pictures` | `--path <log> --dir <folder> --pics <json>` (Rust sidecar only) | `picture` for each entry of `--pics` |
@@ -62,7 +64,7 @@ does not download; `install-isolated.sh` copies the sidecar in.
 | `phone status` / `on` / `off` | `--home <herdr-app home>` (Rust sidecar only) | `phone` |
 
 `card` and `commands` only read. `approve` and `answer` send keys to the agent; the mod runs them only when the
-owner presses a button, never on a timer. `send` types a message and presses Enter.
+owner presses a button, never on a timer. `keys` too: only on the owner's key or press on the panel card. `send` types a message and presses Enter.
 
 `<addr>` is the herdr-core terminal address (`t7`). The pane id form (`hc:t7`) also works.
 `--cache` is a file the sidecar may read and write; the mod passes `<herdr-app home>/herdr-contr/cache.json`.
@@ -166,7 +168,7 @@ Targets: `x86_64-unknown-linux-musl`, `aarch64-unknown-linux-musl`, `universal-a
 ### `version`
 
 ```json
-{"commands":["version","feed","status","card","approve","answer","send","paste-image","mermaid","pictures","helper","queue","phone","commands","working","model","usage","favicon","suggestion"],"release":"0.9.0","type":"version"}
+{"commands":["version","feed","status","card","approve","answer","send","paste-image","mermaid","pictures","helper","queue","phone","commands","working","model","usage","favicon","panel","keys","suggestion"],"release":"0.9.0","type":"version"}
 ```
 
 `commands`: the commands this sidecar has. The mod hides actions whose command is missing.
@@ -435,6 +437,22 @@ while a Claude Code, Codex or Grok Build agent works. No queue: `agent` is `""` 
 
 - Only when the screen shows it: Claude Code's note under its prompt box on work in the background ("1 shell
   still running", "2 background tasks"). Read while the agent works, is idle or is done (Claude Code only).
+
+### `panel` (`panel`)
+
+```json
+{"type":"panel","lines":[" Select model",""," ❯ 1. Default (Opus)  ✔","   2. Sonnet"]}
+```
+
+- A panel that Claude Code draws in place of its input box (`/model`, `/config`, `/agents`, `/resume`), as plain
+  text: the screen lines under the last rule line, or the whole screen when it has no rule. Blank lines at the ends
+  go. hc gives no text styles: a selected row shows only when the panel marks it with a character.
+- `lines` is `null` when the input box is on screen, the agent works, an approval or question card is on screen, or
+  the agent is not Claude Code.
+
+`keys --keys '["Down","Enter"]'`: sends the keys to that panel, one gated key at a time (the same agent, and a panel
+still on screen, before each key). Only `Up`, `Down`, `Left`, `Right`, `Enter`, `Tab`, `Space`, `Escape` and `0`-`9`;
+any other key: `failed`, nothing sent. No panel on screen: `changed`, nothing sent.
 
 ### `model` (`model`)
 

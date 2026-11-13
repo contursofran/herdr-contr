@@ -28,6 +28,24 @@ test("a title that tells nothing gives the program's name", () => {
   assert.equal(tabLabel({ name: "1" }, { title: "zsh", program: zsh }), "zsh");
 });
 
+test("a plain terminal with an automatic name (a number or its address) shows its folder's name (#139)", () => {
+  assert.equal(tabLabel({ name: "t2n9" }, { title: "~/code/contr", cwd: "/home/me/code/contr", program: zsh }), "contr");
+  assert.equal(tabLabel({ name: "1" }, { title: "zsh", cwd: "/home/me/code/contr/", program: zsh }), "contr");
+  assert.equal(tabLabel({ name: "t2n9" }, { title: "zsh", cwd: null, program: zsh }), "zsh");
+  assert.equal(tabLabel({ name: "t2n9" }, { title: "", cwd: "/" }), "t2n9");
+  assert.equal(tabLabel({ name: "t2n9" }, { title: "✳ Claude Code", cwd: "/home/me/code/contr", program: claude }), "Claude Code");
+});
+
+test("the + stands right after the tabs, and a box after it fills the bar (#139)", () => {
+  fake.spaces = [{ id: "s1", active: true, tabs: [{ id: "t1", name: "1", active: true }] }];
+  fake.panes = [{ id: "p1", tab: "t1", terminal: true, title: "zsh", program: zsh }];
+  const v = new Tabs();
+  v.scroll = { scroll_to_item() {} };
+  const ids = v.render().kids.map((k) => k?._a?.id);
+  assert.deepEqual(ids.slice(0, 3), ["tab-scroll", "tab-new", "tab-fill"]);
+  assert.ok(!("flex_1" in byId(v.render(), "tab-scroll")._a));
+});
+
 test("the number only when there is nothing else", () => {
   assert.equal(tabLabel({ name: "4" }, undefined), "4");
   assert.equal(tabLabel({ name: "4" }, { title: "" }), "4");
