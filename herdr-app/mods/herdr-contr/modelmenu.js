@@ -57,6 +57,7 @@ export const effortValues = (list) => argsOf(list, "effort").map((x) => x.value)
 
 // The other models: { value, name, line } for each `/model` value, in the helper's order, without the current
 // model (by id or by name) and with each name once. Kept by list and current name: the menu draws it on each frame.
+const ALIAS = /^(opus|sonnet|haiku|fable)$/i;
 const others = new Map();
 export function otherModels(list, current) {
   const cur = modelName(current);
@@ -64,9 +65,15 @@ export function otherModels(list, current) {
   if (key && key.cur === cur) return key.items;
   const seen = new Set([cur]);
   const items = [];
-  for (const a of argsOf(list, "model")) {
+  const args = argsOf(list, "model");
+  // The families that have a model with a version, in the list or as the current model: their alias ("opus",
+  // "The latest Opus") says the same thing again and is left out (#137).
+  const family = (id) => modelName(id).split(" ")[0].toLowerCase();
+  const versioned = new Set([cur, ...args.map((a) => modelName(a.value))].filter((n) => / \d/.test(n)).map(family));
+  for (const a of args) {
     const name = a.label || modelName(a.value);
     if (a.value === current || seen.has(name) || modelName(a.value) === cur) continue;
+    if (ALIAS.test(a.value) && versioned.has(a.value.toLowerCase())) continue;
     seen.add(name);
     items.push({ value: a.value, name, line: modelLine(a.value) });
   }
@@ -82,7 +89,8 @@ const ROW_PX = 34;
 export function menuPanel(m, model, list, t, on) {
   const check = () => svg(icon("check")).size(14).flex_none().text_color(t.accent);
   const chevron = (dir) => svg(icon(`chevron-${dir}`)).size(12).flex_none().text_color(t.muted);
-  const row = (id) => h_flex().id(id).w_full().min_h(ROW_PX).px(10).py(6).gap(10).items_center().rounded(8).hover((s) => s.bg(t.hover));
+  // flex_none: a row keeps its height in the scroll list; without it the rows shrink and draw over each other (#137).
+  const row = (id) => h_flex().id(id).w_full().flex_none().min_h(ROW_PX).px(10).py(6).gap(10).items_center().rounded(8).hover((s) => s.bg(t.hover));
   const label = (text) => div().flex_1().min_w(0).truncate().text_size(15).text_color(t.foreground).child(text);
   const divider = (id) => div().id(id).w_full().h(1).my(4).bg(t.border);
   const named = (id, name, line, checked) => row(id)

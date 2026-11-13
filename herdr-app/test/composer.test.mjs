@@ -879,11 +879,19 @@ test("model menu: the helpers (family lines, other models, efforts) (#112)", () 
   assert.deepEqual(effortValues(MENU_CMDS), ["low", "medium", "high", "xhigh", "max"]);
   assert.deepEqual(effortValues(CMDS), []);
   const o = otherModels(MENU_CMDS, "claude-opus-5-5");
-  assert.deepEqual(o.map((x) => x.value), ["claude-fable-5-2", "claude-sonnet-5-5", "opus", "my-model"], "not the current one; each name once");
+  assert.deepEqual(o.map((x) => x.value), ["claude-fable-5-2", "claude-sonnet-5-5", "my-model"], "not the current one; each name once; no alias of a family with a version");
   assert.deepEqual(o[0], { value: "claude-fable-5-2", name: "Fable 5.2", line: FAMILY_LINES.fable });
-  assert.equal(o[3].line, "");
+  assert.equal(o[2].line, "");
   assert.equal(otherModels(MENU_CMDS, "claude-opus-5-5"), o, "kept: the same list and model give the same answer");
   assert.deepEqual(otherModels(MENU_CMDS, "Opus 5.5").map((x) => x.value), o.map((x) => x.value), "the current model by its name too");
+});
+
+test("model menu: a family alias is left out when a model of that family has a version; rows keep their height (#137)", () => {
+  const list = [{ name: "model", args: [
+    { value: "claude-opus-5-5", label: "" }, { value: "claude-sonnet-5-5", label: "" }, { value: "default", label: "The recommended model" },
+    { value: "fable", label: "The latest Fable" }, { value: "opus", label: "The latest Opus" }, { value: "sonnet", label: "The latest Sonnet" },
+    { value: "haiku", label: "The latest Haiku" }] }];
+  assert.deepEqual(otherModels(list, "claude-fable-5-2").map((x) => x.value), ["claude-opus-5-5", "claude-sonnet-5-5", "default", "haiku"]);
 });
 
 function menuRig(opts = {}) {
@@ -953,7 +961,8 @@ test("model menu: More models lists the others; a press sends /model <id> (#112)
   const menu = byId(r.view(), "model-menu");
   assert.equal(textOf(byId(menu, "menu-back")), "More models");
   assert.equal(textOf(byId(menu, "menu-model-0")), `Fable 5.2 ${FAMILY_LINES.fable}`);
-  assert.equal(textOf(byId(menu, "menu-model-3")), "my-model", "an unknown model has no line");
+  assert.equal(textOf(byId(menu, "menu-model-2")), "my-model", "an unknown model has no line");
+  assert.equal("flex_none" in byId(menu, "menu-model-0")._a, true, "a row keeps its height in the list (#137)");
   assert.equal(byId(menu, "menu-models")._a.max_h, 320);
   await r.press("menu-model-1");
   assert.equal(sent[0][sent[0].indexOf("--text") + 1], "/model claude-sonnet-5-5");
