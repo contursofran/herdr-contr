@@ -123,8 +123,16 @@ Left to right:
      12 px muted, and on the right a two-choice switch: 26 px choices in a `chrome` frame, the chosen
      one `selected` and semibold), a `border` line under each row. **General**: CHAT, **Status row**
      Show | Hide, **Inline PR icons (experimental)** Off | On; OTHER MACHINES, **Helper on other machines** Ask | Never. **Phone page**: PHONE PAGE,
-     **Phone page** Off | On. It opens on General. A box with a `blocked`
-     border above any section when config.json is not JSON.
+     **Phone page** Off | On. **Orchestration** (between General and Phone page): contr's agents.json
+     (see below). FLOW: **Plan first** Never | When needed | Always; **Review** None | Code PRs | Every PR;
+     **Debugger after** and **Workers at once**, each − <n> <unit> + (24 px buttons, 1 to 99);
+     **Merge** Ask me | When CI and review pass. ROLES: Orchestrator, Planner, Builder, Reviewer,
+     Debugger, each a row with its name and what it does, then a model switch (Opus 5.5 | Sonnet 5.5 |
+     Haiku 5.5 | Fable 5.2) and an effort switch (low | medium | high | xhigh | max). A role whose
+     command is not one of these shows "Custom: <command>" and no choice selected. At the bottom
+     "Saved in <path>. contr's coordinator reads it." It opens on General. A box with a `blocked`
+     border above a section when config.json is not JSON (on Orchestration: when agents.json is not
+     JSON, or when a write failed, with the reason).
      Phone page: the row "Read your agents on your phone, through Tailscale." with Off | On, then a status
      dot and line when there is something to say (Running in `done`, a problem in `blocked`; nothing when
      Off). SET UP: four steps, each a 20 px round mark (a `done` check when done; its number in `accent`
@@ -179,6 +187,17 @@ drawn by Herdr's `frames`; every loader of the mod is this one); done is a check
   preview layout (an option with a `preview`): the box on the right is not read, the card has no
   own-answer row (`noOther`), and Send moves the focus with Up or Down to the pick, then presses
   Enter.
+- **Orchestration settings**: contr's agents.json, the file contr's coordinator reads. The path is
+  `CONTR_AGENTS_CONFIG` when set (read through `sh`, as the mod has no environment), else the user
+  config folder's `contr/agents.json` (macOS `~/Library/Application Support`, other systems
+  `$XDG_CONFIG_HOME` or `~/.config`). The values and defaults are contr's (`internal/agents`: Flow,
+  DefaultConfig): flow `when-needed`, `code`, 2, 4, `ask`; orchestrator opus medium, builder sonnet
+  medium, planner and reviewer opus low, debugger opus xhigh. A change reads the file, sets one field
+  and writes it against the text just read: all other keys stay; the flow is written whole; a
+  role sets `--model` or `--effort` in its `argv` (a missing `--effort` goes after `--model`), and a
+  role that does not start `claude` starts again from its default. A missing file shows the defaults;
+  the first change creates it (and its folder). A file that is not JSON shows an error and is never
+  written.
 - **herdr-contr settings** (the herdr-contr row, or ⌘⇧,): saved in `<herdr-app home>/herdr-contr/config.json`
   as `{"status_row": "show", "remote_helper": "ask"}`. The install never
   creates the file; a missing file or key is the default, and so is a value that is not one of the

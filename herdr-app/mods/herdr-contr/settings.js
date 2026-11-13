@@ -2,13 +2,15 @@
 // over the window as Herdr's own Settings, and laid out like it: sections in a sidebar on the left,
 // UPPERCASE headings on the right, a row's title and line on the left and its control on the right.
 // Esc, a click beside it or its close button closes it. Three settings of two or three choices, saved in
-// <appHome>/herdr-contr/config.json (config.js), and the Phone page (phone.js). Tab moves through the
+// <appHome>/herdr-contr/config.json (config.js), the Orchestration section (contr's agents.json,
+// orchestration.js) and the Phone page (phone.js). Tab moves through the
 // sections, then the choices; Enter or Space picks one.
 import { div, svg } from "gpui-kit";
 import { v_flex, h_flex, Input, InputState } from "gpui-base";
 import { theme, props, closeOverlay } from "herdr";
 import { setting, setSetting, loadConfig, configBad, configPath } from "./config.js";
 import { icon, settingsClosed } from "./state.js";
+import { loadAgents, orchestrationBody } from "./orchestration.js";
 import { pollPhone, phoneTick, PHONE_TICK_MS, phoneOn, phoneBlocked, phoneChoose, phoneUser, phoneBody, setPhoneOption } from "./phone.js";
 
 const PHONE = { title: "Phone page", about: "Read your agents on your phone, through Tailscale." };
@@ -27,6 +29,7 @@ export const SETTINGS = [
 // The sidebar's sections; `parts`: [heading, setting keys] in order.
 export const SECTIONS = [
   { id: "general", label: "General", icon: "sliders", parts: [["CHAT", ["text_size", "status_row", "inline_icons"]], ["OTHER MACHINES", ["remote_helper"]]] },
+  { id: "orchestration", label: "Orchestration", icon: "grid" },
   { id: "phone", label: "Phone page", icon: "phone" },
 ];
 
@@ -50,6 +53,7 @@ export class SettingsView {
     this.login.on("submit", save);
     this.login.on("blur", save);
     cx?.spawn?.(async (cx) => { await loadConfig(); this.login.set_value(phoneUser()); cx.notify(); });
+    cx?.spawn?.(async (cx) => { await loadAgents(); cx.notify(); });
     cx?.spawn?.(async (cx) => { await pollPhone(false); cx.notify(); });
     // Every 10 s; every 3 s while On waits for Serve (phone.js).
     cx?.timer?.every(PHONE_TICK_MS, (cx) => cx.spawn(async (cx) => { await phoneTick(); cx.notify(); }));
@@ -121,13 +125,14 @@ export class SettingsView {
       .child(seg(s.key, s.choices, (v, cx) => this.choose(s.key, v, cx)));
     const sec = SECTIONS.find((x) => x.id === this.section) ?? SECTIONS[0];
     const body = v_flex().w_full().gap(0);
-    if (bad) body.child(div().id("set-bad").mt(12).p(10).rounded(8).bg(t.raised).border(1).border_color(t.blocked)
+    if (bad && sec.id !== "orchestration") body.child(div().id("set-bad").mt(12).p(10).rounded(8).bg(t.raised).border(1).border_color(t.blocked)
       .text_size(12.5).text_color(t.foreground)
       .child("config.json could not be read (it is not valid JSON), so the defaults apply. Fix the file or remove it to change these here."));
     for (const [h, keys] of sec.parts ?? []) {
       body.child(heading(h));
       for (const k of keys) body.child(row(SETTINGS.find((x) => x.key === k)));
     }
+    if (sec.id === "orchestration") body.child(orchestrationBody({ t, seg, small: smallButton(t), heading, about, div, h_flex, v_flex }, this));
     if (sec.id === "phone") {
       body.child(heading("PHONE PAGE"))
         .child(v_flex().id("set-phone").w_full().py(14).gap(12).border_b(1).border_color(t.border)
