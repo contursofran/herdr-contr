@@ -6,7 +6,7 @@ import { theme } from "herdr";
 import { setView, shownScreen, activeTab, tabAgents } from "./state.js";
 
 export const SWITCH_H = 36;
-const KEY_HINT = "⌘⇧T";
+export const KEY_HINT = "⌘J";
 
 export function viewSwitch(t, shown = shownScreen()) {
   const seg = (child, label) => {
