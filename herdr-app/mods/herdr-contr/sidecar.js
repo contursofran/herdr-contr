@@ -72,6 +72,7 @@ export const removeHelper = (machine) => call("helper", ["remove", "--machine", 
 export const phone = (what) => call("phone", [what]);
 // A Claude Code terminal's "/" commands (read from files; nothing goes to the agent).
 export const working = (terminal) => call("working", ["--terminal", terminal, "--cache", cachePath()]);
+export const model = (terminal) => call("model", ["--terminal", terminal, "--cache", cachePath()]);
 export const commands = (terminal) => call("commands", ["--terminal", terminal, "--cache", cachePath()]);
 export const pasteImage = () => call("paste-image", ["--dir", `${appHome()}/herdr-contr/paste`]);
 // `seen`: the agent kind and the log the chat last showed; the sidecar refuses another agent or conversation.
