@@ -6,7 +6,7 @@ import { fakeCx } from "./fake-cx.mjs";
 import { agent, space } from "./fixtures.mjs";
 import { ChatView } from "../mods/herdr-contr/chat.js";
 import { forgetCommands } from "../mods/herdr-contr/sidecar.js";
-import { picturesTick, picturesKey, picturesOf, forgetPictures } from "../mods/herdr-contr/pictures.js";
+import { picturesTick, picturesKey, picturesOf, forgetPictures, pastedOf, userPictures } from "../mods/herdr-contr/pictures.js";
 import { picturesLayout, PIC_H, PIC_GAP } from "../mods/herdr-contr/metrics.js";
 import { rowHeight } from "../mods/herdr-contr/estimate.js";
 
@@ -50,7 +50,7 @@ test("layout: 120 px high, width from the shape, at most the text width, side by
 
 test("the row height counts the pictures in place of the \"N images\" line", () => {
   const r = { k: "user", text: "hi", images: 2 };
-  const text = rowHeight(r, 800), pics = rowHeight(r, 800, false, 1, 1, 248);
+  const text = rowHeight(r, 800), pics = rowHeight(r, 800, false, 1, 1, { text: "hi", h: 248 });
   assert.equal(pics - text, 248 - 19);
 });
 
@@ -110,4 +110,39 @@ test("an older sidecar without `pictures`, a remote row and a note from another 
   assert.equal(picturesKey({ k: "user", pics: row.pics }, null), null);
   assert.equal(await picturesTick([{ k: "user", images: 1 }], LOG), false);
   assert.equal(log.exec.filter(([, a]) => a[0] === "pictures").length, 0);
+});
+
+const PASTE = "/home/test/.config/herdr-app/herdr-contr/paste";
+
+test("a pasted image path in a sent message: out of the text, drawn as a picture", () => {
+  const p = pastedOf(`Look at this ${PASTE}/paste-20261113-101500-A1B2C3.png and '${PASTE}/paste-20261113-101501-D4E5F6.jpg' please`);
+  assert.equal(p.text, "Look at this and please");
+  assert.deepEqual(p.rels, ["herdr-contr/paste/paste-20261113-101500-A1B2C3.png", "herdr-contr/paste/paste-20261113-101501-D4E5F6.jpg"]);
+  const other = `see /tmp/x/herdr-contr/paste/paste-1.png`;
+  assert.deepEqual(pastedOf(other), { text: other, rels: [] }, "not under the app home: text");
+  assert.deepEqual(pastedOf(`${PASTE}/paste-1.gif`).rels, [], "a GIF stays text");
+  assert.deepEqual(pastedOf("plain"), { text: "plain", rels: [] });
+});
+
+test("pasted pictures: one line PIC_H high counts in the row height; the log's pictures win when known", () => {
+  const r = { k: "user", text: `fix this ${PASTE}/paste-20261113-101500-A1B2C3.png` };
+  const u = userPictures(r, LOG, 500);
+  assert.deepEqual([u.text, u.h, u.pasted.length, u.log], ["fix this", PIC_H, 1, null]);
+  const plain = rowHeight({ k: "user", text: "fix this" }, 800);
+  assert.equal(rowHeight(r, 800, false, 1, 1, u) - plain, 4 + PIC_H, "the text is measured without the path");
+});
+
+test("the chat draws a pasted image of a sent message from its path", async () => {
+  const sent = { type: "row", id: "u2", k: "user", text: `Here ${PASTE}/paste-20261113-101500-A1B2C3.png`, ts: 1 };
+  fake.exec = (cmd, args) => {
+    if (args[0] === "feed") return jl(header, { type: "log", agent: "claude", path: LOG, start: 0, size: 10, cursor: "c1" }, { type: "splice", at: 0, count: 1 }, sent, end);
+    return jl(header, end);
+  };
+  const cx = fakeCx(); const v = new ChatView(cx); await cx.settle(); v.width = 900;
+  v.render(cx);
+  const el = lastList._args.render({ start: 0, end: 1 })[0];
+  assert.doesNotMatch(textOf(el), /paste-/);
+  assert.deepEqual(images(el).map((e) => e._a.path), ["herdr-contr/paste/paste-20261113-101500-A1B2C3.png"]);
+  assert.equal(v.height(v.feed().rows[0]), rowHeight({ k: "user", text: "Here" }, v.colWidth()) + 4 + PIC_H);
+  assert.equal(log.exec.filter(([, a]) => a[0] === "pictures").length, 0, "no helper call");
 });

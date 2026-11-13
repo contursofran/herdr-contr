@@ -57,6 +57,9 @@ Left to right:
        The helper's `pictures` writes them to `<herdr-app home>/herdr-contr/pics` (asked from the
        chat's timer, never while drawing). Until they are there, when they cannot be read (WebP, GIF,
        not in the log any more), and for an agent on another machine: "1 image" or "N images".
+       A pasted image's path in the text (`herdr-contr/paste` under the app home, PNG or JPEG) is taken
+       out of the text and drawn: one line of 120 px high pictures, each as wide as its image, cut at
+       the text width. No helper call: the file is there. A path outside the app home stays text.
      - Agent reply: full-width markdown, 16 px text, 26 px lines (the `TextView` default; a mod
        cannot change it). Code fences are 12 px rounded boxes (`raised`,
        1 px border, Menlo 13 px, 21 px lines: one selectable `TextView` paragraph, so a drag selects across lines; right-click a box: Copy code, the box as written). Tables are 12 px rounded frames: a `raised` header

@@ -9,7 +9,7 @@ import { v_flex, h_flex } from "gpui-base";
 import { appHome } from "herdr";
 import * as sidecar from "./sidecar.js";
 import { appRel } from "./phone.js";
-import { picturesLayout, PIC_GAP } from "./metrics.js";
+import { picturesLayout, PIC_H, PIC_GAP } from "./metrics.js";
 
 const RETRY_MS = 60_000, MAX_ASKS = 2, MAX_KEPT = 500;
 const answers = new Map();   // key -> { list: [{ rel, width, height }], at, failed?, layouts: Map }
@@ -57,6 +57,44 @@ export function picturesView(a, t, maxW) {
         .child(image(a.list[p.i].rel).w(p.w - 2).h(p.h - 2).rounded(7))))));
 }
 
+// A sent message that names a pasted image (composer.js, herdr-contr/paste under the app home) by its path: the
+// path is taken out of the text and the picture is drawn. The file is there, so nothing is asked. A path that is
+// not under the app home stays text. { text, rels }, kept by text (each draw asks).
+const PASTE_PATH = /(['"]?)(\S*\/herdr-contr\/paste\/paste-[\w-]+\.(?:png|jpe?g))\1/gi;
+const pastes = new Map();
+export function pastedOf(text) {
+  const src = String(text ?? "");
+  if (pastes.has(src)) return pastes.get(src);
+  const rels = [];
+  const out = src.replace(PASTE_PATH, (m, _q, path) => {
+    const rel = appRel(path);
+    if (!rel) return m;
+    rels.push(rel);
+    return "";
+  });
+  const r = rels.length ? { text: out.split("\n").map((l) => l.replace(/[ \t]{2,}/g, " ").trim()).join("\n").trim(), rels } : { text: src, rels };
+  if (pastes.size >= 500) pastes.clear();
+  pastes.set(src, r);
+  return r;
+}
+
+// What a user row's bubble shows: its text (pasted paths out), and its pictures: the log's when they are known,
+// else the pasted ones (one line PIC_H high, each as wide as its image). `h`: their height, or null (the
+// "N images" line, if any). For estimate.js rowHeight and the draw.
+export function userPictures(row, path, maxW) {
+  const p = pastedOf(row.text);
+  const log = picturesOf(row, path);
+  if (log) return { text: p.text, log, pasted: [], h: layoutOf(log, maxW).height };
+  return { text: p.text, log: null, pasted: p.rels, h: p.rels.length ? PIC_H : null };
+}
+
+// The pasted pictures: one line, PIC_H high, cut at `maxW`.
+export function pastedView(rels, t, maxW) {
+  return h_flex().flex_none().h(PIC_H).max_w(maxW).gap(PIC_GAP).overflow_hidden().children(rels.map((rel) =>
+    div().flex_none().h(PIC_H).rounded(8).border(1).border_color(t.border).bg(t.chrome).overflow_hidden()
+      .child(image(rel).h(PIC_H - 2).rounded(7))));
+}
+
 // Asks the sidecar for the pictures of the shown rows that have no answer yet: at most MAX_ASKS at once,
 // a failed ask again after RETRY_MS. An older sidecar without `pictures`: nothing. Run from a timer, never
 // from render. true when an answer came that changes what the chat draws.
@@ -85,4 +123,4 @@ export async function picturesTick(rows, path, now = Date.now()) {
   return got.some(Boolean);
 }
 
-export function forgetPictures() { answers.clear(); asking.clear(); }
+export function forgetPictures() { answers.clear(); asking.clear(); pastes.clear(); }

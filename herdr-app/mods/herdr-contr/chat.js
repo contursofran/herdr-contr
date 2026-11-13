@@ -17,7 +17,7 @@ import { switchStrip } from "./viewswitch.js";
 import { markdownView, codeBlockAt } from "./mdblocks.js";
 import { repoFor } from "./refs.js";
 import { inlineTick } from "./inline.js";
-import { picturesTick, picturesOf, picturesHeight, picturesView } from "./pictures.js";
+import { picturesTick, userPictures, picturesView, pastedView } from "./pictures.js";
 import { textScale, setting } from "./config.js";
 
 // Herdr's zoom: line heights round in zoomed px (estimate.js lineHeight).
@@ -243,10 +243,11 @@ export class ChatView {
   height(row) {
     const w = this.colWidth(), open = this.open.has(row.id), k = textScale(), zoom = appZoom();
     // The pictures' height: null until they are known, then theirs (a new answer counts at once).
-    const ph = picturesHeight(row, this.feed()?.path, bubbleTextWidth(w));
+    const pics = row.k === "user" && row.from == null ? userPictures(row, this.feed()?.path, bubbleTextWidth(w)) : null;
+    const ph = pics?.h ?? null;
     const c = this.heights.get(row);
     if (c && c.w === w && c.open === open && c.k === k && c.zoom === zoom && c.ph === ph) return c.h;
-    const h = rowHeight(row, w, open, k, zoom, ph);
+    const h = rowHeight(row, w, open, k, zoom, pics);
     this.heights.set(row, { w, open, k, zoom, ph, h });
     return h;
   }
@@ -257,12 +258,13 @@ export class ChatView {
     switch (row.k) {
       case "user": {
         if (row.from != null) return this.agentNote(row, t, md);
-        const pics = picturesOf(row, this.feed()?.path), tw = bubbleTextWidth(this.colWidth());
+        const tw = bubbleTextWidth(this.colWidth()), pics = userPictures(row, this.feed()?.path, tw);
         return h_flex().w_full().justify_end().py(ROW_PAD_Y).when(Boolean(row.echo), (el) => el.opacity(ECHO_OPACITY))
           .child(v_flex().max_w(bubbleWidth(this.colWidth())).px(BUBBLE_PAD_X).py(BUBBLE_PAD_Y).gap(BUBBLE_GAP).rounded(16).bg(t.raised).text_color(t.foreground)
-            .child(md(row.text, tw))
-            .when(Boolean(pics), (el) => el.child(picturesView(pics, t, tw)))
-            .when(!pics && Boolean(row.images), (el) => el.child(div().text_size(IMAGES_FS).text_color(t.muted).child(row.images === 1 ? "1 image" : `${row.images} images`))));
+            .child(md(pics.text, tw))
+            .when(Boolean(pics.log), (el) => el.child(picturesView(pics.log, t, tw)))
+            .when(pics.pasted.length > 0, (el) => el.child(pastedView(pics.pasted, t, tw)))
+            .when(pics.h == null && Boolean(row.images), (el) => el.child(div().text_size(IMAGES_FS).text_color(t.muted).child(row.images === 1 ? "1 image" : `${row.images} images`))));
       }
       case "assistant":
         return div().w_full().py(ROW_PAD_Y).text_color(t.foreground).child(md(row.text));
