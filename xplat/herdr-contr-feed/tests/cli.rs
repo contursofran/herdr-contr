@@ -22,7 +22,7 @@ fn run(sock: &str, args: &[&str]) -> Vec<Value> {
 fn protocol_lines() {
     let v = run("/nonexistent.sock", &["version"]);
     assert_eq!(v[0], serde_json::json!({"type":"header","protocol":1,"sidecar":"0.1.0","cmd":"version"}));
-    assert_eq!(v[1]["commands"], serde_json::json!(["version", "feed", "status", "card", "approve", "answer", "send", "paste-image", "pictures", "helper", "queue", "phone", "commands", "working", "model", "usage"]));
+    assert_eq!(v[1]["commands"], serde_json::json!(["version", "feed", "status", "card", "approve", "answer", "send", "paste-image", "mermaid", "pictures", "helper", "queue", "phone", "commands", "working", "model", "usage"]));
     assert_eq!(v.last().unwrap()["type"], "end");
     assert_eq!(v.last().unwrap()["ok"], true);
 
@@ -31,6 +31,19 @@ fn protocol_lines() {
     assert_eq!(u.last().unwrap()["ok"], false);
     assert_eq!(run("/nonexistent.sock", &["feed"])[1]["message"], "feed needs --terminal <addr>");
     assert_eq!(run("/nonexistent.sock", &["feed", "--terminal", "t1"])[1]["code"], "no-core");
+
+    // mermaid: the options before --text, the text as it is (#87).
+    assert_eq!(run("/nonexistent.sock", &["mermaid", "--dir", "x"])[1]["message"], "mermaid needs --text <s>");
+    assert_eq!(run("/nonexistent.sock", &["mermaid", "--text", "--dir"])[1]["message"], "mermaid needs --dir <folder>");
+    let dir = tempfile::tempdir().unwrap();
+    let d = dir.path().to_str().unwrap();
+    let m = run("/nonexistent.sock", &["mermaid", "--dir", d, "--dark", "--fg", "#eeeeee", "--text", "flowchart LR\n  A --> B"]);
+    assert_eq!(m[1]["type"], "mermaid", "{m:?}");
+    assert!(m[1]["path"].as_str().unwrap().starts_with(d) && m[1]["path"].as_str().unwrap().ends_with(".svg"));
+    assert!(m[1]["width"].as_f64().unwrap() > 0.0 && m[1]["height"].as_f64().unwrap() > 0.0);
+    assert!(std::fs::read_to_string(m[1]["path"].as_str().unwrap()).unwrap().contains("#eeeeee"));
+    let bad = run("/nonexistent.sock", &["mermaid", "--dir", d, "--text", "not a diagram (("]);
+    assert_eq!((bad[1]["code"].as_str(), bad.last().unwrap()["ok"].as_bool()), (Some("parse"), Some(false)));
 
     let fake = FakeHc::start();
     fake.set_terminals(vec![claude("t1", "blocked", "permission"), common::terminal("t2", &["zsh"], Some(9), None, None)]);

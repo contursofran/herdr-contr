@@ -6,6 +6,7 @@
 // letters are counted per character a little wide, and END_PAD px go on the end.
 // No percentage on top: on a long pasted message 8% of the height was many lines of empty space.
 import { splitBlocks, tableCells } from "./blocks.js";
+import { isMermaid, mermaidOf, mermaidSize } from "./mermaid.js";
 import { ROW_PAD_Y, BUBBLE_PAD_Y, bubbleTextWidth, BUBBLE_GAP, IMAGES_LINE_H, CHIP_ROW, CHIP_GAP, OPEN_INDENT, CALL_H, CALLS_PAD,
   SEP_H, FOOTER_H, STATUS_H, CARD_ROW_H, OTHER_H } from "./metrics.js";
 
@@ -158,6 +159,15 @@ function measure(text, width, spans, k, zoom) {
       close(); lastLevel = null; box();
       if (spans) spans.push({ top: h + p + 6, bottom: 0, lines: [] });
       h += 34;
+      // A mermaid block drawn as a diagram (mermaid.js): the image's height, scaled to the text width.
+      const d = isMermaid(b) ? mermaidOf(b.text) : null;
+      if (d) {
+        if (spans) spans.at(-1).lines.push(...b.lines.map((l) => l.replace(/\r$/, "")));
+        h += mermaidSize(d, width).h;
+        if (spans) spans.at(-1).bottom = h + p - 6;
+        prevBlank = true;
+        continue;
+      }
       for (const raw of b.lines) {
         if (spans) spans.at(-1).lines.push(raw.replace(/\r$/, ""));
         h += CODE_LH * Math.max(1, wrapLines(raw.replace(/\t/g, "    "), width - 30, 13 * k));

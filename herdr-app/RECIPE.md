@@ -376,6 +376,12 @@ drawn by Herdr's `frames`; every loader of the mod is this one); done is a check
 - A virtual list row takes no handlers, and `on_item_click` gives no position: a button inside a row cannot
   be told from a press on the text. `on_item_secondary_click` gives the press against the row; the chat finds
   the code box under it from the same estimate as the row heights.
+- A code block with the language mermaid is a diagram (mermaid.js, #87): the helper's `mermaid` draws it to an
+  SVG under `herdr-contr/mermaid` in the app home, in the theme's colors (dark when the background's luminance
+  is under half). Render only reads the answers (a Map by text) and notes the blocks it drew; the chat's tick
+  asks the helper for them, two at a time. The image is in the code box's frame, at its own size or scaled
+  down to the text width; estimate.js counts the same height, and a new answer makes the chat measure its
+  rows again. Until the answer is there, or when the helper cannot read the text, it is the code box.
 - `TextView.markdown` takes no style and draws code and tables square. Split the text into blocks
   and draw fences and tables yourself. A `TextView` in a flexible cell keeps its one-line width
   and spills out: give table cells a fixed width.
@@ -399,6 +405,8 @@ drawn by Herdr's `frames`; every loader of the mod is this one); done is a check
   from the agent appears without a click.
 - A reply with a code fence and a table shows a rounded code box and a rounded table whose text
   stays inside its cells.
+- A reply with a ```mermaid flowchart or sequence diagram shows the diagram in a rounded box, readable in a
+  dark and a light theme, no wider than the text; the rows under it do not overlap it.
 - Typing in the reply box and pressing Enter puts the text into the agent's terminal.
 - ⌘V in the reply box after copying a file in Finder attaches the file (no name typed); after a
   screenshot to the clipboard it attaches a PNG; after copying text it types the text at the cursor.

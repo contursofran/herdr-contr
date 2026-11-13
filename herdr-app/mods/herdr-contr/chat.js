@@ -18,6 +18,7 @@ import { markdownView, codeBlockAt } from "./mdblocks.js";
 import { repoFor } from "./refs.js";
 import { inlineTick } from "./inline.js";
 import { picturesTick, userPictures, picturesView, pastedView } from "./pictures.js";
+import { mermaidTick, mermaidVersion } from "./mermaid.js";
 import { textScale, setting } from "./config.js";
 
 // Herdr's zoom: line heights round in zoomed px (estimate.js lineHeight).
@@ -84,7 +85,7 @@ export class ChatView {
     this.width = 0;              // the pane's width, from on_size_change
     this.follow = true;          // keep the newest row on screen
     this.open = new Set();       // tool rows that show their calls
-    this.heights = new WeakMap(); // row → { w, open, k, zoom, ph, h }
+    this.heights = new WeakMap(); // row → { w, open, k, zoom, mv, ph, h }
     this.busy = false;
     this.lastPoll = 0; this.lastWork = 0; this.work = null;
     this.composer = new Composer(cx);
@@ -152,6 +153,9 @@ export class ChatView {
     cx.spawn(async (cx) => { if (await inlineTick(ids)) cx.notify(); });
     // A message's pictures (pictures.js): asked here, not while drawing. An answer changes the row's height.
     if (f) cx.spawn(async (cx) => { if (await picturesTick(this.rowsOf(f), f.path) && f === this.feed()) cx.notify(); });
+    // Mermaid diagrams (mermaid.js): the blocks the last draw showed, drawn by the helper here. A new one changes
+    // the row heights (mermaidVersion is in the height cache's key).
+    cx.spawn(async (cx) => { if (await mermaidTick()) cx.notify(); });
     const status = agent?.status;
     if (status === "working") { if (Date.now() - this.lastWork >= WORK_MS) cx.spawn((cx) => this.pollWorking(cx, agent.address)); }
     else {
@@ -241,14 +245,14 @@ export class ChatView {
   colWidth() { return columnWidth(this.width); }
 
   height(row) {
-    const w = this.colWidth(), open = this.open.has(row.id), k = textScale(), zoom = appZoom();
+    const w = this.colWidth(), open = this.open.has(row.id), k = textScale(), zoom = appZoom(), mv = mermaidVersion();
     // The pictures' height: null until they are known, then theirs (a new answer counts at once).
     const pics = row.k === "user" && row.from == null ? userPictures(row, this.feed()?.path, bubbleTextWidth(w)) : null;
     const ph = pics?.h ?? null;
     const c = this.heights.get(row);
-    if (c && c.w === w && c.open === open && c.k === k && c.zoom === zoom && c.ph === ph) return c.h;
+    if (c && c.w === w && c.open === open && c.k === k && c.zoom === zoom && c.mv === mv && c.ph === ph) return c.h;
     const h = rowHeight(row, w, open, k, zoom, pics);
-    this.heights.set(row, { w, open, k, zoom, ph, h });
+    this.heights.set(row, { w, open, k, zoom, mv, ph, h });
     return h;
   }
 
