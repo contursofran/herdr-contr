@@ -66,11 +66,11 @@ test("modelDue: a new terminal, then a changed status, never twice in MODEL_MS, 
   assert.equal(modelDue({ ...m, busy: true }, "working", 1000 + MODEL_MS), false);
 });
 
-test("hover: the age and the mark hide, Stop and 'Open in a new tab' show, the icon is at full opacity", () => {
+test("hover: the age and the mark hide, Stop and 'Open in a new tab' show; the icon is always at full color", () => {
   const { v } = make();
   let row = byId(v.render(), "ag-a2");
   const line = () => row.kids[0];
-  assert.equal(line().kids[0]._a.opacity, 0.45);
+  assert.equal(line().kids[0]._a.opacity, undefined);
   assert.ok(line().kids.some((k) => k._a?.font_family === "Menlo" && k._a?.text_size === 11), "the age");
   assert.ok(line().kids.some((k) => k._a?.loop), "the waiting mark");
   assert.ok(!ids(row).includes("stop-a2"));

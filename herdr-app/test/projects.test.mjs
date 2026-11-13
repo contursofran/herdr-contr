@@ -71,8 +71,7 @@ test("the title's ink and weight: shown 500 full, done and not seen 600 full, el
   assert.ok("font_medium" in title("ag-a1") && title("ag-a1").text_color === "#foreground");
   assert.ok("font_semibold" in title("ag-a2") && title("ag-a2").text_color === "#foreground");
   assert.ok(!("font_medium" in title("ag-a3")) && !("font_semibold" in title("ag-a3")) && title("ag-a3").text_color === "#muted");
-  assert.equal(byId(el, "ag-a3").kids[0].kids[0]._a.opacity, 0.45, "the icon is dim off the shown row");
-  assert.equal(byId(el, "ag-a1").kids[0].kids[0]._a.opacity, undefined);
+  for (const id of ["ag-a1", "ag-a3"]) assert.equal(byId(el, id).kids[0].kids[0]._a.opacity, undefined, "each icon at full color (#154)");
 });
 
 test("the shown agent's row is raised; marks: loader working, a pulsing ⠿ waiting, ✓ done, ⠶ idle", () => {
@@ -216,4 +215,12 @@ test("workerWork: the worker's own title, cleaned; not its program, a path, user
   assert.equal(workerWork(k, "t9"), "");
   assert.equal(workerWork(k, ""), "");
   assert.equal(workerWork(k, undefined), "");
+});
+
+test("a project row is lighter than its agents and has no hover highlight (#154)", () => {
+  const row = byId(make().render(), "space-s1");
+  assert.equal(row._a.hover, undefined, "no highlight on hover");
+  const line = row.kids.at(-1).kids;
+  const name = line.find((k) => k?._a && "font_medium" in k._a);
+  assert.equal(name._a.text_color, "#muted");
 });

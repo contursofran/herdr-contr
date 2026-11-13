@@ -141,6 +141,7 @@ export class SettingsView {
             .child(seg("phone", [[false, "Off", "off"], [true, "On", "on"]], (v, cx) => phoneChoose(v, cx), phoneOn(), phoneBlocked())))
           .child(phoneBody(t, this, { seg, small: smallButton(t), heading })));
     }
-    return v_flex().id("settings-root").size_full().overflow_y_scrollbar().px(32).pb(24).child(body);
+    // flex_none: the body keeps its height in the scroll column, so it scrolls and does not shrink (#149).
+    return v_flex().id("settings-root").size_full().overflow_y_scrollbar().px(32).pb(24).child(body.flex_none());
   }
 }
