@@ -1,4 +1,4 @@
-// Pull request and issue references in chat prose, as markdown links (#57): "PR #51", "#51",
+// Pull request and issue references in chat prose, as markdown links (#57): "PR #51", "#51", "PR 51", "issue 51" (#156),
 // "owner/repo#51" and github.com/<owner>/<repo>/pull|issues/<n> URLs. TextView underlines a link and
 // opens it in the browser. Not inside code spans, links, URLs or words; "#fff" is not a number.
 // A bare "#51" needs the repository of the agent's folder (repoFor); without one it stays text.
@@ -10,9 +10,10 @@ const GH = "https://github.com";
 const URL_RE = /https?:\/\/github\.com\/([\w.-]+)\/([\w.-]+)\/(pull|issues)\/(\d+)(?![\w/])/y;
 const SKIP_RE = /\[[^\]\n]*\]\([^)\n]*\)|<[^>\n]*>|https?:\/\/[^\s)]+/y;
 const SLUG_RE = /([\w.-]+)\/([\w.-]+)#(\d+)(?![\w-])/y;
-const BARE_RE = /(PR #|PR#|#)(\d+)(?![\w-])/y;
+// "PR 51" and "issue 51" with no "#" are references too (#156): contr's chat-writing form.
+const BARE_RE = /(PR #|PR#|PR |[Ii]ssue #|[Ii]ssue |#)(\d+)(?![\w-])/y;
 // "name #51", "name PR #51", "name#51": the name of a known repository before a bare reference (#101).
-const NAMED_RE = /([\w.-]+)( ?)((?:PR #|PR#|#)(\d+))(?![\w-])/y;
+const NAMED_RE = /([\w.-]+)( ?)((?:PR #|PR#|PR |[Ii]ssue #|[Ii]ssue |#)(\d+))(?![\w-])/y;
 
 const at = (re, s, i) => { re.lastIndex = i; return re.exec(s); };
 
@@ -42,7 +43,7 @@ function linkPlain(s, repo) {
 
 // The markdown with each reference as a link; code spans (any run of backticks to the same run) stay.
 export function linkRefs(md, repo = null) {
-  if (!md || !/#\d|github\.com\//.test(md)) return md;
+  if (!md || !/#\d|github\.com\/|\b(?:PR|[Ii]ssue) \d/.test(md)) return md;
   let out = "", i = 0;
   const tick = /(`+)[\s\S]*?\1/g;
   for (let m; (m = tick.exec(md));) { out += linkPlain(md.slice(i, m.index), repo) + m[0]; i = tick.lastIndex; }

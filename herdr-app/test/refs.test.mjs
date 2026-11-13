@@ -72,7 +72,7 @@ test("a known repository's name before a bare reference links to that repository
   assert.equal(linkRefs("herdr-contr #99", R), `herdr-contr [#99](${H}/issues/99)`);
   assert.equal(linkRefs("see herdr-contr PR #99.", R), `see herdr-contr [PR #99](${H}/pull/99).`);
   assert.equal(linkRefs("herdr-contr#99", R), `herdr-contr[#99](${H}/issues/99)`);
-  assert.equal(linkRefs("issue #99 and PR #9", R), `issue [#99](${G}/o/r/issues/99) and [PR #9](${G}/o/r/pull/9)`);
+  assert.equal(linkRefs("issue #99 and PR #9", R), `[issue #99](${G}/o/r/issues/99) and [PR #9](${G}/o/r/pull/9)`);
   assert.equal(linkRefs("abc#51", R), "abc#51");
   assert.equal(linkRefs("dup #1", R), `dup [#1](${G}/o/dup/issues/1)`, "two owners: the agent's own owner");
   assert.equal(linkRefs("twin #1", R), `twin [#1](${G}/o/r/issues/1)`, "two owners, none ours: own repository");
@@ -136,4 +136,12 @@ test("at most 2 lookups run at a time (#104)", async () => {
   done.forEach((f) => f()); await tick();
   lookupNames();
   assert.deepEqual(log.exec.map((e) => e[1][1]), ["repos/o/aa", "repos/o/bb", "repos/o/cc"]);
+});
+
+test("\"PR 12\" and \"issue 12\" with no # link like \"PR #12\" and \"#12\" (#156)", () => {
+  assert.equal(linkRefs("see PR 12 and issue 7.", "o/r"), "see [PR 12](https://github.com/o/r/pull/12) and [issue 7](https://github.com/o/r/issues/7).");
+  assert.equal(linkRefs("Issue #7", "o/r"), "[Issue #7](https://github.com/o/r/issues/7)");
+  assert.equal(linkRefs("r PR 12 is merged", "o/r"), "r [PR 12](https://github.com/o/r/pull/12) is merged");
+  assert.equal(linkRefs("PR 12", null), "PR 12", "no repository: text");
+  assert.equal(linkRefs("PR 12a, issue x, APR 12, `PR 12`", "o/r"), "PR 12a, issue x, APR 12, `PR 12`");
 });

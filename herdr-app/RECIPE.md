@@ -64,7 +64,7 @@ Left to right:
        cannot change it). Code fences are 12 px rounded boxes (`raised`,
        1 px border, Menlo 13 px, 21 px lines: one selectable `TextView` paragraph, so a drag selects across lines; right-click a box: Copy code, the box as written). Tables are 12 px rounded frames: a `raised` header
        row, 1 px lines between rows, columns sized to their content.
-       In prose, pull request and issue references ("PR #51", "#51", "owner/repo#51", GitHub
+       In prose, pull request and issue references ("PR #51", "#51", "PR 51" and "issue 51" with no "#", "owner/repo#51", GitHub
        pull and issue URLs) are links (`refs.js`); a click opens them in the browser. A bare "#51"
        takes the repository of the agent's folder (`git remote get-url origin`, read once); without
        one it stays text. With the name of a known repository before it ("herdr-contr #51",
