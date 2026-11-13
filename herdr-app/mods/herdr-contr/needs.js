@@ -44,7 +44,7 @@ export class NeedsView {
     const item = (a) => {
       const on = a.address === cur.address;
       const p = a.program;
-      return h_flex().id(`need-${a.address}`).h(52).px(12).gap(10).items_center().rounded(8)
+      return h_flex().id(`need-${a.address}`).h(52).flex_none().px(12).gap(10).items_center().rounded(8)
         .bg(on ? t.selected : t.background).hover((s) => s.bg(on ? t.selected : t.hover))
         .on_click((_e, cx) => { this.picked = a.address; cx.notify(); })
         .when(Boolean(p?.icon), (el) => el.child(p.tint ? svg(p.icon).size(18).text_color(t.muted) : image(p.icon).size(18)))
@@ -57,14 +57,15 @@ export class NeedsView {
     return watchEdge(h_flex().id("needs-root").size_full().min_h(0).items_start())
       .child(v_flex().id("needs-list").w(340).flex_none().h_full().p(10).gap(2).border_r(1).border_color(t.border)
         .overflow_y_scrollbar()
-        .child(div().px(4).pb(6).text_size(15).font_semibold().text_color(t.foreground).child(`Needs you · ${list.length}`))
+        .child(div().flex_none().px(4).pb(6).text_size(15).font_semibold().text_color(t.foreground).child(`Needs you · ${list.length}`))
         .children(list.map(item)))
+      // flex_none: each row keeps its height in the scroll columns (#149).
       .child(v_flex().id("needs-detail").flex_1().min_w(0).h_full().overflow_y_scrollbar().p(24).gap(12)
-        .child(div().text_size(18).font_semibold().text_color(t.foreground).child(agentName(cur)))
-        .child(div().text_size(13).text_color(t.muted).child(cur.title || `${cur.space_name} · ${cur.tab_name}`))
-        .child(this.cards.view(cur.address, t, "needs-card") ?? div().text_size(13).text_color(t.muted)
-          .child(this.cards.byAgent.get(cur.address)?.read ? "It waits for you in its terminal. Open the chat to see why." : "Reading what it waits for…"))
-        .child(div().id("needs-open").self_start().px(14).h(32).flex().items_center().rounded(8).text_size(13)
+        .child(div().flex_none().text_size(18).font_semibold().text_color(t.foreground).child(agentName(cur)))
+        .child(div().flex_none().text_size(13).text_color(t.muted).child(cur.title || `${cur.space_name} · ${cur.tab_name}`))
+        .child((this.cards.view(cur.address, t, "needs-card") ?? div().text_size(13).text_color(t.muted)
+          .child(this.cards.byAgent.get(cur.address)?.read ? "It waits for you in its terminal. Open the chat to see why." : "Reading what it waits for…")).flex_none())
+        .child(div().id("needs-open").flex_none().self_start().px(14).h(32).flex().items_center().rounded(8).text_size(13)
           .bg(t.accent).text_color(t.background).hover((s) => s.opacity(0.9))
           .on_click(() => showAgent(cur.address)).child("Open chat")));
   }

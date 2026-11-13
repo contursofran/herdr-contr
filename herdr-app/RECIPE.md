@@ -493,3 +493,11 @@ drawn by Herdr's `frames`; every loader of the mod is this one); done is a check
   out of the bar and releasing moves nothing.
 - Dragging a workspace row onto another row moves that workspace there, in the docked and the
   floating sidebar; dragging it out of the list and releasing moves nothing.
+
+## Layout rules
+
+`test/layout-rules.test.mjs` holds these rules over each view's tree, because the test stub does not lay out or paint:
+
+- Each direct child of a scrolling column (`overflow_y_scrollbar`, `overflow_y_scroll`) has `flex_none`. Without it the rows shrink and draw over each other (#137).
+- A gpui-base `Popover` that must fill its row sits in a wrapper with `flex_1`; it does not grow by itself (#135). The list of such popovers is in the test.
+- In each state of the sidebar (wide or rail, macOS or not), the head or the Projects list has an element that toggles it (#144).
