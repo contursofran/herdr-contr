@@ -43,6 +43,21 @@ export const workerText = (k) => k.name || k.template || k.program?.name || k.ad
 
 const clean = (s) => (s ?? "").replace(/^[^\p{L}\p{N}]+/u, "").trim();
 
+// A title that says something: not empty, not the program's name or key, not a path, not user@host.
+function telling(raw, program) {
+  const live = clean(raw);
+  // clean() would strip a path's leading ~ or /: test the title with only its status glyph gone.
+  const path = /^[~/]|^[A-Za-z]:\\/.test((raw ?? "").replace(/^[^\p{L}\p{N}~/]+/u, ""));
+  return live && live !== program?.name && !path && !live.includes("@") && live.toLowerCase() !== program?.key ? live : "";
+}
+
+// What a worker works on: its session's own title (`title`: the agent's terminal title), when it says
+// something and is not the worker's name; else "" (the row shows the name alone).
+export function workerWork(k, title) {
+  const w = telling(title, k.program);
+  return w && w !== k.name && w !== k.address ? w : "";
+}
+
 // Each tab's lead pane: its first agent, else its first focused terminal, else its first terminal.
 export function leadPanes(all) {
   const leads = new Map();
@@ -55,12 +70,8 @@ export function leadPanes(all) {
 }
 
 function title(tab, l) {
-  const prog = l?.program?.name;
-  const live = clean(l?.title);
-  // clean() would strip a path's leading ~ or /: test the title with only its status glyph gone.
-  const path = /^[~/]|^[A-Za-z]:\\/.test((l?.title ?? "").replace(/^[^\p{L}\p{N}~/]+/u, ""));
-  const telling = live && live !== prog && !path && !live.includes("@") && live.toLowerCase() !== l?.program?.key;
-  return (tab.name === prog || !tab.named) && telling ? live : tab.name;
+  const live = telling(l?.title, l?.program);
+  return (tab.name === l?.program?.name || !tab.named) && live ? live : tab.name;
 }
 
 // An agent's title: a tab someone named, or the agent's own title; never an automatic tab number.

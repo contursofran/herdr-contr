@@ -6,7 +6,7 @@ import { fake, log, reset, theme } from "./stub/herdr.mjs";
 import { byId, textOf } from "./stub/ui.mjs";
 import { fakeCx } from "./fake-cx.mjs";
 import Spaces from "../mods/herdr-contr-spaces/main.js";
-import { split, countLine, moreLine, agentLabel, bySpace, workers } from "../mods/herdr-contr-spaces/projects.js";
+import { split, countLine, moreLine, agentLabel, bySpace, workers, workerWork } from "../mods/herdr-contr-spaces/projects.js";
 
 const store = new Map();
 Object.defineProperty(globalThis, "localStorage", { configurable: true,
@@ -46,7 +46,11 @@ test("grouping: each project, then its agents; an orchestrator's workers under i
   assert.deepEqual(order, ["space-s1", "ag-a1", "sub-w1", "sub-w2", "sub-w3", "ag-a2", "space-s2", "ag-a3"]);
   assert.ok(!ids(el).includes("ag-w1"), "a worker with a pane is not an agent row of its own");
   assert.ok(!ids(el).includes("sub-w4"), "an exited worker is not shown");
-  assert.equal(textOf(byId(el, "sub-w1").kids[1]), "Question card");
+  assert.equal(textOf(byId(el, "sub-w1").kids[1]), "w1 own pane", "a worker with a pane: its own title");
+  assert.equal(textOf(byId(el, "sub-w1").kids[2]), "Question card", "and its name at the right");
+  assert.equal(byId(el, "sub-w1")._a.tooltip, "Question card · w1 own pane");
+  assert.equal(textOf(byId(el, "sub-w2").kids[1]), "PR links in chat", "no title: the name alone");
+  assert.equal(byId(el, "sub-w2").kids.length, 3, "and no name at the right");
   assert.equal(textOf(byId(el, "sub-w3").kids[1]), "builder");
   assert.equal(textOf(el.kids[0]), "Projects");
 });
@@ -199,4 +203,17 @@ test("agentLabel: a named tab, the agent's own title, never an automatic tab num
   assert.equal(agentLabel(a, tabs, new Map([["t1", { title: "✳ Fix the bar", program: claude }]]), false), "Fix the bar");
   assert.equal(agentLabel(a, tabs, new Map(), false), "claude");
   assert.equal(agentLabel({ ...a, tab: "t2" }, tabs, new Map(), false), "review");
+});
+
+test("workerWork: the worker's own title, cleaned; not its program, a path, user@host or its name", () => {
+  const k = { address: "t9", name: "b-h118", program: claude };
+  assert.equal(workerWork(k, "\u2733 Worker row title"), "Worker row title");
+  assert.equal(workerWork(k, "claude"), "");
+  assert.equal(workerWork(k, "~/code/x"), "");
+  assert.equal(workerWork(k, "\u2733 /tmp"), "");
+  assert.equal(workerWork(k, "me@mac"), "");
+  assert.equal(workerWork(k, "b-h118"), "");
+  assert.equal(workerWork(k, "t9"), "");
+  assert.equal(workerWork(k, ""), "");
+  assert.equal(workerWork(k, undefined), "");
 });
