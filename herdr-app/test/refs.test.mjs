@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { linkRefs, slugOf, repoFor, forgetRepos } from "../mods/herdr-contr/refs.js";
+import { linkRefs, slugOf, repoFor, forgetRepos, refsVersion } from "../mods/herdr-contr/refs.js";
 import { markdownView } from "../mods/herdr-contr/mdblocks.js";
 import { fake, log, reset } from "./stub/herdr.mjs";
 
@@ -57,4 +57,44 @@ test("markdownView links references in prose, not in code boxes", () => {
   const texts = all(markdownView("r", "PR #5\n\n```\n#6\n```", T, 600, 1, R)).map((n) => n._a?.text).filter(Boolean);
   assert.ok(texts.some((x) => x.startsWith(`[PR #5](`)), texts.join("|"));
   assert.ok(texts.some((x) => x.includes("\\#6")), "the code box keeps #6 as text");
+});
+
+test("a known repository's name before a bare reference links to that repository (#101)", async () => {
+  reset(); forgetRepos();
+  const remotes = { "/a": "o/r", "/b": "o/herdr-contr", "/c": "x/dup", "/d": "o/dup", "/e": "y/twin", "/f": "z/twin" };
+  fake.exec = async (_c, _a, opts) => ({ code: 0, stdout: `https://github.com/${remotes[opts.cwd]}.git\n`, stderr: "" });
+  assert.equal(linkRefs("herdr-contr #99", R), `herdr-contr [#99](${G}/o/r/issues/99)`, "not known yet: own repository");
+  const v = refsVersion();
+  for (const d of Object.keys(remotes)) repoFor(d);
+  await new Promise((r) => setTimeout(r, 0));
+  assert.ok(refsVersion() > v, "the version goes up when a repository becomes known");
+  const H = `${G}/o/herdr-contr`;
+  assert.equal(linkRefs("herdr-contr #99", R), `herdr-contr [#99](${H}/issues/99)`);
+  assert.equal(linkRefs("see herdr-contr PR #99.", R), `see herdr-contr [PR #99](${H}/pull/99).`);
+  assert.equal(linkRefs("herdr-contr#99", R), `herdr-contr[#99](${H}/issues/99)`);
+  assert.equal(linkRefs("issue #99 and PR #9", R), `issue [#99](${G}/o/r/issues/99) and [PR #9](${G}/o/r/pull/9)`);
+  assert.equal(linkRefs("abc#51", R), "abc#51");
+  assert.equal(linkRefs("dup #1", R), `dup [#1](${G}/o/dup/issues/1)`, "two owners: the agent's own owner");
+  assert.equal(linkRefs("twin #1", R), `twin [#1](${G}/o/r/issues/1)`, "two owners, none ours: own repository");
+  assert.equal(linkRefs("herdr-contr #99"), `herdr-contr [#99](${H}/issues/99)`, "no own repository");
+  const v2 = refsVersion(); fake.exec = async () => ({ code: 0, stdout: "git@github.com:o/r.git", stderr: "" }); repoFor("/a2");
+  await new Promise((r) => setTimeout(r, 0));
+  assert.equal(refsVersion(), v2, "a repository known before does not change the version");
+});
+
+test("the kept cuts and fits of a text use the new link when a repository becomes known (#101)", async () => {
+  reset(); forgetRepos();
+  const { KEY_CONFIG } = await import("../mods/herdr-contr/config.js");
+  fake.shared[KEY_CONFIG] = { file: { inline_icons: "on" }, bad: false };
+  const T = new Proxy({}, { get: (_t, k) => `#${k}` });
+  const dump = (el) => JSON.stringify(el, (k, v) => (k === "parent" ? undefined : v));
+  try {
+    const before = dump(markdownView("r", "In other #7 now.", T, 600, 1, R));
+    assert.ok(before.includes(`${G}/o/r/issues/7`) || before.includes("o/r#7"), before);
+    fake.exec = async () => ({ code: 0, stdout: "git@github.com:q/other.git", stderr: "" });
+    repoFor("/x"); await new Promise((r) => setTimeout(r, 0));
+    const after = dump(markdownView("r", "In other #7 now.", T, 600, 1, R));
+    assert.ok(after.includes("q/other"), after);
+    assert.ok(!after.includes("o/r/issues/7") && !after.includes("o/r#7"), after);
+  } finally { delete fake.shared[KEY_CONFIG]; }
 });

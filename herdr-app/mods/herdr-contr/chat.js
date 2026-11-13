@@ -3,7 +3,7 @@
 // cannot be scrolled from code, and the chat must open at the newest message. Every row shows in full.
 import { div, svg } from "gpui-kit";
 import { v_flex, h_flex, TextView, Scrollbar, v_virtual_list, VirtualListScrollHandle } from "gpui-base";
-import { theme, run, shared, settings } from "herdr";
+import { theme, run, shared, settings, agents } from "herdr";
 import { currentAgent, machineOf, icon, loader, FADE, shownScreen, watchEdge, noteWindowHeight, KEY_WIN_H } from "./state.js";
 import { Appear } from "./motion.js";
 import { now, record, flush, loadTiming } from "./timing.js";
@@ -15,7 +15,7 @@ import { ROW_PAD_Y, BUBBLE_PAD_X, BUBBLE_PAD_Y, BUBBLE_GAP, IMAGES_FS, bubbleWid
 import { Composer, paneOf } from "./composer.js";
 import { switchStrip } from "./viewswitch.js";
 import { markdownView, codeBlockAt } from "./mdblocks.js";
-import { repoFor } from "./refs.js";
+import { repoFor, refsVersion } from "./refs.js";
 import { inlineTick } from "./inline.js";
 import { picturesTick, userPictures, picturesView, pastedView } from "./pictures.js";
 import { mermaidTick, mermaidVersion } from "./mermaid.js";
@@ -142,6 +142,9 @@ export class ChatView {
     if (this.helper.changed()) cx.notify();
     const repo = this.repo();
     if (repo !== this.shownRepo) { this.shownRepo = repo; cx.notify(); }
+    // The repositories of all agents' folders, for "name #51" links (#101): git runs once per folder.
+    for (const a of agents()) { const cwd = paneOf(a.address)?.cwd; if (cwd) repoFor(cwd, machineOf(a.address)); }
+    if (refsVersion() !== this.refsSeen) { this.refsSeen = refsVersion(); cx.notify(); }
     cx.spawn((cx) => this.composer.pollStatus(cx));
     const agent = currentAgent();
     this.composer.syncPlaceholder(agent, cx);
