@@ -70,7 +70,10 @@ Left to right:
        one it stays text. With the name of a known repository before it ("herdr-contr #51",
        "herdr-contr PR #51", "herdr-contr#51"), it takes that repository; the name stays text. Known: the
        repositories of all agents' folders in the app, each read once. Two with the same name: the one
-       of the agent's own owner, else the agent's own repository. Code, links, other URLs, words and colors such as "#fff" stay as written.
+       of the agent's own owner, else the agent's own repository. A name that no folder gives is asked
+       on GitHub once for the app's run (`gh api repos/<owner of the agent's repository>/<name>`, from the
+       chat's tick, at most 2 at a time); a yes makes it known and the rows draw again. Common words
+       before a reference ("issue", "PR", "fixes", "see", "and" and others) are not asked. Code, links, other URLs, words and colors such as "#fff" stay as written.
        With **Inline PR icons** on (experimental, off by default; `inline.js`), a text block is cut at
        its paragraphs and top-level list items (`splitPieces`; an item with a nested list stays whole).
        Each piece with a reference is a wrapping row of plain elements (chat text size, line height
@@ -94,80 +97,33 @@ Left to right:
      - Separators and footers in 11.5 px dim text.
      - A round 34 px ↓ button at the bottom center while you read older messages.
      - "Loading earlier messages" in a small capsule under the bar while older rows load.
-   - **Reply box** under the chat, at most 800 px wide. Above the box: while the agent works, its
-     working line on the left (12 px braille loader, the text, the detail in `muted`), then Claude Code's
-     background note ("1 shell still running": a 10 px braille loader and the text in `muted`, also while the
-     agent is idle; it truncates first), and on the right the
-     context tag and the Orchestrating pill. Below the box: a row of 22 px round tags (model, effort,
-     cost, folder, agent; not the branch, which is in the box). A warning tag is an outline: `blocked` border, `foreground` text, no fill; the context tag is "ctx 120k / 250k"
-     against Claude Code's `autoCompactWindow` when it is set, else "ctx 37%" of the model's window; without the wrapper, the tokens come from the session log and
-     the tag shows only with `autoCompactWindow`), then a 16 px rounded `raised`
-     box with a one-line text area ("Reply to the agent"), + to attach files on the left (macOS only), the
-     branch, and a round 28 px send button (accent when there is text). File chips above the text: a PNG, JPEG
+   - **Reply box** under the chat, at most 800 px wide (#99). Above the box, 8 px over it, one status line (gap
+     8, 4 px side padding): while the agent works, a 14 px braille loader in `foreground`, the working verb (13 px,
+     `foreground`) and its detail with no parentheses (Menlo 11 px, `muted`: "26s · ↓1.5k tokens"); then Claude
+     Code's background note ("1 shell still running", Menlo 11 px `muted`, also while the agent is idle, with its own
+     loader then; it truncates first); on the right contr's orchestration as plain Menlo 11 px `muted` text. The box:
+     12 px corners, 1 px `border`, `raised`; padding 12 top, 10 right, 8 bottom, 14 left; 10 px between the text
+     and the bottom row. The text is 14 px on 20 px lines; the placeholder is "Reply to <agent name>". The bottom
+     row (gap 4): + (28 px square, 8 px corners, 16 px icon, hover fill; macOS only), the model button (28 px
+     high, 8 px corners, 8 px side padding, gap 6, hover fill: the agent's 13 px mark in the program table's tile
+     color, the short model name "Fable 5.2" at 12 px, the effort in `muted`, an 11 px `muted` chevron), a
+     spacer, the context (a 14 px ring: `border` track, `muted` arc from 12 o'clock in 5% steps, then the percent
+     in Menlo 11 px `muted`; a warning is `blocked` on both), the branch (13 px icon and name, Menlo 11 px
+     `muted`, truncated), and the 28 px send button (8 px corners, 4 px left margin; `chrome` fill and `dim`
+     arrow when empty or sending, else `accent`). The model comes from the helper's `model` (asked with the
+     status, at most every 15 s), else the status line's tags; not known yet, the button shows the app's name
+     alone. Its tooltip: "Opus 5.5 · medium effort · Claude Code" and the folder; the context's: "149k of 250k
+     tokens". A press on the model button in Claude Code puts `/model ` in the box (nothing is sent). No tags
+     row under the box. File chips above the text: a PNG, JPEG
      or SVG under the app home (a pasted image is in `herdr-contr/paste`) shows as a 56 px high picture
      (8 px corners, `border` frame, × on its top right corner); any other file, and an image from another
      folder, is a chip with its name.
-   - **Card** between the chat and the reply box, as wide as the reply box (the chat's column), 14 px corners, `raised`, 14 px
-     padding, an orange 8 px dot before the title.
-     - Approval: the title (the prompt's own, for example "Bash command"; else "<tool> wants to
-       run"), the command in Menlo 12.5 px on `background`
-       (at most 140 px, scrolls), then **1 Allow once** (accent) and **2 Deny**.
-     - Question: "Question 1 of N" with dots, the question, options as rows with a round (one
-       choice) or square (several) mark, "Recommended" in accent, a number hint per option, an
-       "Or type your own answer" row, then "1-9 picks · Enter goes on" on the left and Back,
-       Next or **Send answer** on the right.
-   - **Needs you**: a 340 px list on the left ("Needs you · N", 52 px rows: the program icon,
-     the name, "<space> · waits for you", an orange dot) and the picked agent on the right (name in
-     18 px, its title, its card, an **Open chat** button). With none: a green check, "All clear",
-     "No agent waits for you."
-   - **Overview**: at most 1220 px wide. A greeting ("Good morning", 26 px), "N tabs · N working ·
-     N need you", and a "Group by Status | Workspace" switch. Then groups of 64 px cards (1 to 3
-     columns, at least 300 px each, 12 px gaps): a status mark, the tab label (14 px semibold), how
-     long ago it changed ("13m"), and the space and agent in 12 px muted.
-   - **herdr-contr settings**: not a screen but a dialog over the window, as Herdr's own Settings
-     (`openOverlay` `kind: "dialog"`, 760 px × 0.8 of the window, Herdr's frame: rounded corners,
-     shadow, the window dimmed behind it). Esc, a click beside it, or its close button (28 px, top
-     right) closes it; opening it again replaces it. The sidebar's herdr-contr row, ⌘⇧, and the tab
-     menu's "choose Ask in herdr-contr settings first…" open it. Laid out as Herdr's Settings: a 196 px
-     sidebar on the left (a `border` line on its right) with "herdr-contr" (18 px semibold), one 34 px row a
-     section with its icon (the chosen one `selected`), and "Saved in <file>. Changes apply at once." (11 px
-     `dim`) at the bottom; on the right the close button and the section, which scrolls by itself: UPPERCASE
-     11.5 px `muted` headings, then one row per setting (the name in 13.5 px, a line on what it does in
-     12 px muted, and on the right a two-choice switch: 26 px choices in a `chrome` frame, the chosen
-     one `selected` and semibold), a `border` line under each row. **General**: CHAT, **Status row**
-     Show | Hide, **Inline PR icons (experimental)** Off | On; OTHER MACHINES, **Helper on other machines** Ask | Never. **Phone page**: PHONE PAGE,
-     **Phone page** Off | On. **Orchestration** (between General and Phone page): contr's agents.json
-     (see below). FLOW: **Plan first** Never | When needed | Always; **Review** None | Code PRs | Every PR;
-     **Debugger after** and **Workers at once**, each − <n> <unit> + (24 px buttons, 1 to 99);
-     **Merge** Ask me | When CI and review pass. ROLES: Orchestrator, Planner, Builder, Reviewer,
-     Debugger, with first a 24 px button "Use recommended setup" (#90: orchestrator Fable 5.2 medium, builder Opus 5.5 low, reviewer and planner Fable 5.2 low, debugger Fable 5.2 high; one write, only `--model` and `--effort`, a role that is not claude stays). When all five roles are at it, the button is dim and off and "Recommended setup in use" shows in `dim`. Then each role is a row with its name and what it does, then a model switch (Opus 5.5 | Sonnet 5.5 |
-     Haiku 5.5 | Fable 5.2) and an effort switch (low | medium | high | xhigh | max). A role whose
-     command is not one of these shows "Custom: <command>" and no choice selected. At the bottom
-     "Saved in <path>. contr's coordinator reads it." It opens on General. A box with a `blocked`
-     border above a section when config.json is not JSON (on Orchestration: when agents.json is not
-     JSON, or when a write failed, with the reason).
-     Phone page: the row "Read your agents on your phone, through Tailscale." with Off | On, then a status
-     dot and line when there is something to say (Running in `done`, a problem in `blocked`; nothing when
-     Off). SET UP: four steps, each a 20 px round mark (a `done` check when done; its number in `accent`
-     for the step to do now; `dim` and no text for a later one): 1 **Tailscale on this computer** (done:
-     "Signed in as <login>."; not: the helper's reason, Get Tailscale, which opens tailscale.com/download,
-     and the SERVE.md address with Copy link), 2 **Phone page on** (off: turn it on with the switch above;
-     stopped or failed: turn it Off, then On; by hand: the helper's line; Linux adds `loginctl
-     enable-linger`), 3 **Tailscale Serve set** (the one `tailscale serve` command with Copy,
-     `--https=8443` when 443 is another service's with a `muted` line that says so; the status is asked
-     every 3 s until Serve is set), 4 **Open it on your phone** (install Tailscale and sign in as the
-     login; a 140 px QR code on a white 8 px box beside the address with Copy; "Can't open it?" help).
-     OPTIONS, with Tailscale: a **Tailscale login** row (its line names the login in use; on the right a
-     260 × 30 px field in a `background` frame with a `border` line, 12 px text, placeholder "Default: this
-     machine's Tailscale login"; empty: the login found) and **Read-only** Off | On.
    - **Tab panes**: a split tab, or a tab with a shell, shows its own panes (a 56 px top bar
      above them, 8 px padding, 6 px gaps, 8 px corners, 1 px border, `muted` border on focus).
 
-The context tag sits at the right end of that row, just before the orchestration pill (#40).
-Orchestration: at the right end of the row above the reply box, an "Orchestrating" pill
-(`selected` fill, `working` dot, "· N workers" in `muted`) when the agent's terminal has the hc
-label `contr.orchestrating` or live child terminals; else, for Claude Code, an "Orchestrate"
-button that puts `/contr:orchestrate ` in the box.
+Orchestration: at the right end of the status line above the reply box, "Orchestrating · N workers" as
+plain text when the agent's terminal has the hc label `contr.orchestrating` or live child terminals; else, for
+Claude Code, a quiet "Orchestrate" that puts `/contr:orchestrate ` in the box.
 
 Status marks: working is a 13 px braille loader (`working` color: ⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏ in Menlo, 80 ms a frame,
 drawn by Herdr's `frames`; every loader of the mod is this one); done is a check
@@ -221,7 +177,7 @@ drawn by Herdr's `frames`; every loader of the mod is this one); done is a check
   is written against the text just read (someone else's change is read again, not lost), and every
   view shows it at once. The file is read again each minute and when the dialog opens.
   - **Inline PR icons (experimental)** On: icons before pull request and issue references in prose (see the chat).
-  - **Status row** Hide: no tags (model, context, cost, folder) around the reply box (the branch beside the send button stays).
+  - **Status row** Hide: no model button and no context ring in the reply box (the branch and the status line stay).
   - **Helper on other machines** Never: for a tab on another machine the chat says, in one line,
     "herdr-contr does not run its helper on other machines. To change it: herdr-contr settings, Helper
     on other machines: Ask." No install card; the tab menu has "Remove helper: choose Ask in herdr-contr
@@ -403,6 +359,9 @@ drawn by Herdr's `frames`; every loader of the mod is this one); done is a check
   sees it, and a Finder copy (file names as text) came in as names. The mod binds `secondary-v` with
   `cx.bind_keys` under its own key context (`HerdrContrComposer > Input`), asks `paste-image` first
   (files, then plain text, then an image), and types the text itself when nothing is attached.
+- A `TextareaState` has no placeholder setter, and a state can not be made while drawing. The reply box
+  makes a new state in the chat's tick when the agent's name changes ("Reply to <name>"), moves the text
+  into it, gives it the keyboard when the old one had it, and releases the old one.
 - `layout()` is the file, not the live tree. Keep the shown screen and the sidebar state in shared
   state, and select the screen outright.
 - A mouse move carries no button state and arrives only over the element under the pointer, so

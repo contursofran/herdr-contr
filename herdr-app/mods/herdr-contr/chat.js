@@ -15,7 +15,7 @@ import { ROW_PAD_Y, BUBBLE_PAD_X, BUBBLE_PAD_Y, BUBBLE_GAP, IMAGES_FS, bubbleWid
 import { Composer, paneOf } from "./composer.js";
 import { switchStrip } from "./viewswitch.js";
 import { markdownView, codeBlockAt } from "./mdblocks.js";
-import { repoFor, refsVersion } from "./refs.js";
+import { repoFor, refsVersion, lookupNames } from "./refs.js";
 import { inlineTick } from "./inline.js";
 import { picturesTick, userPictures, picturesView, pastedView } from "./pictures.js";
 import { mermaidTick, mermaidVersion } from "./mermaid.js";
@@ -144,9 +144,11 @@ export class ChatView {
     if (repo !== this.shownRepo) { this.shownRepo = repo; cx.notify(); }
     // The repositories of all agents' folders, for "name #51" links (#101): git runs once per folder.
     for (const a of agents()) { const cwd = paneOf(a.address)?.cwd; if (cwd) repoFor(cwd, machineOf(a.address)); }
+    lookupNames(); // names before a reference that no folder gave, asked on GitHub (#104)
     if (refsVersion() !== this.refsSeen) { this.refsSeen = refsVersion(); cx.notify(); }
     cx.spawn((cx) => this.composer.pollStatus(cx));
     const agent = currentAgent();
+    this.composer.syncPlaceholder(agent, cx);
     cx.spawn((cx) => this.cards.poll(cx, this.address, wanted(agent, this.feed()?.rows)));
     if (this.wantOlder) { this.wantOlder = false; cx.spawn((cx) => this.loadOlder(cx)); }
     const f = this.feed();
