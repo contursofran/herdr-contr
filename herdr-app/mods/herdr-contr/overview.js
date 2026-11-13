@@ -113,8 +113,9 @@ export class OverviewView {
       
       .on_size_change((size, cx) => { noteWindowHeight(size); if (Math.abs(size.width - this.width) >= 1) { this.width = size.width; cx.notify(); } })
       .relative()
+      // flex_none: the body keeps its height in the scroll column (#149).
       .child(v_flex().id("overview-scroll").size_full().items_center().overflow_y_scrollbar()
-        .on_mouse_down("left", (_e, cx) => cx.stop_propagation()).child(body))
+        .on_mouse_down("left", (_e, cx) => cx.stop_propagation()).child(body.flex_none()))
       .child(overBar(t));
   }
 }
