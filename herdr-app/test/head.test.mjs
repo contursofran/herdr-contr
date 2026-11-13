@@ -165,3 +165,16 @@ test("a picked machine that was rebuilt offers Connect, which adds it again", as
   const calls = log.exec.filter(([c]) => c === "hc").map(([, a]) => a.slice(0, 2).join(" "));
   assert.ok(calls.includes("machine rm") && calls.includes("machine add"), calls.join(","));
 });
+
+test("on the macOS rail the list shows the toggle, and a press opens the sidebar again (#144)", async () => {
+  fake.spaces = [sp("s1", "here")];
+  hcMachines([]);
+  const v = await list();
+  assert.equal(byId(v.render(), "rail-open"), null, "the wide sidebar has its toggle in the head");
+  fake.layout = sidebar(76);
+  assert.equal(byId(v.render(), "rail-open"), null, "off macOS the head keeps the toggle");
+  fake.window = { platform: "macos" };
+  fake.shared["sidebar.width"] = 300;
+  byId(v.render(), "rail-open")._h.on_click();
+  assert.deepEqual(log.run.at(-1), ["layout.resize", { id: "sidebar", px: 300 }]);
+});
