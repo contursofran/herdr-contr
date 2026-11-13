@@ -1,12 +1,13 @@
-//! The command line: `agents flow | ls | send | interrupt | stop | rm | read`, and `owner ask | answer | done`.
-//! Ported from contr's `contr agents` and `contr owner`; `agents spawn`, `prompt` and `watch` come with the
-//! next parts of the slice (#160).
+//! The command line: `agents flow | spawn | ls | send | interrupt | stop | rm | read`, and
+//! `owner ask | answer | done`. Ported from contr's `contr agents` and `contr owner`; `agents prompt` and
+//! `watch` come with the next part of the slice (#160).
 use std::io::Write;
 use std::path::PathBuf;
 
 use crate::config::{Config, Flow};
 use crate::owner::{Question, Store};
-use crate::workers::{self, Core, Manager};
+use crate::spawn::{review_worktree, spawn, spawn_task, Spec};
+use crate::workers::{self, Core, Manager, Worker};
 
 pub const USAGE: &str = "Usage:
   herdr-contr-orch agents <command> [args…] list and control the workers (herdr-contr-orch agents help)
@@ -16,6 +17,17 @@ pub const USAGE: &str = "Usage:
 
 pub const AGENTS_USAGE: &str = "Usage:
   herdr-contr-orch agents ls [--all] [--json]      list the workers
+  herdr-contr-orch agents spawn --name N --profile P [--issue I] [--worktree DIR] [--project P]
+                     [--role R] [--review-pr PR] [--no-parent] [--json] [--any-profile]
+                     [--task-file F | [--] task…]
+                                                   start a worker; --task-file reads the
+                                                   task from a file; --review-pr makes a
+                                                   detached worktree at the pull request's
+                                                   head (<main>-wt/review-<PR>) of the
+                                                   repository at --worktree (default: here)
+                                                   and starts the worker there; a profile
+                                                   that the flow names for no role needs
+                                                   --any-profile
   herdr-contr-orch agents send <name> <text…>      type text and press Enter
   herdr-contr-orch agents interrupt <name>         press the stop key
   herdr-contr-orch agents stop <name> [--keep]     end the worker's program and remove its
@@ -31,7 +43,10 @@ an argument.
 
 Environment:
   HC_SOCKET, HC_SESSION the hc core to talk to (default: the session \"default\")
-  HC_TERMINAL_ID        set inside hc: the terminal that this tool runs in
+  HC_TERMINAL_ID        set inside hc: the terminal that this tool runs in; spawn makes
+                        it the parent of the worker
+  CONTR_KIT             the Claude Code plugin folder of the kit; it replaces \"kit\" of
+                        the profiles file
   CONTR_AGENTS_CONFIG   profiles file (default: the user config folder, contr/agents.json).
                         Built-in profiles: orchestrator (claude opus, medium effort), builder,
                         planner, reviewer, debugger, explorer. A profile in the file replaces the
@@ -160,7 +175,7 @@ fn run_agents(args: &[String], env: &dyn Fn(&str) -> String, out: &mut dyn Write
         }
         return 0;
     }
-    if ["ls", "send", "interrupt", "stop", "rm", "read"].contains(&sub.as_str()) {
+    if ["ls", "spawn", "send", "interrupt", "stop", "rm", "read"].contains(&sub.as_str()) {
         return run_worker_command(sub, &args[1..], env, out, err, core);
     }
     if sub != "flow" {
@@ -183,19 +198,30 @@ fn run_agents(args: &[String], env: &dyn Fn(&str) -> String, out: &mut dyn Write
     }
 }
 
-/// The flags of the worker commands, and the names of those that the command line gave.
+/// The flags that take a value; the others are true or false.
+const VALUE_FLAGS: [&str; 9] = ["lines", "name", "profile", "issue", "worktree", "project", "role", "task-file", "review-pr"];
+const BOOL_FLAGS: [&str; 6] = ["all", "json", "keep", "ended", "no-parent", "any-profile"];
+
+/// The flags of the worker commands that the command line gave, in order, each with its value.
 #[derive(Default)]
 struct Flags {
-    all: bool,
-    json: bool,
-    keep: bool,
-    ended: bool,
-    lines: i64,
-    seen: Vec<String>,
+    seen: Vec<(String, String)>,
+}
+
+impl Flags {
+    fn text(&self, name: &str) -> String {
+        self.seen.iter().rev().find(|(n, _)| n == name).map(|(_, v)| v.clone()).unwrap_or_default()
+    }
+    fn on(&self, name: &str) -> bool {
+        self.text(name) == "true"
+    }
+    fn number(&self, name: &str) -> i64 {
+        self.text(name).parse().unwrap_or(0)
+    }
 }
 
 /// Reads the flags before and after the other arguments, which it gives in order. A flag is -name or --name;
-/// `lines` takes its value after "=" or as the next argument. After "--" every word is an argument.
+/// a flag with a value takes it after "=" or as the next argument. After "--" every word is an argument.
 fn parse_flags(args: &[String]) -> Result<(Flags, Vec<String>), String> {
     let mut f = Flags::default();
     let mut pos = Vec::new();
@@ -215,26 +241,24 @@ fn parse_flags(args: &[String]) -> Result<(Flags, Vec<String>), String> {
             Some((n, v)) => (n, Some(v.to_string())),
             None => (flag, None),
         };
-        if name == "lines" {
+        let value = if VALUE_FLAGS.contains(&name) {
             let Some(v) = value.or_else(|| args.get(i).cloned().inspect(|_| i += 1)) else {
-                return Err("flag needs an argument: -lines".into());
+                return Err(format!("flag needs an argument: -{name}"));
             };
-            f.lines = v.parse().map_err(|_| format!("--lines {v:?} is not a number"))?;
-        } else {
-            let on = match value.as_deref() {
-                None | Some("true") => true,
-                Some("false") => false,
-                Some(v) => return Err(format!("--{name} {v:?} is not true or false")),
-            };
-            match name {
-                "all" => f.all = on,
-                "json" => f.json = on,
-                "keep" => f.keep = on,
-                "ended" => f.ended = on,
-                _ => return Err(format!("flag provided but not defined: -{name}")),
+            if ["lines", "review-pr"].contains(&name) && v.parse::<i64>().is_err() {
+                return Err(format!("--{name} {v:?} is not a number"));
             }
-        }
-        f.seen.push(name.to_string());
+            v
+        } else if BOOL_FLAGS.contains(&name) {
+            match value.as_deref() {
+                None | Some("true") => "true".to_string(),
+                Some("false") => "false".to_string(),
+                Some(v) => return Err(format!("--{name} {v:?} is not true or false")),
+            }
+        } else {
+            return Err(format!("flag provided but not defined: -{name}"));
+        };
+        f.seen.push((name.to_string(), value));
     }
     Ok((f, pos))
 }
@@ -250,47 +274,67 @@ fn run_worker_command(sub: &str, rest: &[String], env: &dyn Fn(&str) -> String, 
     };
     let allowed: &[&str] = match sub {
         "ls" => &["all", "json"],
+        "spawn" => &["name", "profile", "issue", "worktree", "project", "role", "no-parent", "json", "task-file", "review-pr", "any-profile"],
         "read" => &["lines"],
         "stop" => &["keep"],
         "rm" => &["ended"],
         _ => &[],
     };
-    if let Some(bad) = flags.seen.iter().find(|f| !allowed.contains(&f.as_str())) {
+    if let Some(bad) = flags.seen.iter().map(|(n, _)| n).find(|n| !allowed.contains(&n.as_str())) {
         let _ = write!(err, "herdr-contr-orch agents {sub}: flag --{bad} does not apply\n{AGENTS_USAGE}");
         return 2;
     }
     let count_ok = match sub {
         "ls" => pos.is_empty(),
         "send" => pos.len() >= 2,
-        "rm" => true,
+        "rm" | "spawn" => true,
         _ => pos.len() == 1,
     };
     if !count_ok {
         let _ = write!(err, "herdr-contr-orch agents {sub}: wrong number of arguments\n{AGENTS_USAGE}");
         return 2;
     }
-    if sub == "rm" && (flags.ended == (pos.len() == 1) || pos.len() > 1) {
+    if sub == "rm" && (flags.on("ended") == (pos.len() == 1) || pos.len() > 1) {
         let _ = write!(err, "herdr-contr-orch agents rm: give one name, or --ended\n{AGENTS_USAGE}");
         return 2;
+    }
+    // Only spawn needs the profiles, so a broken file does not block the rest.
+    let mut cfg = Config::default();
+    if sub == "spawn" {
+        cfg = match Config::load(&config_path(env)) {
+            Ok(c) => c,
+            Err(e) => {
+                let _ = writeln!(err, "herdr-contr-orch agents: {e}");
+                return 1;
+            }
+        };
+        let kit = env("CONTR_KIT");
+        if !kit.is_empty() {
+            cfg.kit = kit;
+        }
     }
     let m = Manager::new(core, env("HC_TERMINAL_ID"));
     let mut text = String::new();
     let res = match sub {
-        "ls" => m.list(flags.all).and_then(|ws| {
-            text = if flags.json { serde_json::to_string_pretty(&ws).map_err(|e| e.to_string())? + "\n" } else { workers::table(&ws) };
+        "spawn" => spawn_worker(&flags, &pos, &cfg, env, core).and_then(|w| {
+            text = if flags.on("json") { serde_json::to_string_pretty(&w).map_err(|e| e.to_string())? + "\n" } else { format!("{} {}\n", w.name, w.address) };
+            Ok(())
+        }),
+        "ls" => m.list(flags.on("all")).and_then(|ws| {
+            text = if flags.on("json") { serde_json::to_string_pretty(&ws).map_err(|e| e.to_string())? + "\n" } else { workers::table(&ws) };
             Ok(())
         }),
         "send" => m.send(&pos[0], &pos[1..].join(" ")),
         "interrupt" => m.interrupt(&pos[0]).map(|o| text = o + "\n"),
-        "stop" => m.stop(&pos[0], flags.keep),
-        "rm" if !flags.ended => m.remove(&pos[0]),
+        "stop" => m.stop(&pos[0], flags.on("keep")),
+        "rm" if !flags.on("ended") => m.remove(&pos[0]),
         "rm" => {
             let mut names = Vec::new();
             let res = m.remove_ended(&mut names);
             text = names.iter().map(|n| format!("{n}\n")).collect();
             res
         }
-        _ => m.read(&pos[0], flags.lines).map(|t| text = t.trim_end_matches('\n').to_string() + "\n"),
+        _ => m.read(&pos[0], flags.number("lines")).map(|t| text = t.trim_end_matches('\n').to_string() + "\n"),
     };
     let _ = out.write_all(text.as_bytes());
     if let Err(e) = res {
@@ -298,6 +342,24 @@ fn run_worker_command(sub: &str, rest: &[String], env: &dyn Fn(&str) -> String, 
         return 1;
     }
     0
+}
+
+/// `agents spawn`: the task, the check of the profile against the flow, the review worktree, then the worker.
+fn spawn_worker(flags: &Flags, pos: &[String], cfg: &Config, env: &dyn Fn(&str) -> String, core: &dyn Core) -> Result<Worker, String> {
+    let task = spawn_task(&pos.join(" "), &flags.text("task-file"))?;
+    let profile = flags.text("profile");
+    if !flags.on("any-profile") {
+        cfg.check_profile(&profile)?;
+    }
+    let mut spec = Spec { name: flags.text("name"), profile, role: flags.text("role"), issue: flags.text("issue"), worktree: flags.text("worktree"), project: flags.text("project"), task, ..Spec::default() };
+    let pr = flags.number("review-pr");
+    if pr != 0 {
+        spec.worktree = review_worktree(if spec.worktree.is_empty() { "." } else { &spec.worktree }, pr)?;
+    }
+    if !flags.on("no-parent") {
+        spec.parent = env("HC_TERMINAL_ID");
+    }
+    spawn(core, cfg, env, spec)
 }
 
 fn run_owner(args: &[String], env: &dyn Fn(&str) -> String, out: &mut dyn Write, err: &mut dyn Write, core: &dyn Core) -> i32 {
