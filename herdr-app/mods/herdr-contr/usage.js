@@ -29,10 +29,16 @@ function find(node, id) {
   return null;
 }
 
-// The layout's foot block takes the height of its rows. It runs only on a change.
-function fitFoot() {
+// The layout's foot block takes the height of its rows. The block's own height in the layout decides (#133): an
+// install can load the layout again (the block is back at its file height) and keep this module, so a height
+// remembered here is not enough. A layout that gives no height: `again` (each read) sends the height again.
+export const FIT_MS = 30_000;
+export function fitFoot(again = false) {
   const px = footHeight(state.plans.length);
-  if (px === state.px || !find(layout(), FOOT_BLOCK)) return;
+  const node = find(layout(), FOOT_BLOCK);
+  if (!node) return;
+  const now = node.size?.px;
+  if (now != null ? now === px : px === state.px && !again) return;
   state.px = px;
   run("layout.resize", { id: FOOT_BLOCK, px });
 }
@@ -48,7 +54,7 @@ export async function pollUsage(cx, now = Date.now()) {
     const l = r.error ? null : r.lines.find((x) => x.type === "usage");
     if (!l) return;
     state.plans = (l.plans ?? []).filter((p) => NAMES[p.plan] && p.windows?.length);
-    fitFoot();
+    fitFoot(true);
     cx?.notify?.();
   } finally { state.busy = false; }
 }
@@ -112,8 +118,9 @@ export function footRows(t, rail = false, nowSecs = Date.now() / 1000) {
   });
 }
 
-// Starts the reads: one now and one every USAGE_MS.
+// Starts the reads: one now and one every USAGE_MS. The foot block's height is checked every FIT_MS, with no read.
 export function startUsage(cx) {
   cx?.spawn?.((cx2) => pollUsage(cx2));
   cx?.timer?.every?.(USAGE_MS, (cx2) => cx2?.spawn?.((cx3) => pollUsage(cx3)));
+  cx?.timer?.every?.(FIT_MS, () => fitFoot());
 }
