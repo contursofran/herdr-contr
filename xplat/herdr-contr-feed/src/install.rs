@@ -14,12 +14,34 @@ mod embedded {
 }
 pub use embedded::{FILES, KEYS, KNOWN};
 
-/// The mods that install puts in <home>/mods: herdr-contr, and our copies of Herdr's agents, spaces and tabs mods.
-pub const MODS: [&str; 4] = ["herdr-contr", "herdr-contr-agents", "herdr-contr-spaces", "herdr-contr-tabs"];
+/// The mods that install puts in <home>/mods: herdr-contr, and our copies of Herdr's spaces and tabs mods.
+pub const MODS: [&str; 3] = ["herdr-contr", "herdr-contr-spaces", "herdr-contr-tabs"];
 
-/// Whether `rel` is a file in one of our mods.
+/// Mods that an earlier install put there and this version does not have (#98: the Projects list draws the
+/// agents). Their unchanged files go, and the folder goes when only files that herdr-app writes stay.
+pub const RETIRED: [&str; 1] = ["herdr-contr-agents"];
+
+/// Whether `rel` is a file in one of our mods, or in a mod we retired.
 fn in_our_mod(rel: &str) -> bool {
-    MODS.iter().any(|m| rel.strip_prefix("mods/").and_then(|r| r.strip_prefix(m)).is_some_and(|r| r.starts_with('/')))
+    MODS.iter().chain(RETIRED.iter()).any(|m| rel.strip_prefix("mods/").and_then(|r| r.strip_prefix(m)).is_some_and(|r| r.starts_with('/')))
+}
+
+/// A file that herdr-app writes at a mod's top level (see .gitignore), or a Finder file.
+fn generated(name: &str) -> bool {
+    name == "jsconfig.json" || name.ends_with(".d.ts") || name == ".DS_Store"
+}
+
+/// Removes a retired mod's folder when only generated files stay in it. A file of the person's keeps it.
+fn remove_retired(home: &Path) -> std::io::Result<()> {
+    for m in RETIRED {
+        let dir = home.join("mods").join(m);
+        let Ok(entries) = fs::read_dir(&dir) else { continue };
+        let names: Vec<_> = entries.filter_map(|e| e.ok()).map(|e| (e.file_type().map(|t| t.is_file()).unwrap_or(false), e.file_name().to_string_lossy().into_owned())).collect();
+        if names.iter().all(|(file, n)| *file && generated(n)) {
+            fs::remove_dir_all(&dir)?;
+        }
+    }
+    Ok(())
 }
 
 const HELP: &str = "\
@@ -216,8 +238,8 @@ pub fn sort_files(home: &Path, files: &BTreeMap<&str, &[u8]>, mine: &BTreeMap<St
                 let rel = rel_of(&p, home);
                 let n = p.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default();
                 // herdr-app writes jsconfig.json and *.d.ts at the mod's top level (see .gitignore).
-                let generated = p.parent() == Some(mod_dest.as_path()) && (n == "jsconfig.json" || n.ends_with(".d.ts"));
-                if files.contains_key(rel.as_str()) || mine.contains_key(&rel) || n == ".DS_Store" || generated {
+                let made = p.parent() == Some(mod_dest.as_path()) && generated(&n);
+                if files.contains_key(rel.as_str()) || mine.contains_key(&rel) || n == ".DS_Store" || made {
                     continue;
                 }
                 match sha_file(&p).and_then(|h| known_as(&rel, &h)) {
@@ -409,6 +431,7 @@ pub fn run(args: &[String]) -> i32 {
                 fs::remove_file(&dest)?;
             }
         }
+        remove_retired(&home)?;
         if keys != old_keys {
             put(&keys_path, (serde_json::to_string_pretty(&keys).unwrap() + "\n").as_bytes(), false)?;
         }

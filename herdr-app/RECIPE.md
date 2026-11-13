@@ -283,22 +283,15 @@ drawn by Herdr's `frames`; every loader of the mod is this one); done is a check
   `tab-panes`. With a `tabs` block in the layout (`herdrTabBar()`), the chat, Needs you and
   Overview draw no bar and leave no room for one (`barH()` is 0); Needs you is ⌘⇧I and Overview
   ⌘⇧\.
-- **Mods** `mods/herdr-contr-agents/` and `mods/herdr-contr-tabs/`: copies of Herdr's `agents` and
-  `tabs` mods (Apache-2.0). Since #96 no layout names the agents copy (the Projects list draws the agents);
-  it stays installed until slice 3 moves its model line into a tooltip. The one change: the working mark is the braille loader of
-  `mods/herdr-contr/state.js` (12 px, ⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏ in Menlo, `line_height(1)`, 80 ms a frame), in place
-  of the turning arc. A mod cannot import another mod, so each copy has its own `loader()`. The tabs
-  copy keeps its window icons (`win-*.svg`); the icons of other Herdr mods (`workspace-chrome`,
-  `pane`, `files`, `changes`) stay where Herdr installs them.
-  The agents copy also shows each agent's model and effort on a second line under the name ("Opus 5.5 · low",
-  "GPT-6 · high"; 11 px, `muted`, 14 px line, truncates), aligned with the name, not the icon. Line 1
-  then is 26 px high (top rows and sub-agent rows); a row without a model stays one line (30 px top,
-  26 px sub-agent). In a sub-agent row, a `│` or `├` tree line goes on through line 2. It comes from the
-  helper's `model` command (docs/protocol.md), asked only when the helper has it, when a terminal first
-  shows and when its status changes (at most once in 15 s; no timer). Unknown parts are left out.
+- **Mod** `mods/herdr-contr-tabs/`: a copy of Herdr's `tabs` mod (Apache-2.0). The one change: the working
+  mark is the braille loader of `mods/herdr-contr/state.js` (12 px, ⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏ in Menlo, `line_height(1)`,
+  80 ms a frame), in place of the turning arc. A mod cannot import another mod, so each copy has its own
+  `loader()`. The copy keeps its window icons (`win-*.svg`); the icons of other Herdr mods (`workspace-chrome`,
+  `pane`, `files`, `changes`) stay where Herdr installs them. The copy of Herdr's `agents` mod went in #98: the
+  Projects list draws the agents, and the install removes an installed copy that nobody changed.
 - **Mod** `mods/herdr-contr-spaces/`: a copy of Herdr's `spaces` mod (Apache-2.0). It is the **Projects list**
   of the `herdr-contr` layout (#96; after the owner's design, slice 1 of 3). The layout no longer names
-  `herdr-contr-agents`: the agent rows are drawn here (`projects.js` holds the grouping).
+  the agents copy: the agent rows are drawn here (`projects.js` holds the grouping).
   - A head row "Projects" (12 px, `font_medium`, `muted`; padding 6 10 4 20) with a 24 px + (8 px corners, `space.new`).
     The list: 10 px at the sides, rows 2 px apart, 10 px under each project and its agents.
   - A project row (30 px, 8 px corners, padding 0 10 0 6, gap 6): a 14 px chevron (only when the project has
@@ -328,8 +321,18 @@ drawn by Herdr's `frames`; every loader of the mod is this one); done is a check
     no agents" (30 px, a 14 px chevron, 12 px `muted`). Open (in memory), it lists them as project rows. The
     shown space is never in it; a checkout and its worktrees go there only together.
   - Herdr's agent order (`setAgentOrder`) is the projects' order, shut projects included.
-  - The rail (under 160 px) and the machine group rows are as before. Not yet here: the pin, the sort
-    menu and the model line of the agents copy (slice 3, #98, brings the hover controls and the model tooltip).
+  - Hover (#98, slice 3): on an agent row under the pointer (`on_hover`, kept in the view; the row is drawn
+    again), the age and the state mark hide, the icon is at full opacity, and two buttons show at the right
+    (absolute: top 4, right 6, gap 2): Stop (`terminal.kill`) and "Open in a new tab" (`terminal.keep` with
+    `place: "tab"`). Each is 22 px square, 6 px corners, a 12 px icon in `muted`, `hover` fill, with a tooltip.
+    A press on one is not a press on the row.
+  - The model tooltip: an agent row and a worker row have the tooltip "Opus 5.5 · medium effort" (Herdr's own
+    tooltip: its look and place are the shell's). It comes from the helper's `model` command
+    (docs/protocol.md), asked only when the helper has it, from a timer (at start, then every 15 s) and never
+    from a draw: for a terminal the first time it shows and when its status changed, at most once in 15 s.
+    No model known: no tooltip.
+  - The rail (under 160 px) and the machine group rows are as before. The agents copy's pin and sort menu are
+    not here: the owner's design has neither.
 
   The favicon change: the
   space icon (18 px) is the project's favicon (`image()`, full color, 4 px corners), else a folder icon
