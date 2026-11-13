@@ -26,6 +26,7 @@ const appZoom = () => { const z = Number(settings?.()?.zoom); return z > 0 ? z :
 import { openMenu } from "./menu.js";
 import { Cards, wanted } from "./cards.js";
 import { PanelCard } from "./panelcard.js";
+import { OwnerCards } from "./ownerq.js";
 import { startTop, overBar, barH, herdrTabBar } from "./top.js";
 import { HelperUI, isRemoteProblem } from "./helpercard.js";
 
@@ -95,6 +96,7 @@ export class ChatView {
     this.appear = new Appear();
     this.cards = new Cards(cx);
     this.panel = new PanelCard(cx);
+    this.owner = new OwnerCards(cx);   // the coordinator's questions for the owner (#131)
     this.helper = new HelperUI();
     this.refresh = (cx) => { this.lastPoll = 0; return this.poll(cx); };
     this.composer.onNewConversation = (_address, cx) => this.refresh(cx);
@@ -111,6 +113,7 @@ export class ChatView {
     this.composer.onSendDone = (address, cx) => { if (address === this.address) return this.refresh(cx); };
     this.cards.canFocus = () => this.composer?.empty !== false;
     this.panel.canFocus = this.cards.canFocus;
+    this.owner.canFocus = this.cards.canFocus;
     this.switchTo(currentAgent()?.address ?? null);
     cx.spawn((cx) => this.poll(cx));
     cx.timer.every(CHECK_MS, (cx) => this.tick(cx));
@@ -127,7 +130,7 @@ export class ChatView {
 
   // Every chat opens at its newest message, also one read before.
   switchTo(address) {
-    this.address = address; this.cards.shown = address; this.panel.shown = address;
+    this.address = address; this.cards.shown = address; this.panel.shown = address; this.owner.shown = address;
     if (address && !this.feeds.has(address)) this.feeds.set(address, emptyFeed(address));
     this.follow = true; this.open = new Set(); this.autoOlder = 0;
     // A newly shown agent gets its own background read.
@@ -157,6 +160,7 @@ export class ChatView {
     // A panel in the terminal (#141): read while the agent does not work and no approval or question card shows.
     const calm = Boolean(agent) && agent.status !== "working" && !want && !this.cards.card(this.address);
     cx.spawn((cx) => this.panel.poll(cx, this.address, calm));
+    cx.spawn((cx) => this.owner.poll(cx, this.address));   // reads the owner file at most every OWNER_MS
     if (this.wantOlder) { this.wantOlder = false; cx.spawn((cx) => this.loadOlder(cx)); }
     const f = this.feed();
     if (f && settleEchoes(f)) cx.notify();
@@ -479,6 +483,8 @@ export class ChatView {
       .when(Boolean(this.helper.removeCard(t, this.refresh)), (el) => el.child(h_flex().w_full().px(16).pt(8).justify_center()
         .on_mouse_down("left", stop).child(this.helper.removeCard(t, this.refresh))))
       .when(Boolean(f) && f.error?.code !== "not-agent" && !isRemoteProblem(f.error), (el) => {
+        const ask = this.owner.view(this.address, t, "chat-owner", this.colWidth());
+        if (ask) el.child(this.appear.wrap(h_flex().w_full().px(16).pt(8).justify_center().on_mouse_down("left", stop).child(ask), "chat-owner-in", `${this.address}:${this.owner.key(this.address)}`, cx, 10));
         const card = this.cards.view(this.address, t, "chat-card", this.colWidth());
         if (card) el.child(this.appear.wrap(h_flex().w_full().px(16).pt(8).justify_center().on_mouse_down("left", stop).child(card), "chat-card-in", `${this.address}:${this.cards.key?.(this.address) ?? ""}`, cx, 10));
         const panel = card ? null : this.panel.view(this.address, t, "chat-panel", this.colWidth());
