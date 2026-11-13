@@ -110,9 +110,9 @@ fn installs_into_an_empty_home_puts_the_helper_in_place_and_runs_check() {
     let mode = fs::metadata(s.app.join("herdr-contr/bin/herdr-contr-feed")).unwrap().permissions().mode();
     assert_eq!(mode & 0o777, 0o755);
     assert_eq!(keys_of(&s.app), ours());
-    assert!(s.app.join("mods/herdr-contr-agents/main.js").exists());
+    assert!(!s.app.join("mods/herdr-contr-agents").exists(), "retired in #98");
     assert!(s.app.join("mods/herdr-contr-tabs/win-close.svg").exists());
-    let checks: Vec<String> = ["herdr-contr", "herdr-contr-agents", "herdr-contr-spaces", "herdr-contr-tabs"].iter().map(|m| format!("{0} check {0}/mods/{m}", s.app_s())).collect();
+    let checks: Vec<String> = ["herdr-contr", "herdr-contr-spaces", "herdr-contr-tabs"].iter().map(|m| format!("{0} check {0}/mods/{m}", s.app_s())).collect();
     assert_eq!(s.calls(), checks);
 }
 
@@ -130,7 +130,7 @@ fn installs_exactly_the_files_in_the_repo() {
             want.push(format!("themes/{n}"));
         }
     }
-    let git = Command::new("git").args(["ls-files", "mods/herdr-contr", "mods/herdr-contr-agents", "mods/herdr-contr-spaces", "mods/herdr-contr-tabs"]).current_dir(mod_dir()).output().unwrap();
+    let git = Command::new("git").args(["ls-files", "mods/herdr-contr", "mods/herdr-contr-spaces", "mods/herdr-contr-tabs"]).current_dir(mod_dir()).output().unwrap();
     want.extend(String::from_utf8(git.stdout).unwrap().lines().map(String::from));
     want.sort();
     let have: Vec<String> = files.keys().cloned().collect();
@@ -193,14 +193,53 @@ fn removes_an_unchanged_file_an_earlier_install_put_in_a_copied_herdr_mod() {
     let s = sandbox();
     let r = s.run(&["--home", s.app_s()]);
     assert_eq!(r.status.code(), Some(0), "{}", both(&r));
-    fs::write(s.app.join("mods/herdr-contr-agents/old.js"), "gone\n").unwrap();
+    fs::write(s.app.join("mods/herdr-contr-tabs/old.js"), "gone\n").unwrap();
     let marker_path = s.app.join("herdr-contr/install.json");
     let mut marker: Value = serde_json::from_str(&read(&marker_path)).unwrap();
-    marker["files"]["mods/herdr-contr-agents/old.js"] = json!(sha(b"gone\n"));
+    marker["files"]["mods/herdr-contr-tabs/old.js"] = json!(sha(b"gone\n"));
     fs::write(&marker_path, marker.to_string()).unwrap();
     let r = s.run(&["--home", s.app_s()]);
     assert_eq!(r.status.code(), Some(0), "{}", both(&r));
-    assert!(!s.app.join("mods/herdr-contr-agents/old.js").exists());
+    assert!(!s.app.join("mods/herdr-contr-tabs/old.js").exists());
+}
+
+// An earlier install put the agents copy there (#98 retired it): its unchanged files and the folder go,
+// with the files herdr-app wrote in it.
+fn retired_install(s: &Sandbox, own: Option<&str>) {
+    let r = s.run(&["--home", s.app_s()]);
+    assert_eq!(r.status.code(), Some(0), "{}", both(&r));
+    let dir = s.app.join("mods/herdr-contr-agents");
+    fs::create_dir_all(&dir).unwrap();
+    fs::write(dir.join("main.js"), "old agents\n").unwrap();
+    fs::write(dir.join("mod.json"), "{}\n").unwrap();
+    fs::write(dir.join("jsconfig.json"), "{}\n").unwrap();
+    fs::write(dir.join("herdr.d.ts"), "x\n").unwrap();
+    if let Some(n) = own {
+        fs::write(dir.join(n), "mine\n").unwrap();
+    }
+    let marker_path = s.app.join("herdr-contr/install.json");
+    let mut marker: Value = serde_json::from_str(&read(&marker_path)).unwrap();
+    marker["files"]["mods/herdr-contr-agents/main.js"] = json!(sha(b"old agents\n"));
+    marker["files"]["mods/herdr-contr-agents/mod.json"] = json!(sha(b"{}\n"));
+    fs::write(&marker_path, marker.to_string()).unwrap();
+    let r = s.run(&["--home", s.app_s()]);
+    assert_eq!(r.status.code(), Some(0), "{}", both(&r));
+}
+
+#[test]
+fn removes_the_retired_agents_copy() {
+    let s = sandbox();
+    retired_install(&s, None);
+    assert!(!s.app.join("mods/herdr-contr-agents").exists());
+}
+
+#[test]
+fn keeps_the_retired_agents_copy_folder_when_a_file_is_the_persons() {
+    let s = sandbox();
+    retired_install(&s, Some("notes.js"));
+    let dir = s.app.join("mods/herdr-contr-agents");
+    assert!(!dir.join("main.js").exists(), "ours, unchanged: removed");
+    assert_eq!(read(dir.join("notes.js")), "mine\n");
 }
 
 #[test]
