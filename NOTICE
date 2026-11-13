@@ -25,3 +25,8 @@ Copyright (c) GitHub Inc.
 The helper (xplat/herdr-contr-feed) draws mermaid diagrams with mermaid-rs-renderer
 (https://github.com/1jehuang/mermaid-rs-renderer), licensed under the MIT License,
 Copyright (c) 2026 mermaid-rs-renderer contributors.
+
+The framed hc client of the helper (xplat/herdr-contr-feed/src/framed.rs) is our
+own code, written from the wire layout of herdr-core
+(https://github.com/herdrdev/herdr-core), which is published without a license.
+No code was copied from it.
