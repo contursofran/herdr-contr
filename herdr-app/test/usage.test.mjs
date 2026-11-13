@@ -5,7 +5,7 @@ import { textOf, byId } from "./stub/ui.mjs";
 import { fakeCx } from "./fake-cx.mjs";
 import { SideView } from "../mods/herdr-contr/side.js";
 import { forgetCommands } from "../mods/herdr-contr/sidecar.js";
-import { pollUsage, resetUsage, usagePlans, planRow, planValue, untilText, footHeight, USAGE_MS } from "../mods/herdr-contr/usage.js";
+import { fitFoot, pollUsage, resetUsage, usagePlans, planRow, planValue, untilText, footHeight, USAGE_MS } from "../mods/herdr-contr/usage.js";
 
 const NOW = Math.floor(Date.now() / 1000);
 const answer = (...lines) => ({ code: 0, stdout: [{ type: "header", protocol: 1 }, ...lines, { type: "end", ok: true }].map((l) => JSON.stringify(l)).join("\n") });
@@ -80,15 +80,40 @@ test("row text: whole percents, the time to reset, a window past its reset is 0%
 });
 
 test("herdr-contr layout: the foot block takes the height of its rows, and resizes only on a change", async () => {
-  fake.layout = { id: "root", children: [{ id: "sidebar", children: [{ id: "foot" }] }] };
+  const foot = { id: "foot", size: { px: 45 } };
+  fake.layout = { id: "root", children: [{ id: "sidebar", children: [foot] }] };
   const sizes = () => log.run.filter(([c, a]) => c === "layout.resize" && a?.id === "foot").map(([, a]) => a.px);
   await pollUsage(null, 1);
+  foot.size.px = footHeight(2);
   await pollUsage(null, 1 + USAGE_MS);
+  fitFoot();
   assert.deepEqual(sizes(), [footHeight(2)]);
   plans = [];
   await pollUsage(null, 1 + 2 * USAGE_MS);
   assert.deepEqual(sizes(), [footHeight(2), footHeight(0)]);
   assert.deepEqual([footHeight(0), footHeight(1), footHeight(2)], [45, 79, 105]);
+});
+
+test("the layout loads again and this module stays (#133): the foot block gets its height again, with no read", async () => {
+  const foot = { id: "foot", size: { px: 45 } };
+  fake.layout = { id: "root", children: [{ id: "sidebar", children: [foot] }] };
+  const sizes = () => log.run.filter(([c, a]) => c === "layout.resize" && a?.id === "foot").map(([, a]) => a.px);
+  await pollUsage(null, 1);
+  foot.size.px = footHeight(2);
+  fitFoot();
+  assert.deepEqual(sizes(), [footHeight(2)]);
+  foot.size.px = 45;
+  fitFoot();
+  assert.deepEqual(sizes(), [footHeight(2), footHeight(2)]);
+});
+
+test("a layout that gives no height: each read sends the height again, the check between reads does not", async () => {
+  fake.layout = { id: "root", children: [{ id: "foot" }] };
+  const sizes = () => log.run.filter(([c, a]) => c === "layout.resize" && a?.id === "foot").map(([, a]) => a.px);
+  await pollUsage(null, 1);
+  fitFoot();
+  await pollUsage(null, 1 + USAGE_MS);
+  assert.deepEqual(sizes(), [footHeight(2), footHeight(2)]);
 });
 
 test("no foot block in the layout (herdr-contr-own): nothing to resize", async () => {

@@ -252,7 +252,8 @@ drawn by Herdr's `frames`; every loader of the mod is this one); done is a check
     (`accent`) when an app update is ready; a right-click opens the herdr-contr settings, and its tooltip says so.
     At its right the add machine button (28 px square, 8 px corners, 16 px +, tooltip "Add machine") opens Herdr's
     `machine-add` dialog. The block is as tall as its rows (`layout.resize` on a change of the plan count: 45 px
-    with no plan, 79 px with one, 105 px with two). On the rail: the bars only, the name and value in a tooltip,
+    with no plan, 79 px with one, 105 px with two; checked against the block's height in the layout every 30 s
+    with no read, so a layout that loads again gets it back, #133). On the rail: the bars only, the name and value in a tooltip,
     and Settings only. The chat, Needs you and Overview screens start the reads too. The mod knows it by
   `shared("layout") === "herdr-contr"`: there the left edge opens no floating sidebar, the
   sidebar shows unless `layouts/.state/herdr-contr.json` hides it, and the bar leaves no room
