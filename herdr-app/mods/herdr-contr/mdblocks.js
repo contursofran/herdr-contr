@@ -5,7 +5,7 @@ import { div, image } from "gpui-kit";
 import { v_flex, h_flex, TextView } from "gpui-base";
 import { colWidths, markdownHeight, markdownRaw, lineHeight } from "./estimate.js";
 import { splitBlocks, splitPieces, tableCells } from "./blocks.js";
-import { linkRefs } from "./refs.js";
+import { linkRefs, refsVersion } from "./refs.js";
 import { inlinePiece, inlineFit, inlineContent } from "./inline.js";
 import { setting } from "./config.js";
 import { isMermaid, mermaidOf, mermaidSize } from "./mermaid.js";
@@ -112,7 +112,7 @@ function safeSplit(key, rowId, md, next, repo, t, width, k) {
 // has icons. The chat draws each shown row again on each frame; only the elements are built then.
 const plans = new Map();
 function splitPlan(md, next, repo, width, k) {
-  const id = `${width}|${k}|${next ?? ""}|${repo ?? ""}|${md}`;
+  const id = `${width}|${k}|${next ?? ""}|${repo ?? ""}|${refsVersion()}|${md}`;
   if (plans.has(id)) return plans.get(id);
   const plan = cutPlan(md, next, repo, width, k);
   if (plans.size >= 1000) plans.clear();

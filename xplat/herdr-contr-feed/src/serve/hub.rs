@@ -249,7 +249,7 @@ pub fn item(row: &Value) -> Option<Value> {
 }
 
 /// The log ref a row's `pics` entry names (`rows::FeedPic`).
-fn pic_ref(p: &Value) -> Option<herdr_core::log_image::Ref> {
+pub fn pic_ref(p: &Value) -> Option<herdr_core::log_image::Ref> {
     use herdr_core::log_image::Format;
     let format = match p["format"].as_str()? {
         "png" => Format::Png,

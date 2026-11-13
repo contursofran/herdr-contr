@@ -36,3 +36,25 @@ export const FOOTER_H = 30;
 export const STATUS_H = 34;
 export const CARD_ROW_H = 44;   // a running call (perm) or a question
 export const OTHER_H = 30;
+
+// A user row's pictures (#86), under its text in place of the "N images" line: PIC_H high (the width from the
+// picture's shape), at most the bubble's text width, PIC_GAP apart, side by side and wrapping. Each box counts its
+// 1 px border. The layout of `pics` ([{ width, height }]) in `maxW` px: { lines: [[{ i, w, h }]], width, height }.
+export const PIC_H = 120;
+export const PIC_GAP = 8;
+export function picturesLayout(pics, maxW) {
+  const lines = [];
+  let line = [], lineW = 0;
+  pics.forEach((p, i) => {
+    const r = p.width > 0 && p.height > 0 ? p.width / p.height : 1;
+    let w = Math.max(8, Math.round(PIC_H * r)), h = PIC_H;
+    if (w > maxW) { w = Math.max(8, Math.floor(maxW)); h = Math.max(8, Math.round(w / r)); }
+    if (line.length && lineW + PIC_GAP + w > maxW) { lines.push(line); line = []; lineW = 0; }
+    lineW += (line.length ? PIC_GAP : 0) + w;
+    line.push({ i, w, h });
+  });
+  if (line.length) lines.push(line);
+  const lineW2 = (l) => l.reduce((s, p) => s + p.w, 0) + PIC_GAP * (l.length - 1);
+  const lineH = (l) => Math.max(...l.map((p) => p.h));
+  return { lines, width: Math.max(0, ...lines.map(lineW2)), height: lines.reduce((s, l) => s + lineH(l), 0) + PIC_GAP * Math.max(0, lines.length - 1) };
+}

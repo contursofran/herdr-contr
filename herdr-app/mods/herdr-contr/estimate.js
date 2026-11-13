@@ -267,12 +267,15 @@ export function colWidths(width, rows, n, k = 1) {
 export const columnWidth = (paneWidth) => Math.max(240, Math.min(READ_W, (paneWidth || 800) - GUTTER * 2));
 
 // The height of a row. `open`: its tool chip shows the calls, or its note from another agent the whole text.
-// The sizes are the drawing's (metrics.js).
-export function rowHeight(row, width, open = false, k = 1, zoom = 1) {
+// The sizes are the drawing's (metrics.js). `pics` (pictures.js userPictures), for a user row: `text`, its text
+// without pasted image paths, and `h`, the height of its pictures when there are some to draw, else its
+// "N images" line counts.
+export function rowHeight(row, width, open = false, k = 1, zoom = 1, pics = null) {
   switch (row.k) {
     case "user":
       if (row.from != null) return CHIP_ROW + (open ? markdownHeight(row.text || "", width - OPEN_INDENT, null, k, zoom) + CHIP_GAP : 0);
-      return markdownHeight(row.text || "", bubbleTextWidth(width), null, k, zoom) + (row.images ? BUBBLE_GAP + IMAGES_LINE_H : 0)
+      return markdownHeight((pics ? pics.text : row.text) || "", bubbleTextWidth(width), null, k, zoom)
+        + (row.images || pics?.h ? BUBBLE_GAP + (pics?.h || IMAGES_LINE_H) : 0)
         + 2 * BUBBLE_PAD_Y + 2 * ROW_PAD_Y;
     case "assistant": return markdownHeight(row.text || "", width, null, k, zoom) + 2 * ROW_PAD_Y;
     case "tools": {

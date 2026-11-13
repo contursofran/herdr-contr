@@ -20,6 +20,7 @@ pub mod serve;
 pub mod status;
 pub mod tail;
 pub mod phone;
+pub mod pictures;
 pub mod update;
 pub mod usage;
 pub mod working;
