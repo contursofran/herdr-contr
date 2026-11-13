@@ -1,6 +1,6 @@
-//! The command line: `agents flow | spawn | ls | send | interrupt | stop | rm | read`, and
-//! `owner ask | answer | done`. Ported from contr's `contr agents` and `contr owner`; `agents prompt` and
-//! `watch` come with the next part of the slice (#160).
+//! The command line: `agents flow | spawn | ls | send | interrupt | stop | rm | read | prompt`, and
+//! `owner ask | answer | done`. Ported from contr's `contr agents` and `contr owner`. `agents watch` is not
+//! ported: no part of the kit or of this repository calls it.
 use std::io::Write;
 use std::path::PathBuf;
 
@@ -36,6 +36,10 @@ pub const AGENTS_USAGE: &str = "Usage:
   herdr-contr-orch agents rm --ended               remove all finished workers that this
                                                    terminal started
   herdr-contr-orch agents read <name> [--lines N]  print the screen and history
+  herdr-contr-orch agents prompt <name>            print the menu that a blocked worker waits
+                                                   on: the tool and its command, the question
+                                                   and the numbered choices; \"no prompt\"
+                                                   when it waits on none
   herdr-contr-orch agents flow                     print the flow: how the coordinator takes an issue to a merge
 
 Flags can come before or after the other arguments. After --, every word is
@@ -175,7 +179,7 @@ fn run_agents(args: &[String], env: &dyn Fn(&str) -> String, out: &mut dyn Write
         }
         return 0;
     }
-    if ["ls", "spawn", "send", "interrupt", "stop", "rm", "read"].contains(&sub.as_str()) {
+    if ["ls", "spawn", "send", "interrupt", "stop", "rm", "read", "prompt"].contains(&sub.as_str()) {
         return run_worker_command(sub, &args[1..], env, out, err, core);
     }
     if sub != "flow" {
@@ -328,6 +332,7 @@ fn run_worker_command(sub: &str, rest: &[String], env: &dyn Fn(&str) -> String, 
         "interrupt" => m.interrupt(&pos[0]).map(|o| text = o + "\n"),
         "stop" => m.stop(&pos[0], flags.on("keep")),
         "rm" if !flags.on("ended") => m.remove(&pos[0]),
+        "prompt" => pending_prompt(&m, &pos[0]).map(|t| text = t + "\n"),
         "rm" => {
             let mut names = Vec::new();
             let res = m.remove_ended(&mut names);
@@ -342,6 +347,20 @@ fn run_worker_command(sub: &str, rest: &[String], env: &dyn Fn(&str) -> String, 
         return 1;
     }
     0
+}
+
+/// How many terminal lines `agents prompt` reads to find the menu.
+const PROMPT_LINES: i64 = 40;
+
+/// The menu that a blocked worker waits on, or "no prompt" when the worker is not blocked or its screen has no
+/// menu that this tool can read.
+fn pending_prompt(m: &Manager, name: &str) -> Result<String, String> {
+    let w = m.get(name)?;
+    if !w.live || w.status != "blocked" {
+        return Ok("no prompt".into());
+    }
+    let screen = m.read(name, PROMPT_LINES)?;
+    Ok(crate::prompt::parse(&w.command, &w.kind, &screen).map(|p| p.text()).unwrap_or_else(|| "no prompt".into()))
 }
 
 /// `agents spawn`: the task, the check of the profile against the flow, the review worktree, then the worker.
