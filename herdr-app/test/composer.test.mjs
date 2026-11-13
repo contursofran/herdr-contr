@@ -4,7 +4,7 @@ import { fake, log, reset } from "./stub/herdr.mjs";
 import { textOf, byId } from "./stub/ui.mjs";
 import { fakeCx } from "./fake-cx.mjs";
 import { agent, space } from "./fixtures.mjs";
-import { Composer, tagsFor, shortPath, quoted, withFiles, slashQuery, matchCommands, screenNote, argItems, matchArgs, thumbPath, THUMB_PX } from "../mods/herdr-contr/composer.js";
+import { Composer, tagsFor, shortPath, quoted, withFiles, slashQuery, matchCommands, screenNote, argItems, matchArgs, thumbPath, THUMB_PX, modelName, modelInfo, modelTip, ringIcon, contextTip, contextPercent, MODEL_MS } from "../mods/herdr-contr/composer.js";
 import { ChatView } from "../mods/herdr-contr/chat.js";
 import { forgetCommands } from "../mods/herdr-contr/sidecar.js";
 import { KEY_CONFIG } from "../mods/herdr-contr/config.js";
@@ -53,35 +53,201 @@ test("tags: the sidecar's, then folder, branch and agent name", () => {
   assert.deepEqual(tagsFor(fake.agents[1], null).map((t) => t.kind), ["agent"]);
 });
 
-test("status is read for the shown agent and drawn as tags", async () => {
+test("status line: the working verb and detail (no parentheses), the background note, contr's orchestration on the right (#99)", async () => {
   const cx = fakeCx(); const c = new Composer(cx);
   c.box(fake.agents[0]);
   await c.pollStatus(cx);
-  const el = c.render(fake.agents[0], new Proxy({}, { get: (_t, k) => `#${k}` }));
-  assert.match(textOf(byId(el, "tags")), /Opus 5\.5.*api/);
-  assert.doesNotMatch(textOf(byId(el, "tags")), /feat\/login/, "the branch is in the box, not in the tags (#47)");
-  assert.equal(byId(el, "tags-row").kids.length < 4, true);
-  const ids = el.kids.map((k) => k._a?.id ?? k._id);
-  assert.ok(ids.indexOf("box") < ids.indexOf("tags") && ids.indexOf("tags-row") < ids.indexOf("box"), "tags below the box, working row above (#47)");
-  assert.equal(byId(el, "working"), null, "no working line while it does not work");
-  const w = c.render(fake.agents[0], new Proxy({}, { get: (_t, k) => `#${k}` }), 800, { text: "Brewing…", detail: "3s" });
-  assert.match(textOf(byId(w, "working")), /Brewing….*\(3s\)/);
-  assert.equal(byId(el, "background"), null, "no background note without one");
   const th = new Proxy({}, { get: (_t, k) => `#${k}` });
-  const both = c.render(fake.agents[0], th, 800, { text: "Brewing…", detail: "3s" }, { text: "1 shell still running" });
-  const row = textOf(byId(both, "tags-row"));
-  assert.ok(row.indexOf("Brewing…") < row.indexOf("1 shell still running") && row.indexOf("1 shell still running") < row.indexOf("ctx 84%"), "working, then background, then ctx (#61)");
+  const el = c.render(fake.agents[0], th);
+  assert.equal(byId(el, "tags"), null, "no tags row below the box");
+  assert.equal(byId(el, "ctx-tag"), null, "no ctx pill on the status line");
+  assert.equal(byId(el, "working"), null, "no working line while it does not work");
+  assert.equal(byId(el, "background"), null, "no background note without one");
+  const ids = el.kids.map((k) => k._a?.id);
+  assert.ok(ids.indexOf("status-line") < ids.indexOf("box"), "the status line is above the box");
+  assert.equal(el._a.gap, 8, "8 px above the box");
+  const both = c.render(fake.agents[0], th, 800, { text: "Brewing…", detail: "26s · ↓1.5k tokens" }, { text: "1 shell still running" });
+  const line = byId(both, "status-line");
+  assert.equal(line._a.px, 4);
+  const w = byId(both, "working");
+  assert.equal(textOf(w), "⠋ Brewing… 26s · ↓1.5k tokens");
+  assert.equal(w.kids[0]._a.text_color, "#foreground"); assert.equal(w.kids[0]._a.w, 14);
+  assert.equal(w.kids[1]._a.text_size, 13);
+  assert.equal(w.kids[1]._a.text_color, "#foreground");
+  assert.equal(w.kids[2]._a.font_family, "Menlo");
+  assert.equal(w.kids[2]._a.text_size, 11);
+  assert.equal(w.kids[2]._a.text_color, "#muted");
+  const text = textOf(line);
+  assert.ok(text.indexOf("Brewing…") < text.indexOf("1 shell still running") && text.indexOf("1 shell still running") < text.indexOf("Orchestrate"),
+    "working, then background, then orchestration (#61)");
   assert.equal(byId(both, "background")._a.text_color, "#muted");
+  assert.ok("truncate" in byId(both, "background").kids.at(-1)._a, "the background note truncates first");
   const alone = c.render(fake.agents[0], th, 800, null, { text: "2 background tasks" });
   assert.equal(byId(alone, "working"), null);
   assert.match(textOf(byId(alone, "background")), /2 background tasks/);
-  assert.doesNotMatch(textOf(byId(el, "tags")), /ctx/, "the context is on the right (#40)");
-  assert.equal(textOf(byId(el, "ctx-tag")), "ctx 84%");
-  const warn = byId(el, "ctx-tag").kids[0];
-  assert.equal(warn._a.bg, "#chrome", "a warning is an outline, not a fill (#43)");
-  assert.equal(warn._a.border_color, "#blocked");
-  assert.ok(textOf(byId(el, "tags-row")).indexOf("ctx 84%") < textOf(byId(el, "tags-row")).indexOf("Orchestrate"), "ctx sits before the pill");
+  const orch = byId(el, "orchestrate");
+  assert.equal(orch._a.font_family, "Menlo");
+  assert.equal(orch._a.text_color, "#muted");
+  assert.equal(orch._a.border, undefined, "plain text, no pill");
   assert.deepEqual(log.exec[0][1].slice(0, 3), ["status", "--terminal", "t1"]);
+});
+
+test("box: radius 12, the design's padding, 14 px text; the bottom row's buttons are 28 px with radius 8 (#99)", () => {
+  const c = new Composer(fakeCx()); c.box(fake.agents[0]);
+  const el = c.render(fake.agents[0], TH);
+  const box = byId(el, "box");
+  assert.deepEqual([box._a.rounded, box._a.pt, box._a.pr, box._a.pb, box._a.pl, box._a.gap], [12, 12, 10, 8, 14, 10]);
+  assert.deepEqual([byId(el, "slash-keys")._a.text_size, byId(el, "slash-keys")._a.line_height], [14, 20 / 14]); // a multiple of the text size, not px (#106)
+  assert.equal(byId(el, "box-row")._a.gap, 4);
+  const attach = byId(el, "attach");
+  assert.deepEqual([attach._a.size, attach._a.rounded, attach.kids[0]._a.size], [28, 8, 16]);
+  const send = byId(el, "send");
+  assert.deepEqual([send._a.size, send._a.rounded, send._a.ml], [28, 8, 4]);
+  assert.equal(send._a.bg, "#chrome", "empty: faint fill");
+  assert.equal(send._a.text_color, "#dim");
+  c.setText("hi");
+  assert.equal(byId(c.render(fake.agents[0], TH), "send")._a.bg, "#accent");
+  const branch = byId(el, "branch");
+  assert.equal(textOf(branch), "feat/login");
+  assert.equal(branch._a.font_family, "Menlo");
+  assert.equal(branch.kids[0]._a.size, 13);
+  const kids = byId(el, "box-row").kids.map((k) => k._a?.id);
+  assert.deepEqual(kids.filter(Boolean), ["attach", "model", "branch", "send"], "no context while it is not known");
+});
+
+test("model button: the agent's mark in its color, the short name, the effort, a chevron; its tooltip names the app and the folder (#99)", async () => {
+  const cx = fakeCx(); const c = new Composer(cx);
+  const a = { ...fake.agents[0], program: { ...fake.agents[0].program, tile: "#d97757" } };
+  c.box(a);
+  // Nothing known yet: the app's name alone.
+  let m = byId(c.render(a, TH), "model");
+  assert.equal(textOf(m), "Claude Code");
+  // The status line's tags.
+  await c.pollStatus(cx);
+  m = byId(c.render(a, TH), "model");
+  assert.equal(textOf(m), "Opus 5.5 high");
+  // The helper's `model` line wins: an id becomes the short name.
+  c.models.set(a.address, { at: Date.now(), line: { type: "model", model: "claude-fable-5-2", effort: "medium" } });
+  m = byId(c.render(a, TH), "model");
+  assert.equal(textOf(m), "Fable 5.2 medium");
+  assert.equal(m._a.h, 28); assert.equal(m._a.rounded, 8); assert.equal(m._a.px, 8); assert.equal(m._a.gap, 6);
+  const [mark, name, effort, chev] = m.kids;
+  assert.equal(mark._a.path, "icons/claude.svg"); assert.equal(mark._a.size, 13); assert.equal(mark._a.text_color, "#d97757");
+  assert.equal(name._a.text_size, 12); assert.equal(name._a.text_color, "#foreground");
+  assert.equal(effort._a.text_color, "#muted");
+  assert.match(chev._a.path, /chevron-down\.svg$/); assert.equal(chev._a.size, 11); assert.equal(chev._a.text_color, "#muted");
+  assert.equal(m._a.tooltip, "Fable 5.2 · medium effort · Claude Code\n~/w/app");
+  assert.ok(m._h.hover, "a fill on hover");
+});
+
+test("modelName: ids become the short name; short names stay", () => {
+  assert.equal(modelName("claude-opus-5-5"), "Opus 5.5");
+  assert.equal(modelName("claude-fable-5-2"), "Fable 5.2");
+  assert.equal(modelName("claude-sonnet-4-5-20250929"), "Sonnet 4.5");
+  assert.equal(modelName("claude-3-5-haiku-20241022"), "Haiku 3.5");
+  assert.equal(modelName("gpt-6-codex"), "GPT-6");
+  assert.equal(modelName("opus"), "Opus");
+  assert.equal(modelName("Opus 5.5"), "Opus 5.5");
+  assert.equal(modelName(null), "");
+  assert.deepEqual(modelInfo({ app: "pi", program: { name: "Pi" } }, null, null), { name: "Pi", effort: "", known: false });
+  assert.equal(modelTip({ address: "x", app: "pi", program: { name: "Pi" } }, modelInfo({ program: { name: "Pi" } }, null, null)), "Pi");
+});
+
+test("the helper's model is asked with the status, at most every MODEL_MS, only when it has the command", async () => {
+  forgetCommands();
+  let asked = 0;
+  fake.exec = (cmd, args) => {
+    if (args[0] === "version") return jl(header("version"), { type: "version", commands: ["status", "model"] }, end);
+    if (args[0] === "status") return jl(header("status"), statusLine, end);
+    if (args[0] === "model") { asked++; return jl(header("model"), { type: "model", agent: "claude", model: "claude-opus-5-5", effort: "low" }, end); }
+    return jl(header(args[0]), end);
+  };
+  const cx = fakeCx(); const c = new Composer(cx);
+  c.box(fake.agents[0]);
+  await c.pollStatus(cx);
+  assert.equal(asked, 1);
+  assert.deepEqual(log.exec.find(([, x]) => x[0] === "model")[1].slice(0, 3), ["model", "--terminal", "t1"]);
+  assert.equal(textOf(byId(c.render(fake.agents[0], TH), "model")), "Opus 5.5 low");
+  c.statusAt = 0; await c.pollStatus(cx);
+  assert.equal(asked, 1, "not again before MODEL_MS");
+  c.models.get("t1").at -= MODEL_MS; c.statusAt = 0; await c.pollStatus(cx);
+  assert.equal(asked, 2);
+  forgetCommands();
+});
+
+test("a press on the model button in a Claude Code session puts /model in the box; nothing is sent; other apps get no press", async () => {
+  const cx = fakeCx(); const c = new Composer(cx);
+  const b = c.box(fake.agents[0]);
+  byId(c.render(fake.agents[0], TH), "model")._h.on_click({}, cx);
+  await cx.settle();
+  assert.equal(b.input.value(), "/model ");
+  assert.equal(sent.length, 0);
+  const pi = { ...fake.agents[1], app: "pi" };
+  c.box(pi);
+  assert.equal(byId(c.render(pi, TH), "model")._h.on_click, undefined);
+});
+
+test("context: a ring by 5% steps and the percent; its tooltip says the tokens; a warning keeps the blocked color (#99)", async () => {
+  assert.equal(ringIcon(0), null);
+  assert.match(ringIcon(1), /ring\/arc-005\.svg$/);
+  assert.match(ringIcon(59.6), /ring\/arc-060\.svg$/);
+  assert.match(ringIcon(100), /ring\/arc-100\.svg$/);
+  assert.match(ringIcon(140), /ring\/arc-100\.svg$/);
+  const { existsSync } = await import("node:fs");
+  for (let p = 5; p <= 100; p += 5) assert.ok(existsSync(new URL(`../mods/herdr-contr/icons/ring/arc-${String(p).padStart(3, "0")}.svg`, import.meta.url)), `arc ${p}`);
+  assert.ok(existsSync(new URL("../mods/herdr-contr/icons/ring/track.svg", import.meta.url)));
+  assert.ok(existsSync(new URL("../mods/herdr-contr/icons/chevron-down.svg", import.meta.url)));
+  assert.equal(contextTip({ text: "ctx 149k / 250k", percent: 60 }), "149k of 250k tokens");
+  assert.equal(contextTip({ text: "ctx 37%", percent: 37 }), "37% of the context");
+  assert.equal(contextPercent({ text: "ctx 37%" }), 37);
+  assert.equal(contextPercent({ text: "ctx" }), null);
+
+  const c = new Composer(fakeCx()); c.box(fake.agents[0]);
+  c.status.set("t1", { type: "status", tags: [{ kind: "context", text: "ctx 149k / 250k", percent: 60, warn: false }] });
+  let ctx = byId(c.render(fake.agents[0], TH), "context");
+  assert.equal(textOf(ctx), "60%");
+  assert.equal(ctx._a.tooltip, "149k of 250k tokens");
+  const ring = byId(ctx, "ctx-ring");
+  assert.equal(ring._a.size, 14);
+  assert.equal(ring.kids[0]._a.text_color, "#border", "the track is faint");
+  assert.match(ring.kids[1]._a.path, /arc-060/);
+  assert.equal(ring.kids[1]._a.text_color, "#muted");
+  assert.equal(ctx.kids[1]._a.font_family, "Menlo");
+  assert.equal(ctx.kids[1]._a.text_size, 11);
+  const row = byId(c.render(fake.agents[0], TH), "box-row").kids.map((k) => k._a?.id).filter(Boolean);
+  assert.deepEqual(row, ["attach", "model", "context", "branch", "send"]);
+  c.status.set("t1", { type: "status", tags: [{ kind: "context", text: "ctx 84%", percent: 84, warn: true }] });
+  ctx = byId(c.render(fake.agents[0], TH), "context");
+  assert.equal(byId(ctx, "ctx-ring").kids[1]._a.text_color, "#blocked");
+  assert.equal(ctx.kids[1]._a.text_color, "#blocked");
+  c.status.set("t1", { type: "status", tags: [{ kind: "context", text: "ctx 0%", percent: 0, warn: false }] });
+  assert.equal(byId(c.render(fake.agents[0], TH), "ctx-ring").kids.length, 1, "0%: the track alone");
+});
+
+test("the placeholder follows the agent's name; a new state is made outside the draw and keeps the text and the keyboard", async () => {
+  const { made } = await import("./stub/ui.mjs");
+  const cx = fakeCx(); const c = new Composer(cx);
+  assert.equal(c.input.placeholder, "Reply to the agent");
+  const before = made.textarea;
+  c.box(fake.agents[0]); c.render(fake.agents[0], TH);
+  assert.equal(made.textarea, before, "no state made while drawing");
+  const old = c.input;
+  old._h.focus?.({}, cx);
+  old.set_value("half typed");
+  assert.equal(c.syncPlaceholder(fake.agents[0], cx), true);
+  assert.equal(c.input.placeholder, "Reply to api");
+  assert.equal(c.input.value(), "half typed");
+  assert.equal(c.input.focusCalls, 1, "the keyboard stays in the box");
+  assert.equal(old.released, true);
+  assert.equal(c.syncPlaceholder(fake.agents[0], cx), false, "the same name: the same state");
+  assert.equal(made.textarea, before + 1);
+  c.syncPlaceholder(fake.agents[1], cx);
+  assert.equal(c.input.placeholder, "Reply to Claude Code");
+  assert.equal(c.input.focusCalls, 1, "a box that had the keyboard keeps it");
+  // The new state's handlers work: Enter sends.
+  c.box(fake.agents[1]); c.input.set_value("go"); c.typed = ["go", "go"];
+  c.input._h.submit({}, cx); await cx.settle();
+  assert.equal(sent.length, 1);
 });
 
 test("Enter sends the text and files through the sidecar, then empties the box", async () => {
@@ -588,15 +754,6 @@ test("/model lists full ids with their labels; a part completes; the note's exam
 });
 
 
-test("the status tags row scrolls sideways with no scrollbar", async () => {
-  const cx = fakeCx(); const c = new Composer(cx);
-  c.box(fake.agents[0]);
-  await c.pollStatus(cx);
-  const row = byId(c.render(fake.agents[0], new Proxy({}, { get: (_t, k) => `#${k}` })), "tags");
-  assert.ok("overflow_x_scroll" in row._a && !("overflow_x_scrollbar" in row._a));
-});
-
-
 test("a Claude Code session that does not orchestrate shows Orchestrate, and a press puts /contr:orchestrate in the box", () => {
   const cx = fakeCx(); const c = new Composer(cx);
   const a = fake.agents[0];
@@ -689,4 +846,15 @@ test("an image under the app home shows as a 56 px picture with ×; a text file 
   el = c.render(fake.agents[0], t);
   assert.deepEqual(pics(el), []);
   assert.deepEqual(chips(el), ["notes.txt", "far.png"]);
+});
+
+test("the placeholder names the agent by its own title when no tab is named (#106)", async () => {
+  const { replyName, placeholderFor } = await import("../mods/herdr-contr/composer.js");
+  const prog = { name: "Claude Code" };
+  assert.equal(replyName({ program: prog, title: "\u2733 Flockbook layout" }), "Flockbook layout");
+  assert.equal(replyName({ program: prog, tab_name: "Mine", title: "\u2733 Other" }), "Mine");
+  assert.equal(replyName({ program: prog, title: "~/code/contr" }), "Claude Code");
+  assert.equal(replyName({ program: prog, title: "Claude Code" }), "Claude Code");
+  assert.equal(placeholderFor({ program: prog, title: "\u2733 Flockbook layout" }), "Reply to Flockbook layout");
+  assert.equal(placeholderFor(null), "Reply to the agent");
 });

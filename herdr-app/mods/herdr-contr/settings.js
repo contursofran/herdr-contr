@@ -19,7 +19,7 @@ export const SETTINGS = [
   { key: "text_size", title: "Text size", choices: [["small", "Small", "small"], ["default", "Default", "default"], ["large", "Large", "large"]],
     about: "The size of the messages, code and tables in the chat. ⌥⌘- and ⌥⌘= step it, ⌥⌘0 resets it; Herdr's zoom (⌘- and ⌘=) scales the whole window." },
   { key: "status_row", title: "Status row", choices: [["show", "Show", "show"], ["hide", "Hide", "hide"]],
-    about: "The model, context, cost, folder and branch above the reply box." },
+    about: "The model button and the context ring in the reply box." },
   { key: "inline_icons", title: "Inline PR icons (experimental)", choices: [["off", "Off", "off"], ["on", "On", "on"]],
     about: "A paragraph with a pull request or issue shows GitHub's icon before each one, colored by its state." },
   { key: "remote_helper", title: "Helper on other machines", choices: [["ask", "Ask", "ask"], ["never", "Never", "never"]],
