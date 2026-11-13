@@ -50,8 +50,10 @@ does not download; `install-isolated.sh` copies the sidecar in.
 | `answer` | `--terminal <addr> --request <id> --answers <json>` `[--cache <file>]` | `done` |
 | `send` | `--terminal <addr> --text <s>` `[--file <path>]…` `[--expect-kind <agent>]` `[--expect-path <log>]` `[--cache <file>]` | `done` (`changed` when the terminal now runs another agent or conversation than the expected one; nothing is sent. Its message says "new conversation" when the same agent process wrote the expected log, e.g. after `/clear`. With `--cache` the log is looked up again and written to the cache, so the next `feed` reads it) |
 | `queue` | `--terminal <addr>` `[--cache <file>]` (Rust sidecar only; `serve` and other machines) | `queued` |
-| `working` | `--terminal <addr>` `[--cache <file>]` (Rust sidecar only; read only) | `working` |
+| `working` | `--terminal <addr>` `[--cache <file>]` (Rust sidecar only; read only) | `working`, `background` |
+| `model` | `--terminal <addr>` `[--cache <file>]` (Rust sidecar only; read only) | `model` |
 | `commands` | `--terminal <addr>` `[--cache <file>]` (Rust sidecar only) | `commands` |
+| `usage` | — (Rust sidecar only; read only) | `usage` |
 | `helper install` | `--machine <m> --sha256 <hex> [--cache <file>]` | `installed` |
 | `helper remove` | `--machine <m> [--cache <file>]` | `removed` |
 | `phone status` / `on` / `off` | `--home <herdr-app home>` (Rust sidecar only) | `phone` |
@@ -161,7 +163,7 @@ Targets: `x86_64-unknown-linux-musl`, `aarch64-unknown-linux-musl`, `universal-a
 ### `version`
 
 ```json
-{"commands":["version","feed","status","card","approve","answer","send","paste-image","helper","queue","phone","commands","working"],"release":"0.9.0","type":"version"}
+{"commands":["version","feed","status","card","approve","answer","send","paste-image","helper","queue","phone","commands","working","model","usage"],"release":"0.9.0","type":"version"}
 ```
 
 `commands`: the commands this sidecar has. The mod hides actions whose command is missing.
@@ -307,8 +309,9 @@ approval is the `card` command's job.
 
 `question`: `toolUseId`, `agent`, `delivery` (`picker`: keys drive the agent's picker;
 `message`: the answer is a normal message), `state` (`pending`, `answered`, `declined`),
-`answers` (when answered), `questions[]` with `id`, `header`, `text`, `multi`, and `options[]`
-(`label`, `detail`, `recommended`).
+`answers` (when answered), `questions[]` with `id`, `header`, `text`, `multi`, `options[]`
+(`label`, `detail`, `recommended`), and `noOther: true` when the picker has no own-answer row
+(Claude's preview layout; left out otherwise).
 
 ### `status` (`status`)
 
@@ -319,7 +322,7 @@ approval is the `card` command's job.
 | Field | Meaning |
 |---|---|
 | `source` | `statusline` (herdr-contr's status line wrapper is on), `log` (only the model, from the log), `none`. |
-| `tags[]` | `kind` (`model`, `effort`, `context`, `cost`, `own`), `text`, `percent` (context only), `warn` (context 80% or more). |
+| `tags[]` | `kind` (`model`, `effort`, `context`, `cost`, `own`), `text`, `percent` (context only), `warn` (context 80% or more). With `autoCompactWindow` in Claude Code's settings and the tokens known, the context `text` is `ctx 120k / 250k`, and `percent` and `warn` are against that limit. With source `log`, the context tag comes from the log's newest assistant usage, only when `autoCompactWindow` is set. |
 
 The mod adds the cwd, the branch and the agent name from herdr-app's own `panes()` data.
 
@@ -368,6 +371,44 @@ while a Claude Code, Codex or Grok Build agent works. No queue: `agent` is `""` 
 - The agent's working line on its screen, while the agent works (Claude Code only). Key hints such as
   "esc to interrupt" are left out of `detail`; `detail` can be empty.
 - None on screen, the agent is not working, or another agent kind: `text` and `detail` are `null`.
+
+```json
+{"type":"background","text":"1 shell still running"}
+```
+
+- Only when the screen shows it: Claude Code's note under its prompt box on work in the background ("1 shell
+  still running", "2 background tasks"). Read while the agent works, is idle or is done (Claude Code only).
+
+### `model` (`model`)
+
+```json
+{"type":"model","agent":"claude","model":"claude-opus-5-5","effort":"low"}
+```
+
+- The agent's model and effort, for the sidebar's agent rows. Read only. A part that is not known is `null`.
+- `model`: the newest model that the session log names.
+- `effort`, the first source that has it. Claude Code: herdr-contr's status line record, then `--effort <level>`
+  on the agent's command line (the pane's processes and their children), then Claude Code's settings:
+  `.claude/settings.local.json`, then `.claude/settings.json` in the pane's cwd, then the user's `settings.json`.
+  In each file, `modelSettings.<model>.effortLevel` for the log's model, then a top-level `effortLevel`. Codex: the newest `turn_context` in the rollout, then `-c model_reasoning_effort=<level>` on the
+  command line, then `model_reasoning_effort` in `config.toml`. Other agents: `null`.
+
+### `usage` (`usage`)
+
+```json
+{"type":"usage","plans":[{"plan":"claude","windows":[{"kind":"five_hour","used_percent":38.0,"resets_at":1763000000},{"kind":"seven_day","used_percent":12.0,"resets_at":null}],"read_at":1762990000}]}
+```
+
+- The plan usage of Claude and Codex, as contr's `internal/usage` reads it. Claude first, then Codex. A plan
+  with no data is not in `plans`.
+- Claude: the file `usage/claude.json` (schema 1) in contr's state folder (`CONTR_STATE_DIR`, else macOS
+  `~/Library/Application Support/contr`, else `$XDG_STATE_HOME/contr` or `~/.local/state/contr`). contr's
+  status line command writes it. Kinds `five_hour` and `seven_day`.
+- Codex: `codex app-server` (`initialize`, `initialized`, `account/rateLimits/read`; killed after 10 s), with
+  `codex` from PATH, else from the login shell's PATH. Else the last `token_count` line of the newest rollout
+  file in the two newest day folders of `$CODEX_HOME/sessions` (default `~/.codex`). Kinds `primary` (5 h) and
+  `secondary` (week).
+- `used_percent`: 0 to 100. `resets_at` and `read_at`: Unix seconds; `resets_at` can be `null`.
 
 ### `commands` (`commands`)
 

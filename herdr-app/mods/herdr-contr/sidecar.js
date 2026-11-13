@@ -84,3 +84,5 @@ export const agentChanged = (done) => done?.result === "changed" && /another age
 // The same agent started a new conversation (`/clear`): nothing was sent; the chat reads the new log.
 export const NEW_CONVERSATION = "The agent started a new conversation; the chat now shows it. Nothing was sent.";
 export const newConversation = (done) => done?.result === "changed" && /new conversation/i.test(done?.message ?? "");
+// The Claude and Codex plan usage (`usage`): one `usage` line; read only.
+export const usage = () => call("usage");

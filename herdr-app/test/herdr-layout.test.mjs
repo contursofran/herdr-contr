@@ -17,7 +17,11 @@ beforeEach(() => { reset(); fake.shared.layout = "herdr-contr"; });
 test("the sidebar is Herdr's, shown, and the work area is the mod's screen stack", () => {
   const side = find(layout, "sidebar");
   assert.equal(side.hidden, undefined);
-  assert.deepEqual(mods(side), ["workspace-chrome", "spaces", "agents", "workspace-chrome"]);
+  assert.deepEqual(mods(side), ["workspace-chrome", "herdr-contr-spaces", "herdr-contr-agents", "herdr-contr", "herdr-contr", "workspace-chrome"]);
+  // The plan usage: between the lists and Herdr's footer, hidden until a plan has data.
+  assert.deepEqual(side.children.map((c) => c.id).slice(-4), ["sidebar-lists", "usage", "settings-row", "sidebar-footer"]);
+  const usage = find(layout, "usage");
+  assert.deepEqual([usage.content.props.view, usage.size.px, usage.hidden], ["usage", 56, true]);
   const screen = find(layout, "screen");
   assert.equal(screen.type, "stack");
   assert.deepEqual(screen.children.map((c) => c.id), ["chat", "needs", "overview", "tab"]);
@@ -27,7 +31,7 @@ test("the sidebar is Herdr's, shown, and the work area is the mod's screen stack
 test("the top bar is Herdr's tabs block, with Herdr's Files and Changes panel beside the screens", () => {
   const work = find(layout, "work");
   assert.deepEqual(work.children.map((c) => c.id), ["tabs", "work-body"]);
-  assert.equal(find(layout, "tabs").content.mod, "tabs");
+  assert.equal(find(layout, "tabs").content.mod, "herdr-contr-tabs");
   assert.deepEqual(find(layout, "work-body").children.map((c) => c.id), ["screen", "panel"]);
   const panel = find(layout, "panel");
   assert.equal(panel.hidden, true);
@@ -82,4 +86,12 @@ test("the bar leaves no room for the window buttons while Herdr's sidebar shows"
   assert.equal(lightsRoom(), 12);
   fake.shared["herdr-contr.sidebar"] = false;
   assert.ok(lightsRoom() > 12);
+});
+
+test("Herdr's own tabs mod in the tabs block also counts as the tab bar", () => {
+  fake.layout = JSON.parse(JSON.stringify(layout));
+  find(fake.layout, "tabs").content.mod = "tabs";
+  assert.equal(herdrTabBar(), true);
+  find(fake.layout, "tabs").content.mod = "other";
+  assert.equal(herdrTabBar(), false);
 });

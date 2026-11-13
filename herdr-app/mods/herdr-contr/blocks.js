@@ -70,3 +70,35 @@ export function splitBlocks(text) {
   flush();
   return out;
 }
+
+// A markdown block cut at its paragraphs and top-level list items, for "Inline PR icons" (#68).
+// [{k:"para"|"item"|"other", lines, tail, mark}]: `lines` the piece's source lines, `tail` the blank lines
+// after it, `mark` an item's "-" or "3.". A heading, quote or rule line is "other"; an item with an indented
+// line (a nested list or a code line) is "other" too, so it stays TextView. The pieces' lines, with their
+// tails, give the block again.
+const ITEM = /^([-*+]|\d+[.)])\s+/;
+const NESTED = /^\s+([-*+]|\d+[.)])\s/;
+const OTHER = /^\s*(#{1,6}\s|>|([-*_=])(\s*\2){2,}\s*$)/;
+export function splitPieces(md) {
+  const out = [];
+  let cur = null;
+  const start = (p) => { out.push(p); cur = p; };
+  for (const line of String(md).split("\n")) {
+    if (!line.trim()) { if (cur) cur.tail.push(line); else start({ k: "other", lines: [], tail: [line] }); continue; }
+    const open = !!cur && !cur.tail.length;
+    const m = ITEM.exec(line);
+    if (m) { start({ k: "item", item: true, lines: [line], tail: [], mark: m[1], body: [line.slice(m[0].length)] }); continue; }
+    if (OTHER.test(line)) { start({ k: "other", lines: [line], tail: [], heading: /^\s*#/.test(line) }); continue; }
+    // An indented line under an item: a soft break (joined), or a nested list or a later paragraph of it
+    // (then the whole item stays TextView).
+    if (/^\s/.test(line) && cur?.item) {
+      if (!open || NESTED.test(line)) cur.k = "other";
+      cur.lines.push(...cur.tail, line); cur.tail = []; cur.body.push(line.trim()); continue;
+    }
+    // A line right under a paragraph, item or quote joins it (markdown's lazy continuation).
+    if (open && !cur.heading && cur.lines.length) { cur.lines.push(line); cur.body?.push(line.trim()); continue; }
+    start({ k: "para", lines: [line], tail: [], body: [line] });
+  }
+  for (const p of out) delete p.heading;
+  return out;
+}

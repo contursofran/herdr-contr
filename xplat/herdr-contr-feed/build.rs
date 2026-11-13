@@ -1,4 +1,4 @@
-// Embeds the herdr-app mod (layout, themes, mods/herdr-contr, keys.json) for `herdr-contr-feed install`, so
+// Embeds the herdr-app mods (layout, themes, mods/herdr-contr*, keys.json) for `herdr-contr-feed install`, so
 // the helper alone can install the mod. The files are the repo's herdr-app/ folder at build time.
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -14,7 +14,7 @@ fn walk(dir: &Path, base: &Path, out: &mut Vec<(String, PathBuf)>) {
             continue;
         }
         // herdr-app writes jsconfig.json and *.d.ts at a mod's top level (herdr-app/.gitignore); never ours.
-        let generated = p.parent() == Some(base.join("mods/herdr-contr").as_path()) && (name == "jsconfig.json" || name.ends_with(".d.ts"));
+        let generated = p.parent().and_then(|d| d.parent()) == Some(base.join("mods").as_path()) && (name == "jsconfig.json" || name.ends_with(".d.ts"));
         if name == ".DS_Store" || generated {
             continue;
         }
@@ -37,7 +37,9 @@ fn main() {
     for p in names {
         files.push((format!("themes/{}", p.file_name().unwrap().to_string_lossy()), p));
     }
-    walk(&base.join("mods/herdr-contr"), &base, &mut files);
+    for m in ["herdr-contr", "herdr-contr-agents", "herdr-contr-spaces", "herdr-contr-tabs"] {
+        walk(&base.join("mods").join(m), &base, &mut files);
+    }
     files.sort();
     let mut src = String::from("/// Every file `install` puts in the home, as (path relative to the home, bytes), sorted by path.\npub static FILES: &[(&str, &[u8])] = &[\n");
     for (rel, p) in &files {

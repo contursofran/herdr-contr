@@ -8,4 +8,15 @@ repository is that tree with no changes.
 Flockbook is licensed under the MIT License, Copyright (c) 2026 Minchen Lee.
 See LICENSE.
 
+The mods in herdr-app/mods/herdr-contr-agents, herdr-app/mods/herdr-contr-spaces
+and herdr-app/mods/herdr-contr-tabs are adapted from the agents, spaces and tabs
+mods that ship with the Herdr app, licensed under the Apache License, Version
+2.0. The changes: the working mark is a braille loader, and the space icon is
+the project's favicon. Each changed file says so at its top.
+
 The software that the code uses is listed in THIRD_PARTY_NOTICES.md.
+
+The pull request and issue icons in herdr-app/mods/herdr-contr/icons
+(pull-request.svg, issue.svg) are GitHub's Octicons
+(https://github.com/primer/octicons), licensed under the MIT License,
+Copyright (c) GitHub Inc.

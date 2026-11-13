@@ -42,7 +42,7 @@
               },
               "min": 90,
               "content": {
-                "mod": "spaces"
+                "mod": "herdr-contr-spaces"
               }
             },
             {
@@ -53,10 +53,37 @@
               },
               "min": 90,
               "content": {
-                "mod": "agents"
+                "mod": "herdr-contr-agents"
               }
             }
           ]
+        },
+        {
+          "id": "usage",
+          "type": "block",
+          "size": {
+            "px": 56
+          },
+          "hidden": true,
+          "content": {
+            "mod": "herdr-contr",
+            "props": {
+              "view": "usage"
+            }
+          }
+        },
+        {
+          "id": "settings-row",
+          "type": "block",
+          "size": {
+            "px": 32
+          },
+          "content": {
+            "mod": "herdr-contr",
+            "props": {
+              "view": "settings-row"
+            }
+          }
         },
         {
           "id": "sidebar-footer",
@@ -86,7 +113,7 @@
           },
           "window_drag": true,
           "content": {
-            "mod": "tabs"
+            "mod": "herdr-contr-tabs"
           }
         },
         {

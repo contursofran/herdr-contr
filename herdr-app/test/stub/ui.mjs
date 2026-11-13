@@ -39,6 +39,7 @@ export const h_flex = () => mk("h");
 export class View {}
 export const TextView = { markdown: (id, text) => { const e = mk("md"); e._a.text = text; e._a.id = id; return e; } };
 export const Scrollbar = { vertical: () => mk("sb") };
+export const Link = { new: (id) => { const e = mk("link"); e._a.id = id; return e; } };
 export const Textarea = { new: () => mk("ta") };
 export const Input = { new: (state) => { const e = mk("input"); e._a.state = state; return e; } };
 export const InputState = {
@@ -50,6 +51,7 @@ export const TextareaState = {
 };
 export let lastList = null;
 export const v_virtual_list = (id, n, sizes, key, render) => { const e = mk("vl"); e._args = { id, n, sizes, key, render }; lastList = e; return e; };
+export const ScrollHandle = { new: () => mk("scroll") };
 export const VirtualListScrollHandle = {
   new: () => ({ scroll_to_item: (i, s) => calls.push(["scroll_to_item", i, s]), scroll_to_bottom: () => calls.push(["bottom"]) }),
 };

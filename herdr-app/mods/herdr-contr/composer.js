@@ -407,7 +407,7 @@ export class Composer {
   }
 
   // `width`: the chat's column, so the box lines up with the messages.
-  render(agent, t, width = 800) {
+  render(agent, t, width = 800, work = null, background = null) {
     const tags = tagsFor(agent, agent ? this.status.get(agent.address) : null);
     const branch = tags.find((x) => x.kind === "branch");
     const b = this.box(agent);
@@ -429,7 +429,8 @@ export class Composer {
       : null;
     const empty = !b.input.value().trim() && !b.files.length;
     const tag = (x) => h_flex().h(22).px(8).gap(4).items_center().rounded(11).flex_none().text_size(11.5)
-      .bg(x.warn ? t.blocked : t.chrome).text_color(x.warn ? t.background : t.muted).border(1).border_color(x.warn ? t.blocked : t.border)
+      // A warning is an outline: no fill, so it never turns into a solid block (#43).
+      .bg(t.chrome).text_color(x.warn ? t.foreground : t.muted).border(1).border_color(x.warn ? t.blocked : t.border)
       .when(x.kind === "branch", (el) => el.child(svg(icon("branch")).size(11)))
       .when(x.kind === "cwd", (el) => el.child(svg(icon("folder")).size(11)))
       .child(div().max_w(220).truncate().child(x.text));
@@ -441,10 +442,10 @@ export class Composer {
     // Claude Code session an Orchestrate button that starts /contr:orchestrate in the box.
     const orch = orchestration(agent);
     const pill = orch
-      ? h_flex().id("orchestrating").h(22).px(8).gap(5).items_center().rounded(11).flex_none().text_size(11.5)
+      ? h_flex().id("orchestrating").h(22).px(8).gap(5).items_center().rounded(11).flex_shrink(1).min_w(0).overflow_hidden().text_size(11.5)
         .bg(t.selected).text_color(t.foreground).border(1).border_color(t.border)
-        .child(div().size(6).rounded(3).bg(t.working)).child("Orchestrating")
-        .when(orch.workers > 0, (el) => el.child(div().text_color(t.muted).child(`· ${orch.workers} ${orch.workers === 1 ? "worker" : "workers"}`)))
+        .child(div().size(6).flex_none().rounded(3).bg(t.working)).child(div().flex_none().child("Orchestrating"))
+        .when(orch.workers > 0, (el) => el.child(div().min_w(0).truncate().text_color(t.muted).child(`· ${orch.workers} ${orch.workers === 1 ? "worker" : "workers"}`)))
       : agent?.app === "claude-code"
         ? h_flex().id("orchestrate").h(22).px(8).items_center().rounded(11).flex_none().text_size(11.5)
           .text_color(t.muted).border(1).border_color(t.border).hover((st) => st.bg(t.hover).text_color(t.foreground))
@@ -452,11 +453,23 @@ export class Composer {
           .child("Orchestrate")
         : null;
     const showTags = setting("status_row") !== "hide";
+    const ctxTag = tags.find((x) => x.kind === "context");
+    const below = tags.filter((x) => x.kind !== "context" && x.kind !== "branch");
     return v_flex().id("composer").w_full().px(16).pb(14).pt(6).gap(6).items_center()
       .key_context(PASTE_CONTEXT)
       .on_action(PASTE_ACTION, (_e, cx) => { const text = cx.read_from_clipboard?.(); cx.spawn((cx) => this.paste(cx, text)); })
-      .when(showTags || Boolean(pill), (el) => el.child(h_flex().id("tags-row").w_full().max_w(width).gap(5).items_center()
-        .child(showTags ? h_flex().id("tags").flex_1().min_w(0).gap(5).items_center().overflow_x_scroll().children(tags.map(tag)) : div().flex_1())
+      // Above the box: the agent's working line on the left (#47), the context tag and the pill on the right (#40).
+      // Claude Code's background note ("1 shell still running", #61) follows it, muted; it truncates first.
+      .when(Boolean(work) || Boolean(background) || (showTags && Boolean(ctxTag)) || Boolean(pill), (el) => el.child(h_flex().id("tags-row").w_full().max_w(width).min_w(0).overflow_hidden().gap(5).items_center()
+        .child(h_flex().flex_1().min_w(0).gap(12).items_center()
+          .when(Boolean(work), (r) => r.child(h_flex().id("working").min_w(0).gap(8).items_center().text_size(12.5)
+            .child(loader(12).flex_none().text_color(t.working))
+            .child(div().flex_none().text_color(t.foreground).child(work.text))
+            .when(Boolean(work.detail), (w) => w.child(div().min_w(0).truncate().text_color(t.muted).child(`(${work.detail})`)))))
+          .when(Boolean(background), (r) => r.child(h_flex().id("background").flex_1().min_w(0).gap(6).items_center().text_size(12).text_color(t.muted)
+            .child(loader(10).flex_none())
+            .child(div().min_w(0).truncate().child(background.text)))))
+        .when(showTags && Boolean(ctxTag), (r) => r.child(div().id("ctx-tag").flex_none().child(tag(ctxTag))))
         .when(Boolean(pill), (r) => r.child(pill))))
       .when(Boolean(s), (el) => el.child(v_flex().id("slash").w_full().max_w(width).p(4).gap(0).rounded(12).bg(t.raised)
         .border(1).border_color(t.border).shadow_sm().on_scroll_wheel((e, cx) => this.slashWheel(e, cx))
@@ -481,6 +494,8 @@ export class Composer {
             .bg(empty || this.sending ? t.chrome : t.accent).text_color(empty || this.sending ? t.dim : t.background)
             .on_click((_e, cx) => cx.spawn((cx) => this.submit(cx)))
             .child(this.sending ? loader(13) : svg(icon("send")).size(14)))))
+      // Below the box: the status tags. The branch is in the box already, so it is not here.
+      .when(showTags && below.length > 0, (el) => el.child(h_flex().id("tags").w_full().max_w(width).gap(5).items_center().overflow_x_scroll().children(below.map(tag))))
       .when(Boolean(this.note), (el) => el.child(div().id("send-note").w_full().max_w(width).text_size(12)
         .text_color(this.note.bad ? t.blocked : t.muted).child(this.note.text)));
   }

@@ -212,9 +212,66 @@ fn status_tags() {
         st.contains(r#""source":"statusline""#) && st.contains(r#""text":"Opus 9""#) && st.contains(r#""text":"ctx 84%""#) && st.contains(r#""warn":true"#),
         "modfeed status: wrapper facts, full ctx warns ({st})"
     );
+    // autoCompactWindow: tokens used against it; current_usage first, else the percent of the window.
+    let cmd2 = serde_json::json!({"statusLine": {"type": "command", "command": cmd}, "autoCompactWindow": 250000});
+    std::fs::write(&settings, cmd2.to_string()).unwrap();
+    assert_eq!(status::compact_limit(&settings), Some(250000), "modfeed status: autoCompactWindow from settings");
+    StatusLineFolder::new(&sdir).save(
+        br#"{"session_id":"sess-1","context_window":{"context_window_size":1000000,"used_percentage":12,"current_usage":{"input_tokens":2000,"cache_creation_input_tokens":8000,"cache_read_input_tokens":110000,"output_tokens":500}}}"#,
+        b"",
+        "sess-1",
+    );
+    let mut o8 = JsonLines::new();
+    status::run("claude", Some(&log), &settings, &mut o8, SystemTime::now());
+    assert!(o8.lines[0].contains(r#""text":"ctx 120k / 250k""#) && o8.lines[0].contains(r#""percent":48"#) && o8.lines[0].contains(r#""warn":false"#), "modfeed status: ctx against the limit ({})", o8.lines[0]);
+    StatusLineFolder::new(&sdir).save(br#"{"session_id":"sess-1","context_window":{"context_window_size":1000000,"used_percentage":21}}"#, b"", "sess-1");
+    let mut o9 = JsonLines::new();
+    status::run("claude", Some(&log), &settings, &mut o9, SystemTime::now());
+    assert!(o9.lines[0].contains(r#""text":"ctx 210k / 250k""#) && o9.lines[0].contains(r#""warn":true"#), "modfeed status: near the limit warns ({})", o9.lines[0]);
+    StatusLineFolder::new(&sdir).save(br#"{"session_id":"sess-1","context_window":{"used_percentage":21}}"#, b"", "sess-1");
+    let mut o10 = JsonLines::new();
+    status::run("claude", Some(&log), &settings, &mut o10, SystemTime::now());
+    assert!(o10.lines[0].contains(r#""text":"ctx 21%""#), "modfeed status: tokens not known, percent as before ({})", o10.lines[0]);
+    std::fs::write(&settings, "{}").unwrap();
+    assert_eq!(status::compact_limit(&settings), None, "modfeed status: no autoCompactWindow");
+    assert_eq!(status::compact_limit(&dir.path().join("missing.json")), None, "modfeed status: no settings file");
     let mut o7 = JsonLines::new();
     status::run("codex", Some(&log), &settings, &mut o7, SystemTime::now());
     assert!(o7.lines[0].contains(r#""source":"log""#) && o7.lines[0].contains("claude-test-1"), "modfeed status: model from the log otherwise");
+}
+
+#[test]
+fn status_ctx_from_log() {
+    let dir = tempfile::tempdir().unwrap();
+    let settings = dir.path().join("settings.json");
+    // Another tool's status line: no herdr-contr record, so the log is the source.
+    std::fs::write(&settings, r#"{"statusLine":{"type":"command","command":"other-statusline"},"autoCompactWindow":250000}"#).unwrap();
+    let log = dir.path().join("sess-2.jsonl");
+    let usage = |id: &str, side: bool, n: i64| {
+        serde_json::json!({"type": "assistant", "uuid": id, "isSidechain": side, "sessionId": "sess-2", "timestamp": "2026-11-12T10:00:00Z",
+            "message": {"id": id, "role": "assistant", "model": "claude-test-1", "content": [{"type": "text", "text": "ok"}],
+                "usage": {"input_tokens": 3, "cache_creation_input_tokens": 2000, "cache_read_input_tokens": n, "output_tokens": 50}}})
+        .to_string()
+    };
+    let mut lines = turn();
+    lines.push(usage("m1", false, 50_000));
+    lines.push(usage("m2", false, 118_000));
+    lines.push(usage("m3", true, 5_000));
+    std::fs::write(&log, lines.join("\n") + "\n").unwrap();
+    assert_eq!(tail::context_used(&lines), Some(120_003), "modfeed tail: newest main-thread usage");
+    assert_eq!(tail::context_used(&turn()), None, "modfeed tail: no usage");
+    let mut o = JsonLines::new();
+    status::run("claude", Some(&log), &settings, &mut o, SystemTime::now());
+    let st = &o.lines[0];
+    assert!(st.contains(r#""source":"log""#) && st.contains(r#""text":"claude-test-1""#) && st.contains(r#""text":"ctx 120k / 250k""#) && st.contains(r#""percent":48"#), "modfeed status: ctx from the log ({st})");
+    std::fs::write(&settings, "{}").unwrap();
+    let mut o2 = JsonLines::new();
+    status::run("claude", Some(&log), &settings, &mut o2, SystemTime::now());
+    assert!(!o2.lines[0].contains("ctx"), "modfeed status: no limit, no window, no ctx tag ({})", o2.lines[0]);
+    std::fs::write(&settings, r#"{"autoCompactWindow":250000}"#).unwrap();
+    let mut o3 = JsonLines::new();
+    status::run("codex", Some(&log), &settings, &mut o3, SystemTime::now());
+    assert!(!o3.lines[0].contains("ctx"), "modfeed status: ctx from the log for claude only ({})", o3.lines[0]);
 }
 
 #[test]

@@ -29,7 +29,9 @@ Each step is finished and in use before the next one starts.
 5. The orchestrator's workers and its missed messages.
 
 Not in scope: a files panel and a pull request reader. Herdr's sidebar stays
-as Herdr draws it, for now.
+as Herdr draws it, for now, except the sidebar's agent list, its spaces list
+and the top bar: these are our copies of Herdr's `agents`, `spaces` and `tabs`
+mods, with the braille loader and the project favicons (owner, 2026-11-12).
 
 ## Layout
 
@@ -37,6 +39,7 @@ as Herdr draws it, for now.
 |---|---|
 | `herdr-app/layouts`, `herdr-app/themes`, `herdr-app/keys.json` | the layouts (`herdr-contr` with Herdr's sidebar, and `herdr-contr-own` with the mod's own sidebar), the themes and the keys that the mod installs |
 | `herdr-app/mods/herdr-contr` | the mod: one file for each screen or part |
+| `herdr-app/mods/herdr-contr-agents`, `herdr-app/mods/herdr-contr-spaces`, `herdr-app/mods/herdr-contr-tabs` | copies of Herdr's `agents`, `spaces` and `tabs` mods, with the braille loader and the project favicons |
 | `herdr-app/test` | the mod's tests, with a stub of Herdr's UI in `test/stub` |
 | `herdr-app/RECIPE.md` | each part of the mod in words: sizes, colors, behavior |
 | `herdr-app/docs/protocol.md` | the contract between the mod and the helper (JSON Lines) |
@@ -85,10 +88,10 @@ and `gpui-kit.d.ts`. Read them there. Do not copy them into this repository.
 - The owner's Herdr app and hc core are live. Do not edit files in the
   owner's Herdr home (`~/.config/herdr-app`) by hand. Never send input to the
   owner's Herdr app. Never stop, restart or send input to the owner's hc core.
-- Try the mod only in a test home: `herdr-app/install-isolated.sh <folder>`
-  and `HERDR_APP_HOME=<folder>`, with a scratch `HC_SESSION` and scratch XDG
-  folders. If you cannot be sure that a run uses the scratch core, do not
-  start it. Report that instead.
+- Never start `herdr-app` (owner, 2026-11-12). It is one app per Mac: a
+  second start, even with a test home and a scratch `HC_SESSION`, replaces
+  the owner's window. Check the mod with `npm test`. The coordinator looks at
+  merged `main` in the owner's app (see below).
 - An agent can install merged `main` into the real Herdr home with the
   helper's `install` (owner, 2026-11-12): build the helper, run `install
   --dry-run` first, then `install --helper`. After it, `herdr-app do

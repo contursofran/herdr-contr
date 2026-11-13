@@ -12,10 +12,12 @@ import { emptyFeed, applyFeed, applyOlder, olderFrom, addEcho, dropEcho, settleE
 import { GUTTER, columnWidth, rowHeight } from "./estimate.js";
 import { ROW_PAD_Y, BUBBLE_PAD_X, BUBBLE_PAD_Y, BUBBLE_GAP, IMAGES_FS, bubbleWidth, bubbleTextWidth, CHIP_H, CHIP_PAD_Y, CHIP_GAP, OPEN_INDENT,
   CALL_H, SEP_H, FOOTER_H, STATUS_H, CARD_ROW_H, OTHER_H } from "./metrics.js";
-import { Composer } from "./composer.js";
+import { Composer, paneOf } from "./composer.js";
 import { switchStrip } from "./viewswitch.js";
 import { markdownView, codeBlockAt } from "./mdblocks.js";
-import { textScale } from "./config.js";
+import { repoFor } from "./refs.js";
+import { inlineTick } from "./inline.js";
+import { textScale, setting } from "./config.js";
 
 // Herdr's zoom: line heights round in zoomed px (estimate.js lineHeight).
 const appZoom = () => { const z = Number(settings?.()?.zoom); return z > 0 ? z : 1; };
@@ -27,6 +29,8 @@ import { HelperUI, isRemoteProblem } from "./helpercard.js";
 export const POLL_MS = 2000;
 // How often the working line is read while the shown agent works.
 const WORK_MS = 1000;
+// How often the background note ("1 shell still running") is read while the shown agent is idle.
+const BACKGROUND_MS = 5000;
 const CHECK_MS = 400;
 // A sent message waits dimmed until the agent's log has it.
 const ECHO_OPACITY = 0.55;
@@ -108,6 +112,12 @@ export class ChatView {
     cx.spawn(async () => { if (await loadTiming()) cx.timer.every(1000, () => flush()); });
   }
 
+  // The GitHub repository of the shown agent's folder, for "#51" links; null until git has answered.
+  repo() {
+    const cwd = this.address ? paneOf(this.address)?.cwd : null;
+    return repoFor(cwd, machineOf(this.address));
+  }
+
   feed() { return this.address ? this.feeds.get(this.address) : null; }
 
   // Every chat opens at its newest message, also one read before.
@@ -115,6 +125,8 @@ export class ChatView {
     this.address = address; this.cards.shown = address;
     if (address && !this.feeds.has(address)) this.feeds.set(address, emptyFeed(address));
     this.follow = true; this.open = new Set(); this.autoOlder = 0;
+    // A newly shown agent gets its own background read.
+    this.background = null; this.lastStatus = undefined;
     this.toNewest();
   }
 
@@ -126,22 +138,34 @@ export class ChatView {
     if (screen === "chat" && this.screen !== "chat") { this.follow = true; this.toNewest(); cx.notify(); }
     this.screen = screen;
     if (this.helper.changed()) cx.notify();
+    const repo = this.repo();
+    if (repo !== this.shownRepo) { this.shownRepo = repo; cx.notify(); }
     cx.spawn((cx) => this.composer.pollStatus(cx));
     const agent = currentAgent();
     cx.spawn((cx) => this.cards.poll(cx, this.address, wanted(agent, this.feed()?.rows)));
     if (this.wantOlder) { this.wantOlder = false; cx.spawn((cx) => this.loadOlder(cx)); }
     const f = this.feed();
     if (f && settleEchoes(f)) cx.notify();
-    if (agent?.status === "working") { if (Date.now() - this.lastWork >= WORK_MS) cx.spawn((cx) => this.pollWorking(cx, agent.address)); }
-    else if (this.work) { this.work = null; cx.notify(); }
+    // Inline PR icons (inline.js): gh states read here, not while drawing, for the shown rows. Off: none.
+    const ids = new Set(setting("inline_icons") === "on" ? (f ? this.rowsOf(f) : []).map((r) => r.id) : []);
+    cx.spawn(async (cx) => { if (await inlineTick(ids)) cx.notify(); });
+    const status = agent?.status;
+    if (status === "working") { if (Date.now() - this.lastWork >= WORK_MS) cx.spawn((cx) => this.pollWorking(cx, agent.address)); }
+    else {
+      if (this.work) { this.work = null; cx.notify(); }
+      // Idle or done (turn over, not seen yet): one read when the agent gets there, then every BACKGROUND_MS only
+      // while the last read had a note.
+      const rest = (x) => x === "idle" || x === "done";
+      const wentIdle = rest(status) && !rest(this.lastStatus);
+      if (wentIdle || (rest(status) && this.background && Date.now() - this.lastWork >= BACKGROUND_MS)) cx.spawn((cx) => this.pollWorking(cx, agent.address));
+      else if (!rest(status) && this.background) { this.background = null; cx.notify(); }
+    }
+    this.lastStatus = status;
     if (Date.now() - this.lastPoll >= (f?.echoes?.length ? CHECK_MS : POLL_MS)) return this.poll(cx);
   }
 
-  // The rows drawn: the feed's, the sent messages that wait, then the agent's working line.
-  rowsOf(f) {
-    const rows = shownRows(f);
-    return this.work && this.work.address === f.address ? rows.concat(this.work) : rows;
-  }
+  // The rows drawn: the feed's and the sent messages that wait. The working line is in the composer (#47).
+  rowsOf(f) { return shownRows(f); }
 
   // The agent's working line ("Improvising… · 1m 16s · ↓ 6.0k tokens"), read from its screen while it works.
   // An older helper without the command: no line.
@@ -152,8 +176,12 @@ export class ChatView {
       if (!(await sidecar.hasCommand("working"))) return;
       const r = await sidecar.working(address);
       const l = r.error ? null : r.lines.find((x) => x.type === "working");
+      const bg = r.error ? null : r.lines.find((x) => x.type === "background")?.text || null;
       const was = this.work;
-      if (address !== this.address || currentAgent()?.status !== "working") return;
+      const status = currentAgent()?.status;
+      if (address !== this.address || (status !== "working" && status !== "idle" && status !== "done")) return;
+      if (bg !== (this.background?.text ?? null)) { this.background = bg ? { address, text: bg } : null; cx.notify(); }
+      if (status !== "working") return;
       if (!l?.text) { if (was) { this.work = null; cx.notify(); } return; }
       if (was && was.address === address && was.text === l.text && was.detail === (l.detail ?? "")) return;
       this.work = { id: "working", k: "working", address, text: l.text, detail: l.detail ?? "" };
@@ -220,7 +248,7 @@ export class ChatView {
 
   // A row's content, without the list's fixed height. No handlers: list rows cannot have any.
   body(row, t) {
-    const md = (text, w = this.colWidth()) => markdownView(row.id, text || "", t, w, textScale());
+    const md = (text, w = this.colWidth()) => markdownView(row.id, text || "", t, w, textScale(), this.repo());
     switch (row.k) {
       case "user":
         if (row.from != null) return this.agentNote(row, t, md);
@@ -235,11 +263,6 @@ export class ChatView {
         return h_flex().w_full().h(SEP_H).items_center().justify_center().text_size(11.5).text_color(t.dim).child(row.text || "");
       case "footer":
         return div().w_full().h(FOOTER_H).pt(2).text_size(11.5).text_color(t.dim).child(row.text || "");
-      case "working":
-        return h_flex().w_full().h(STATUS_H).gap(8).items_center().text_size(12.5)
-          .child(loader(12).flex_none().text_color(t.working))
-          .child(div().flex_none().text_color(t.foreground).child(row.text))
-          .when(Boolean(row.detail), (el) => el.child(div().min_w(0).truncate().text_color(t.muted).child(`(${row.detail})`)));
       case "status":
         return h_flex().w_full().h(STATUS_H).items_center().justify_center().text_size(12).text_color(t.muted).child(row.text || "");
       case "perm": {
@@ -430,9 +453,10 @@ export class ChatView {
       .when(Boolean(this.helper.removeCard(t, this.refresh)), (el) => el.child(h_flex().w_full().px(16).pt(8).justify_center()
         .on_mouse_down("left", stop).child(this.helper.removeCard(t, this.refresh))))
       .when(Boolean(f) && f.error?.code !== "not-agent" && !isRemoteProblem(f.error), (el) => {
-        const card = this.cards.view(this.address, t, "chat-card");
+        const card = this.cards.view(this.address, t, "chat-card", this.colWidth());
         if (card) el.child(this.appear.wrap(h_flex().w_full().px(16).pt(8).justify_center().on_mouse_down("left", stop).child(card), "chat-card-in", `${this.address}:${this.cards.key?.(this.address) ?? ""}`, cx, 10));
-        return el.child(div().w_full().on_mouse_down("left", stop).child(this.composer.render(currentAgent(), t, this.colWidth())));
+        return el.child(div().w_full().on_mouse_down("left", stop).child(this.composer.render(currentAgent(), t, this.colWidth(), this.work?.address === this.address ? this.work : null,
+          this.background?.address === this.address ? this.background : null)));
       })
       .child(overBar(t));
   }

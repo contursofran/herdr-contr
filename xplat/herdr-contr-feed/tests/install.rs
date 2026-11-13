@@ -110,7 +110,10 @@ fn installs_into_an_empty_home_puts_the_helper_in_place_and_runs_check() {
     let mode = fs::metadata(s.app.join("herdr-contr/bin/herdr-contr-feed")).unwrap().permissions().mode();
     assert_eq!(mode & 0o777, 0o755);
     assert_eq!(keys_of(&s.app), ours());
-    assert_eq!(s.calls(), vec![format!("{0} check {0}/mods/herdr-contr", s.app_s())]);
+    assert!(s.app.join("mods/herdr-contr-agents/main.js").exists());
+    assert!(s.app.join("mods/herdr-contr-tabs/win-close.svg").exists());
+    let checks: Vec<String> = ["herdr-contr", "herdr-contr-agents", "herdr-contr-spaces", "herdr-contr-tabs"].iter().map(|m| format!("{0} check {0}/mods/{m}", s.app_s())).collect();
+    assert_eq!(s.calls(), checks);
 }
 
 #[test]
@@ -127,7 +130,7 @@ fn installs_exactly_the_files_in_the_repo() {
             want.push(format!("themes/{n}"));
         }
     }
-    let git = Command::new("git").args(["ls-files", "mods/herdr-contr"]).current_dir(mod_dir()).output().unwrap();
+    let git = Command::new("git").args(["ls-files", "mods/herdr-contr", "mods/herdr-contr-agents", "mods/herdr-contr-spaces", "mods/herdr-contr-tabs"]).current_dir(mod_dir()).output().unwrap();
     want.extend(String::from_utf8(git.stdout).unwrap().lines().map(String::from));
     want.sort();
     let have: Vec<String> = files.keys().cloned().collect();
@@ -172,6 +175,32 @@ fn stops_when_the_person_has_their_own_mod_folder() {
     assert!(err(&r).contains("mods/herdr-contr"));
     assert_eq!(read(s.app.join("mods/herdr-contr/main.js")), "mine\n");
     assert!(!s.app.join("layouts").exists());
+}
+
+#[test]
+fn stops_when_the_person_has_a_file_in_a_copied_herdr_mod() {
+    let s = sandbox();
+    fs::create_dir_all(s.app.join("mods/herdr-contr-tabs")).unwrap();
+    fs::write(s.app.join("mods/herdr-contr-tabs/extra.js"), "mine\n").unwrap();
+    let r = s.run(&["--home", s.app_s()]);
+    assert_eq!(r.status.code(), Some(1));
+    assert!(err(&r).contains("mods/herdr-contr-tabs/extra.js"), "{}", err(&r));
+    assert!(!s.app.join("layouts").exists());
+}
+
+#[test]
+fn removes_an_unchanged_file_an_earlier_install_put_in_a_copied_herdr_mod() {
+    let s = sandbox();
+    let r = s.run(&["--home", s.app_s()]);
+    assert_eq!(r.status.code(), Some(0), "{}", both(&r));
+    fs::write(s.app.join("mods/herdr-contr-agents/old.js"), "gone\n").unwrap();
+    let marker_path = s.app.join("herdr-contr/install.json");
+    let mut marker: Value = serde_json::from_str(&read(&marker_path)).unwrap();
+    marker["files"]["mods/herdr-contr-agents/old.js"] = json!(sha(b"gone\n"));
+    fs::write(&marker_path, marker.to_string()).unwrap();
+    let r = s.run(&["--home", s.app_s()]);
+    assert_eq!(r.status.code(), Some(0), "{}", both(&r));
+    assert!(!s.app.join("mods/herdr-contr-agents/old.js").exists());
 }
 
 #[test]

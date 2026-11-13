@@ -27,9 +27,9 @@ test("keys.json binds only commands that exist, in the herdr-contr layout's sect
 });
 
 test("each view renders, and an unknown view says so", () => {
-  for (const view of ["top", "side", "chat", "needs", "overview", "settings"]) {
+  for (const view of ["top", "side", "chat", "needs", "overview", "settings", "usage"]) {
     fake.props = { view }; const m = new HerdrContr(); m.init(undefined, fakeCx());
-    assert.ok(m.render(fakeCx()), view);
+    assert.doesNotMatch(textOf(m.render(fakeCx())), /unknown view/, view);
   }
   fake.props = { view: "nope" }; const m = new HerdrContr(); m.init(undefined, fakeCx());
   assert.match(textOf(m.render(fakeCx())), /unknown view "nope"/);

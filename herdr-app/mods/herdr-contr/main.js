@@ -12,7 +12,9 @@ import { OverviewView } from "./overview.js";
 import { MenuView } from "./menu.js";
 import { SettingsView } from "./settings.js";
 
-const VIEWS = { top: TopView, side: SideView, chat: ChatView, needs: NeedsView, termbar: TermBar, switch: SwitchView, overview: OverviewView, menu: MenuView, settings: SettingsView };
+import { UsageView } from "./usage.js";
+import { SettingsRowView } from "./settingsrow.js";
+const VIEWS = { top: TopView, side: SideView, chat: ChatView, needs: NeedsView, termbar: TermBar, switch: SwitchView, overview: OverviewView, menu: MenuView, settings: SettingsView, usage: UsageView, "settings-row": SettingsRowView };
 
 export default class HerdrContr extends View {
   // The block's props come from props(); init's first argument is not them.

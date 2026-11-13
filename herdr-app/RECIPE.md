@@ -34,7 +34,13 @@ Left to right:
      shows where it goes, the row dims, and the release moves it there. A move under 4 px is a
      click. Leaving the list, another mouse button or a press elsewhere cancels. The same in the
      floating sidebar. The tab drag in the top bar and this one share `drag.js`.
-   - At the bottom: a **herdr-contr** row (the herdr-contr settings dialog), and **Settings**.
+   - At the bottom, the plan usage: one 24 px row per plan with data, Claude then Codex (11.5 px,
+     `muted`). The 22 px column has an 18 x 4 px meter (`border` track, `muted` fill) of the most used
+     window; then the name; then each window in Menlo 10.5 px, `dim`: "5h 38% 2h · wk 12% 3d" (kind,
+     whole percent used, time to its reset). A window past its reset shows 0%. The text clips at the
+     right. The helper's `usage` command reads it: when the sidebar opens and every 5 minutes, off the
+     UI thread, one read for all the views that show it. A plan with no data has no row.
+   - Then a **herdr-contr** row (the herdr-contr settings dialog), and **Settings**.
 2. **Work area**: a stack of four screens. The bar floats over the first three.
    - **Top bar** (56 px, over the content, no background of its own). The sidebar button (28 px,
      round, with a `chrome` backing) sits right of the window buttons while the sidebar is hidden.
@@ -44,24 +50,51 @@ Left to right:
        label (13 px, at most 170 px, cut with an ellipsis). The shown tab is `selected`, semibold,
        with a × to close it. The capsule scrolls sideways when the tabs do not fit.
      - The tools capsule has **+** (new tab) and a terminal button (the agent's terminal).
-   - **Chat**: a reading column at most 760 px wide, 24 px gutters, centered.
+   - **Chat**: a reading column at most 1000 px wide, 24 px gutters, centered.
      - User message: a right-aligned bubble, at most 78% of the column, 16 px corners, `raised`.
        "1 image" or "N images" under it when it had pictures.
      - Agent reply: full-width markdown, 16 px text, 26 px lines (the `TextView` default; a mod
        cannot change it). Code fences are 12 px rounded boxes (`raised`,
        1 px border, Menlo 13 px, 21 px lines: one selectable `TextView` paragraph, so a drag selects across lines; right-click a box: Copy code, the box as written). Tables are 12 px rounded frames: a `raised` header
        row, 1 px lines between rows, columns sized to their content.
+       In prose, pull request and issue references ("PR #51", "#51", "owner/repo#51", GitHub
+       pull and issue URLs) are links (`refs.js`); a click opens them in the browser. A bare "#51"
+       takes the repository of the agent's folder (`git remote get-url origin`, read once); without
+       one it stays text. Code, links, other URLs, words and colors such as "#fff" stay as written.
+       With **Inline PR icons** on (experimental, off by default; `inline.js`), a text block is cut at
+       its paragraphs and top-level list items (`splitPieces`; an item with a nested list stays whole).
+       Each piece with a reference is a wrapping row of plain elements (chat text size, line height
+       and color; one child for each word, a 0.3 em gap between words). Each reference is a `Link`:
+       GitHub's pull request or issue icon (Octicons, 14 px) colored by state, and the reference
+       underlined; the `Link` opens it. Punctuation right after a reference stays with it. `**bold**`
+       is bold (700), code is Menlo 14 px on `raised` with 4 px padding, other links are an underlined
+       `Link`. No handler and no state: the chat's list renderer refuses them (#70). If the drawing
+       throws, the block is the `TextView` and the error is logged once. State from `gh api` (at most 3 at once; open ones and
+       failures read again after 60 s, closed ones kept), `muted` until known. Theme colors:
+       `pr_open`, `pr_draft`, `pr_merged`, `pr_closed`, `issue_open`, `issue_done`,
+       `issue_notplanned`. The states are read in the chat's timer, for the URLs that the shown rows
+       drew. A list item's bullet or number is a 22 px
+       column outside the row. The pieces without a reference between them stay one
+       `TextView`. Each part is as tall as `markdownRaw` counts it, with the gap above it as top
+       padding, so the row heights hold; a block with no piece drawn with icons is one `TextView`. Its height is the estimate's for the paragraph;
+       when the icons would need one more line, the paragraph stays `TextView`.
      - Tool calls: a row of 28 px round chips ("Ran 3 commands", an icon per kind: terminal, doc,
        search, tool), each with ▾. A spinner while a call runs.
      - A pending call: a 28 px chip "Running · <what>" with a spinner.
      - Separators and footers in 11.5 px dim text.
      - A round 34 px ↓ button at the bottom center while you read older messages.
      - "Loading earlier messages" in a small capsule under the bar while older rows load.
-   - **Reply box** under the chat, at most 800 px wide: a row of 22 px round tags (model, effort,
-     context, cost, folder, branch, agent; a warning tag is orange), then a 16 px rounded `raised`
+   - **Reply box** under the chat, at most 800 px wide. Above the box: while the agent works, its
+     working line on the left (12 px braille loader, the text, the detail in `muted`), then Claude Code's
+     background note ("1 shell still running": a 10 px braille loader and the text in `muted`, also while the
+     agent is idle; it truncates first), and on the right the
+     context tag and the Orchestrating pill. Below the box: a row of 22 px round tags (model, effort,
+     cost, folder, agent; not the branch, which is in the box). A warning tag is an outline: `blocked` border, `foreground` text, no fill; the context tag is "ctx 120k / 250k"
+     against Claude Code's `autoCompactWindow` when it is set, else "ctx 37%" of the model's window; without the wrapper, the tokens come from the session log and
+     the tag shows only with `autoCompactWindow`), then a 16 px rounded `raised`
      box with a one-line text area ("Reply to the agent"), + to attach files on the left (macOS only), the
      branch, and a round 28 px send button (accent when there is text). File chips above the text.
-   - **Card** between the chat and the reply box, at most 800 px, 14 px corners, `raised`, 14 px
+   - **Card** between the chat and the reply box, as wide as the reply box (the chat's column), 14 px corners, `raised`, 14 px
      padding, an orange 8 px dot before the title.
      - Approval: the title (the prompt's own, for example "Bash command"; else "<tool> wants to
        run"), the command in Menlo 12.5 px on `background`
@@ -89,7 +122,7 @@ Left to right:
      11.5 px `muted` headings, then one row per setting (the name in 13.5 px, a line on what it does in
      12 px muted, and on the right a two-choice switch: 26 px choices in a `chrome` frame, the chosen
      one `selected` and semibold), a `border` line under each row. **General**: CHAT, **Status row**
-     Show | Hide; OTHER MACHINES, **Helper on other machines** Ask | Never. **Phone page**: PHONE PAGE,
+     Show | Hide, **Inline PR icons (experimental)** Off | On; OTHER MACHINES, **Helper on other machines** Ask | Never. **Phone page**: PHONE PAGE,
      **Phone page** Off | On. **Orchestration** (between General and Phone page): contr's agents.json
      (see below). FLOW: **Plan first** Never | When needed | Always; **Review** None | Code PRs | Every PR;
      **Debugger after** and **Workers at once**, each − <n> <unit> + (24 px buttons, 1 to 99);
@@ -117,6 +150,7 @@ Left to right:
    - **Tab panes**: a split tab, or a tab with a shell, shows its own panes (a 56 px top bar
      above them, 8 px padding, 6 px gaps, 8 px corners, 1 px border, `muted` border on focus).
 
+The context tag sits at the right end of that row, just before the orchestration pill (#40).
 Orchestration: at the right end of the row above the reply box, an "Orchestrating" pill
 (`selected` fill, `working` dot, "· N workers" in `muted`) when the agent's terminal has the hc
 label `contr.orchestrating` or live child terminals; else, for Claude Code, an "Orchestrate"
@@ -149,7 +183,10 @@ drawn by Herdr's `frames`; every loader of the mod is this one); done is a check
   "It changed on screen. Here is what it shows now." when the prompt on screen is another one.
 - **Question card**: 1-9 picks an option (a one-choice pick moves on); the number after the
   options moves the keyboard into the own-answer box; Enter goes on or sends. With more questions
-  behind the first: **Show all N questions** reads them all from the agent's picker.
+  behind the first: **Show all N questions** reads them all from the agent's picker. Claude's
+  preview layout (an option with a `preview`): the box on the right is not read, the card has no
+  own-answer row (`noOther`), and Send moves the focus with Up or Down to the pick, then presses
+  Enter.
 - **Orchestration settings**: contr's agents.json, the file contr's coordinator reads. The path is
   `CONTR_AGENTS_CONFIG` when set (read through `sh`, as the mod has no environment), else the user
   config folder's `contr/agents.json` (macOS `~/Library/Application Support`, other systems
@@ -168,7 +205,8 @@ drawn by Herdr's `frames`; every loader of the mod is this one); done is a check
   nothing until the file is fixed or removed (it is never overwritten). A change keeps the other keys,
   is written against the text just read (someone else's change is read again, not lost), and every
   view shows it at once. The file is read again each minute and when the dialog opens.
-  - **Status row** Hide: no tags (model, context, cost, folder, branch) above the reply box (the branch beside the send button stays).
+  - **Inline PR icons (experimental)** On: icons before pull request and issue references in prose (see the chat).
+  - **Status row** Hide: no tags (model, context, cost, folder) around the reply box (the branch beside the send button stays).
   - **Helper on other machines** Never: for a tab on another machine the chat says, in one line,
     "herdr-contr does not run its helper on other machines. To change it: herdr-contr settings, Helper
     on other machines: Ask." No install card; the tab menu has "Remove helper: choose Ask in herdr-contr
@@ -211,18 +249,47 @@ drawn by Herdr's `frames`; every loader of the mod is this one); done is a check
     padding 8).
   - The ids `sidebar`, `screen`, `chat` and `tab` are what the mod switches.
 - **Layout** `layouts/herdr-contr.json`: the same `work` column and theme, but `sidebar` is
-  Herdr's own, as in Herdr's `main` layout (268 px, shown: the blocks `workspace-chrome`, `spaces`,
-  `agents` and the `workspace-chrome` footer), with `traffic_lights: [12, 16]`. The mod knows it by
+  Herdr's own, as in Herdr's `main` layout (268 px, shown: the blocks `workspace-chrome`, `herdr-contr-spaces`,
+  `herdr-contr-agents` and the `workspace-chrome` footer), with `traffic_lights: [12, 16]`. Between the lists and
+  the footer is the mod's `usage` block (56 px, view `usage`): the same plan usage rows as the mod's own
+  sidebar. It starts hidden; the mod shows it (`layout.show`) when a plan has data and hides it when none
+  has. The chat, Needs you and Overview screens start the reads too, so the hidden block can show. Under it, just
+  above the footer, is the mod's `settings-row` block (32 px, view `settings-row`): one row as Herdr's footer rows
+  (28 px, 8 px in, 14 px `sliders` icon, label "herdr-contr", muted, hover background) that opens the herdr-contr
+  settings dialog. On hover it shows the key `⌘⇧,` at the right. On the rail (sidebar under 160 px) it is the icon
+  only, with a tooltip. The mod knows it by
   `shared("layout") === "herdr-contr"`: there the left edge opens no floating sidebar, the
   sidebar shows unless `layouts/.state/herdr-contr.json` hides it, and the bar leaves no room
   for the window buttons while the sidebar shows. ⌘B hides and shows Herdr's sidebar. The top bar
-  is Herdr's own too: the `work` column is Herdr's `tabs` block (42 px, `window_drag`) above a
+  is Herdr's own too: the `work` column is the `tabs` block (mod `herdr-contr-tabs`, 42 px, `window_drag`) above a
   `work-body` row with the `screen` stack and Herdr's `panel` (368 px, hidden: `files` and
   `changes`), as in `main`. Herdr's bar has the tabs, + and the Files and Changes buttons; a tab
   picked there shows its chat or its terminals (the screen sync). The `tab` column holds only
   `tab-panes`. With a `tabs` block in the layout (`herdrTabBar()`), the chat, Needs you and
   Overview draw no bar and leave no room for one (`barH()` is 0); Needs you is ⌘⇧I and Overview
   ⌘⇧\.
+- **Mods** `mods/herdr-contr-agents/` and `mods/herdr-contr-tabs/`: copies of Herdr's `agents` and
+  `tabs` mods (Apache-2.0). The one change: the working mark is the braille loader of
+  `mods/herdr-contr/state.js` (12 px, ⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏ in Menlo, `line_height(1)`, 80 ms a frame), in place
+  of the turning arc. A mod cannot import another mod, so each copy has its own `loader()`. The tabs
+  copy keeps its window icons (`win-*.svg`); the icons of other Herdr mods (`workspace-chrome`,
+  `pane`, `files`, `changes`) stay where Herdr installs them.
+  The agents copy also shows each agent's model and effort on a second line under the name ("Opus 5.5 · low",
+  "GPT-6 · high"; 11 px, `muted`, 14 px line, truncates), aligned with the name, not the icon. Line 1
+  then is 26 px high (top rows and sub-agent rows); a row without a model stays one line (30 px top,
+  26 px sub-agent). In a sub-agent row, a `│` or `├` tree line goes on through line 2. It comes from the
+  helper's `model` command (docs/protocol.md), asked only when the helper has it, when a terminal first
+  shows and when its status changes (at most once in 15 s; no timer). Unknown parts are left out.
+- **Mod** `mods/herdr-contr-spaces/`: a copy of Herdr's `spaces` mod (Apache-2.0). The one change: the
+  space icon (18 px) is the project's favicon (`image()`, full color, 4 px corners), else a folder icon
+  (`workspace-chrome/folder.svg`, 15 px, `muted`), in place of the colored letter. Worktree rows keep
+  the branch icon. Only spaces on this computer look; a space on another machine shows the folder. The
+  look is one `exec` of `sh` in the space's folder (its first terminal's folder, else where it was
+  made), off the UI thread, on the 250 ms check the mod has already. Its result is kept per folder, so
+  a folder is looked at once, and again only when the space moves to a new folder. Files only, the first
+  found wins: `favicon.svg`, `favicon.png` in the folder, then in `public/`, `static/`, `app/`,
+  `src/app/`, `assets/`, `web/`; then `apple-touch-icon.png`, `icon.png`, `icon.svg` in the same folders.
+  No `.ico`: `image()` names SVG, PNG and JPEG, not ICO.
 - **Mod** `mods/herdr-contr/` (`mod.json`: `place: "none"`): one mod, one view per block, picked
   by `props.view`: `side`, `chat`, `needs`, `overview`, `top`; overlays use `settings` (the herdr-contr
   settings dialog), `termbar` (the terminal window's bar), `menu` (right-click menus) and `side` with `peek: true` (the floating sidebar).

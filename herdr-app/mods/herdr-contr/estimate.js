@@ -9,7 +9,7 @@ import { splitBlocks, tableCells } from "./blocks.js";
 import { ROW_PAD_Y, BUBBLE_PAD_Y, bubbleTextWidth, BUBBLE_GAP, IMAGES_LINE_H, CHIP_ROW, CHIP_GAP, OPEN_INDENT, CALL_H, CALLS_PAD,
   SEP_H, FOOTER_H, STATUS_H, CARD_ROW_H, OTHER_H } from "./metrics.js";
 
-export const READ_W = 760;  // the reading column's width at most
+export const READ_W = 1000; // the reading column's width at most
 export const GUTTER = 24;   // each side of the column
 
 const isWide = (c) => c >= 0x1100 && (c <= 0x115f || (c >= 0x2e80 && c <= 0xa4cf) || (c >= 0xac00 && c <= 0xd7a3) ||
@@ -128,6 +128,16 @@ export function lineHeight(size, zoom = 1) {
 // line heights scale by k; padding and margins stay. Headings and list indents are counted at no less than
 // their default size, so a guess never comes out shorter than drawn.
 export function markdownHeight(text, width, spans = null, k = 1, zoom = 1) {
+  const v = measure(text, width, spans, k, zoom);
+  return Math.ceil(v.h + v.p + (v.p > 0 ? END_PAD : 0));
+}
+// The height before rounding and the end pad: the part of a row that `text` takes. mdblocks.js cuts a
+// text block at its paragraphs and list items and gives each piece the difference of two of these.
+export function markdownRaw(text, width, k = 1, zoom = 1) {
+  const v = measure(text, width, null, k, zoom);
+  return v.h + v.p;
+}
+function measure(text, width, spans, k, zoom) {
   const CODE_LH = lineHeight(13 * k, zoom);    // TextView at 13 px (Menlo): its own line height
   const CELL_LH = lineHeight(13.5 * k, zoom);  // table text at 13.5 px (measured 11-10)
   const fs = FS * k, lh = lineHeight(fs, zoom), up = Math.max(1, k);
@@ -202,7 +212,7 @@ export function markdownHeight(text, width, spans = null, k = 1, zoom = 1) {
     }
   }
   close();
-  return Math.ceil(h + p + (p > 0 ? END_PAD : 0));
+  return { h, p };
 }
 
 export { tableCells };

@@ -1,0 +1,19 @@
+────────────────────────────────────────────────────────────────────────────────
+ ☐ PR icons
+
+Herdr's chat text can't draw icons or colors inside a line. PR and issue refs
+can still be underlined, and clicking one opens it in the browser. Where should
+the colored GitHub state icon go?
+
+❯ 1. Chips under message     ┌──────────────────────────────────────────┐
+     (Recommended)           │ I merged PR #50 and #51; #53 is open.    │
+  2. Links only              │  ──   ── ──                              │
+  3. Draw text ourselves     │ [#50 merged] [#51 merged] [#53 open]     │
+                             └──────────────────────────────────────────┘
+
+  Notes: press n to add notes
+
+────────────────────────────────────────────────────────────────────────────────
+  Chat about this
+
+Enter to select · ↑/↓ to navigate · n to add notes · Esc to cancel
