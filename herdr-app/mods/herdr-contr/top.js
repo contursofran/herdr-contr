@@ -5,7 +5,7 @@ import { h_flex } from "gpui-base";
 import { theme, layout, window, settings, openOverlay, run, setAgentOrder, nextCommand, shared, setShared } from "herdr";
 import { openMenu, tabItems } from "./menu.js";
 import { spaceAgents, spaceTabs, activeTab, currentAgent, tabLabel, screenFor, showTab, closeTab, openTerminal, showNeeds, icon, tabAgents, shownScreen,
-  loader, FADE, sidebarShown, herdrSidebar, toggleSidebar, loadSidebar, showScreen, showOverview, showSettings, watchEdge, toggleView } from "./state.js";
+  loader, FADE, sidebarShown, showMain, herdrSidebar, toggleSidebar, loadSidebar, showScreen, showOverview, showSettings, watchEdge, toggleView } from "./state.js";
 import { loadConfig, stepTextSize } from "./config.js";
 import { dragger, dropPlace } from "./drag.js";
 import { startUsage } from "./usage.js";
@@ -56,6 +56,8 @@ export function command(c) {
   if (c === "terminal") return openTerminal(currentAgent());
   if (c === "needs") return showNeeds();
   if (c === "view") return toggleView();
+  const main = /^main-([1-9])$/.exec(c);
+  if (main) return showMain(Number(main[1]));
   if (c === "sidebar") return toggleSidebar();
   if (c === "overview") return showOverview();
   if (c === "settings") return showSettings();
