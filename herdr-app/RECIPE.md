@@ -67,7 +67,10 @@ Left to right:
        In prose, pull request and issue references ("PR #51", "#51", "owner/repo#51", GitHub
        pull and issue URLs) are links (`refs.js`); a click opens them in the browser. A bare "#51"
        takes the repository of the agent's folder (`git remote get-url origin`, read once); without
-       one it stays text. Code, links, other URLs, words and colors such as "#fff" stay as written.
+       one it stays text. With the name of a known repository before it ("herdr-contr #51",
+       "herdr-contr PR #51", "herdr-contr#51"), it takes that repository; the name stays text. Known: the
+       repositories of all agents' folders in the app, each read once. Two with the same name: the one
+       of the agent's own owner, else the agent's own repository. Code, links, other URLs, words and colors such as "#fff" stay as written.
        With **Inline PR icons** on (experimental, off by default; `inline.js`), a text block is cut at
        its paragraphs and top-level list items (`splitPieces`; an item with a nested list stays whole).
        Each piece with a reference is a wrapping row of plain elements (chat text size, line height
