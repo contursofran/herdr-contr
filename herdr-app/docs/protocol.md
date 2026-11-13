@@ -54,6 +54,7 @@ does not download; `install-isolated.sh` copies the sidecar in.
 | `model` | `--terminal <addr>` `[--cache <file>]` (Rust sidecar only; read only) | `model` |
 | `commands` | `--terminal <addr>` `[--cache <file>]` (Rust sidecar only) | `commands` |
 | `usage` | — (Rust sidecar only; read only) | `usage` |
+| `pictures` | `--path <log> --dir <folder> --pics <json>` (Rust sidecar only) | `picture` for each entry of `--pics` |
 | `helper install` | `--machine <m> --sha256 <hex> [--cache <file>]` | `installed` |
 | `helper remove` | `--machine <m> [--cache <file>]` | `removed` |
 | `phone status` / `on` / `off` | `--home <herdr-app home>` (Rust sidecar only) | `phone` |
@@ -163,7 +164,7 @@ Targets: `x86_64-unknown-linux-musl`, `aarch64-unknown-linux-musl`, `universal-a
 ### `version`
 
 ```json
-{"commands":["version","feed","status","card","approve","answer","send","paste-image","helper","queue","phone","commands","working","model","usage"],"release":"0.9.0","type":"version"}
+{"commands":["version","feed","status","card","approve","answer","send","paste-image","pictures","helper","queue","phone","commands","working","model","usage"],"release":"0.9.0","type":"version"}
 ```
 
 `commands`: the commands this sidecar has. The mod hides actions whose command is missing.
@@ -215,6 +216,20 @@ an `image` line with `path: null` follows it. Otherwise `image`: `path: null` wh
 clipboard's image saved as a new PNG in the folder (PNG as it is; on macOS TIFF and other image types are turned
 into PNG). Pastes older than a day in that folder are removed; other files never.
 
+### `picture` (`pictures --path <log> --dir <folder> --pics <json>`)
+
+```json
+{"height":768,"index":0,"path":"/home/you/.config/herdr-app/herdr-contr/pics/pic-00ff00ff00ff00ff.png","type":"picture","width":1024}
+{"index":1,"path":null,"type":"picture"}
+```
+
+The pictures of a row as files the mod can draw. `--pics` is the row's `pics` (at most 32), `--path` the log they
+are in (the `log` line's `path`). Each picture is read back from the log, checked against its fingerprint, and
+written once to the folder as `pic-<digest>.png` or `.jpg`; one that is there is not written again. The mod passes
+`<herdr-app home>/herdr-contr/pics`. `width`, `height`: the picture's size in px. `path: null`: the picture is not
+in the log any more, or it is WebP or GIF (the mod draws only PNG and JPEG). When a new file is written, pictures
+not written or asked for in 7 days are removed from the folder; other files never.
+
 ### `log` (`feed`)
 
 ```json
@@ -264,12 +279,13 @@ the cursor are not touched. A `moved` error: the agent now writes another log th
 
 ### `row` (`feed`)
 
-With `--pictures` (what `serve` asks for, also with `--before`), the log is parsed with each line's offset, and
+With `--pictures` (what `serve` and the mod ask for, also with `--before`), the log is parsed with each line's offset, and
 `user` and `tools` rows with pictures get `pics`: one entry per picture, the owner's for a user row, the calls'
 result pictures in call order for a tools row. `{"format":"png","width":3,"height":4,"offset":1290,"index":0,
 "digest":"<16 hex digits>"}`: the line's file offset, the picture's place in that line, and the first 8 bytes of
 the SHA-256 of its base64. Codex, Grok and Cursor row ids then come from line offsets, so they differ from the
-rows without `--pictures`. The mod never passes it.
+rows without `--pictures`. For a terminal on another machine the sidecar drops `--pictures` before it forwards the
+command: those pictures are in that machine's log, so its rows give only `images`.
 
 One per conversation row, in order. `id` is stable for the same log and `start`: the mod keys row
 heights by it.
@@ -277,7 +293,7 @@ heights by it.
 | `k` | Fields | Shown as |
 |---|---|---|
 | `user` | `text`, `ts`, `images` (count, when any) | A right-aligned bubble. |
-| | `pics` (with `--pictures` only) | Where the pictures are in the log, for `serve`. |
+| | `pics` (with `--pictures` only) | Where the pictures are in the log, for `serve` and `pictures`. |
 | | `from` (a note from another agent) | One line, "↳ docs-worker: first line", that opens to the whole note. |
 | `assistant` | `text` (markdown), `ts` | Full-width markdown. |
 | `tools` | `chips`, `ts` | A chip: "Ran 3 commands", expands to the calls. |

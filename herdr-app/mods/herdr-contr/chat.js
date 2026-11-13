@@ -17,6 +17,7 @@ import { switchStrip } from "./viewswitch.js";
 import { markdownView, codeBlockAt } from "./mdblocks.js";
 import { repoFor } from "./refs.js";
 import { inlineTick } from "./inline.js";
+import { picturesTick, picturesOf, picturesHeight, picturesView } from "./pictures.js";
 import { textScale, setting } from "./config.js";
 
 // Herdr's zoom: line heights round in zoomed px (estimate.js lineHeight).
@@ -83,7 +84,7 @@ export class ChatView {
     this.width = 0;              // the pane's width, from on_size_change
     this.follow = true;          // keep the newest row on screen
     this.open = new Set();       // tool rows that show their calls
-    this.heights = new WeakMap(); // row → { w, open, k, zoom, h }
+    this.heights = new WeakMap(); // row → { w, open, k, zoom, ph, h }
     this.busy = false;
     this.lastPoll = 0; this.lastWork = 0; this.work = null;
     this.composer = new Composer(cx);
@@ -149,6 +150,8 @@ export class ChatView {
     // Inline PR icons (inline.js): gh states read here, not while drawing, for the shown rows. Off: none.
     const ids = new Set(setting("inline_icons") === "on" ? (f ? this.rowsOf(f) : []).map((r) => r.id) : []);
     cx.spawn(async (cx) => { if (await inlineTick(ids)) cx.notify(); });
+    // A message's pictures (pictures.js): asked here, not while drawing. An answer changes the row's height.
+    if (f) cx.spawn(async (cx) => { if (await picturesTick(this.rowsOf(f), f.path) && f === this.feed()) cx.notify(); });
     const status = agent?.status;
     if (status === "working") { if (Date.now() - this.lastWork >= WORK_MS) cx.spawn((cx) => this.pollWorking(cx, agent.address)); }
     else {
@@ -239,10 +242,12 @@ export class ChatView {
 
   height(row) {
     const w = this.colWidth(), open = this.open.has(row.id), k = textScale(), zoom = appZoom();
+    // The pictures' height: null until they are known, then theirs (a new answer counts at once).
+    const ph = picturesHeight(row, this.feed()?.path, bubbleTextWidth(w));
     const c = this.heights.get(row);
-    if (c && c.w === w && c.open === open && c.k === k && c.zoom === zoom) return c.h;
-    const h = rowHeight(row, w, open, k, zoom);
-    this.heights.set(row, { w, open, k, zoom, h });
+    if (c && c.w === w && c.open === open && c.k === k && c.zoom === zoom && c.ph === ph) return c.h;
+    const h = rowHeight(row, w, open, k, zoom, ph);
+    this.heights.set(row, { w, open, k, zoom, ph, h });
     return h;
   }
 
@@ -250,12 +255,15 @@ export class ChatView {
   body(row, t) {
     const md = (text, w = this.colWidth()) => markdownView(row.id, text || "", t, w, textScale(), this.repo());
     switch (row.k) {
-      case "user":
+      case "user": {
         if (row.from != null) return this.agentNote(row, t, md);
+        const pics = picturesOf(row, this.feed()?.path), tw = bubbleTextWidth(this.colWidth());
         return h_flex().w_full().justify_end().py(ROW_PAD_Y).when(Boolean(row.echo), (el) => el.opacity(ECHO_OPACITY))
           .child(v_flex().max_w(bubbleWidth(this.colWidth())).px(BUBBLE_PAD_X).py(BUBBLE_PAD_Y).gap(BUBBLE_GAP).rounded(16).bg(t.raised).text_color(t.foreground)
-            .child(md(row.text, bubbleTextWidth(this.colWidth())))
-            .when(Boolean(row.images), (el) => el.child(div().text_size(IMAGES_FS).text_color(t.muted).child(row.images === 1 ? "1 image" : `${row.images} images`))));
+            .child(md(row.text, tw))
+            .when(Boolean(pics), (el) => el.child(picturesView(pics, t, tw)))
+            .when(!pics && Boolean(row.images), (el) => el.child(div().text_size(IMAGES_FS).text_color(t.muted).child(row.images === 1 ? "1 image" : `${row.images} images`))));
+      }
       case "assistant":
         return div().w_full().py(ROW_PAD_Y).text_color(t.foreground).child(md(row.text));
       case "tools": return this.tools(row, t);

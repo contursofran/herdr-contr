@@ -55,8 +55,11 @@ export function hasCommand(name) {
 export const forgetCommands = () => { known = null; };
 
 // The commands, with the cache file the sidecar keeps.
-export const feed = (terminal, cursor) => call("feed", ["--terminal", terminal, "--cache", cachePath(), ...(cursor ? ["--cursor", cursor] : [])]);
-export const older = (terminal, before, path) => call("feed", ["--terminal", terminal, "--before", String(before), "--path", path]);
+// `--pictures`: rows say where their pictures are in the log (pictures.js); on another machine the sidecar drops it.
+export const feed = (terminal, cursor) => call("feed", ["--terminal", terminal, "--pictures", "--cache", cachePath(), ...(cursor ? ["--cursor", cursor] : [])]);
+export const older = (terminal, before, path) => call("feed", ["--terminal", terminal, "--pictures", "--before", String(before), "--path", path]);
+// A row's pictures (its `pics`) as files in `dir`: one `picture` line for each.
+export const pictures = (path, pics, dir) => call("pictures", ["--path", path, "--dir", dir, "--pics", JSON.stringify(pics)]);
 export const status = (terminal) => call("status", ["--terminal", terminal, "--cache", cachePath()]);
 export const card = (terminal, all = false) => call("card", ["--terminal", terminal, ...(all ? ["--all"] : []), "--cache", cachePath()]);
 export const approve = (terminal, request, allow) => call("approve", ["--terminal", terminal, "--request", request, allow ? "--allow" : "--deny", "--cache", cachePath()]);

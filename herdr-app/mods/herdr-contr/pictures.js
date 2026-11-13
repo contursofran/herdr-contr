@@ -1,0 +1,88 @@
+// The pictures of a user message (#86), drawn in its bubble under the text. The rows of an agent on this
+// machine say where their pictures are in the log (`feed --pictures`, the rows' `pics`); the sidecar's
+// `pictures` writes them as files under <app home>/herdr-contr/pics. image() reads a path relative to the app
+// home (phone.js appRel). picturesTick (the chat's timer) asks for them, never the draw; the answers are kept
+// here by log and pictures. Until an answer is there, or when it has no picture to draw, the "N images" line shows.
+// The chat's list renderer refuses handlers and state (#70): the pictures are plain elements.
+import { div, image } from "gpui-kit";
+import { v_flex, h_flex } from "gpui-base";
+import { appHome } from "herdr";
+import * as sidecar from "./sidecar.js";
+import { appRel } from "./phone.js";
+import { picturesLayout, PIC_GAP } from "./metrics.js";
+
+const RETRY_MS = 60_000, MAX_ASKS = 2, MAX_KEPT = 500;
+const answers = new Map();   // key -> { list: [{ rel, width, height }], at, failed?, layouts: Map }
+const asking = new Set();
+const keys = new WeakMap();  // row -> key
+
+export const picsDir = () => `${appHome()}/herdr-contr/pics`;
+
+// The key of a row's pictures in `path`'s log, or null (no pictures, or a note from another agent).
+export function picturesKey(row, path) {
+  if (!path || row?.k !== "user" || row.from != null || !Array.isArray(row.pics) || !row.pics.length) return null;
+  const c = keys.get(row);
+  if (c && c.path === path) return c.key;
+  const key = `${path}|${row.pics.map((p) => `${p.digest}:${p.offset}:${p.index}`).join(",")}`;
+  keys.set(row, { path, key });
+  return key;
+}
+
+// The answer for a row with one picture or more to draw, or null.
+export function picturesOf(row, path) {
+  const key = picturesKey(row, path);
+  const a = key ? answers.get(key) : null;
+  return a?.list.length ? a : null;
+}
+
+// The pictures' layout in `maxW` px, kept by width (each draw asks).
+export function layoutOf(a, maxW) {
+  let l = a.layouts.get(maxW);
+  if (!l) { l = picturesLayout(a.list, maxW); a.layouts.set(maxW, l); }
+  return l;
+}
+
+// The height of a row's pictures in `maxW` px, or null (the "N images" line counts then).
+export function picturesHeight(row, path, maxW) {
+  const a = picturesOf(row, path);
+  return a ? layoutOf(a, maxW).height : null;
+}
+
+// The pictures as plain elements: a column of lines, each a row of boxes with a border from the theme.
+export function picturesView(a, t, maxW) {
+  const l = layoutOf(a, maxW);
+  return v_flex().flex_none().w(l.width).h(l.height).gap(PIC_GAP).children(l.lines.map((line) =>
+    h_flex().flex_none().gap(PIC_GAP).items_start().children(line.map((p) =>
+      div().flex_none().w(p.w).h(p.h).rounded(8).border(1).border_color(t.border).bg(t.chrome).overflow_hidden()
+        .child(image(a.list[p.i].rel).w(p.w - 2).h(p.h - 2).rounded(7))))));
+}
+
+// Asks the sidecar for the pictures of the shown rows that have no answer yet: at most MAX_ASKS at once,
+// a failed ask again after RETRY_MS. An older sidecar without `pictures`: nothing. Run from a timer, never
+// from render. true when an answer came that changes what the chat draws.
+export async function picturesTick(rows, path, now = Date.now()) {
+  const todo = [];
+  for (const row of rows ?? []) {
+    const key = picturesKey(row, path);
+    if (!key || asking.has(key) || todo.some((x) => x.key === key)) continue;
+    const a = answers.get(key);
+    if (a && !(a.failed && now - a.at >= RETRY_MS)) continue;
+    todo.push({ key, pics: row.pics });
+  }
+  const run = todo.slice(0, Math.max(0, MAX_ASKS - asking.size));
+  if (!run.length || !(await sidecar.hasCommand("pictures"))) return false;
+  for (const x of run) asking.add(x.key);
+  const got = await Promise.all(run.map(async (x) => {
+    let r;
+    try { r = await sidecar.pictures(path, x.pics, picsDir()); } catch (e) { r = { error: { message: String(e) }, lines: [] }; }
+    asking.delete(x.key);
+    const list = r.error ? [] : r.lines.filter((l) => l.type === "picture" && l.path && l.width > 0 && l.height > 0)
+      .map((l) => ({ rel: appRel(l.path), width: l.width, height: l.height })).filter((p) => p.rel);
+    if (answers.size >= MAX_KEPT) answers.clear();
+    answers.set(x.key, { list, at: now, failed: Boolean(r.error), layouts: new Map() });
+    return list.length > 0;
+  }));
+  return got.some(Boolean);
+}
+
+export function forgetPictures() { answers.clear(); asking.clear(); }

@@ -355,3 +355,14 @@ fn send_with_a_file_puts_it_there_first() {
     assert_eq!(sent.len(), 1);
     assert_eq!(sent[0]["text"], "look at '/remote/tmp/shot one.png'", "the text names the copy there");
 }
+
+#[test]
+fn pictures_stay_there() {
+    // The mod asks `feed --pictures` for every terminal; on another machine the rows give only the count.
+    let w = world();
+    w.install_by_hand();
+    w.run(&["feed", "--terminal", "box/t3", "--pictures", "--cache", "/nonexistent-home/cache.json"]);
+    let fwd = w.here.calls("machine.exec").last().unwrap().clone();
+    let argv: Vec<&str> = fwd["argv"].as_array().unwrap().iter().map(|v| v.as_str().unwrap()).collect();
+    assert!(argv.contains(&"feed") && !argv.contains(&"--pictures"), "{argv:?}");
+}
