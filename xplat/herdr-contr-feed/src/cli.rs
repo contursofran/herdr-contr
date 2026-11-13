@@ -23,7 +23,7 @@
 //! A terminal `m/tN` on another machine: the command runs there, in the helper there (`remote`). Rust only.
 
 use crate::protocol::{JsonLines, PROTOCOL_VERSION, SIDECAR_VERSION};
-use crate::{agentmodel, cards, config, feed, locate, mermaid, paste, phone, queue, remote, status, update, usage, working};
+use crate::{agentmodel, cards, config, feed, locate, mermaid, panel, paste, phone, queue, remote, status, update, usage, working};
 use herdr_core::hc::{HcClient, HcSession};
 use herdr_core::PaneScreen;
 use herdr_core::resolver::SessionResolver;
@@ -62,7 +62,7 @@ pub fn run(argv: &[String]) -> String {
     r.out.emit_value(json!({"type": "header", "protocol": PROTOCOL_VERSION, "sidecar": SIDECAR_VERSION, "cmd": cmd}));
     match cmd.as_str() {
         "version" => {
-            r.out.emit_value(json!({"type": "version", "commands": ["version", "feed", "status", "card", "approve", "answer", "send", "paste-image", "mermaid", "pictures", "helper", "queue", "phone", "commands", "working", "model", "usage", "favicon"], "release": update::release()}));
+            r.out.emit_value(json!({"type": "version", "commands": ["version", "feed", "status", "card", "approve", "answer", "send", "paste-image", "mermaid", "pictures", "helper", "queue", "phone", "commands", "working", "model", "usage", "favicon", "panel", "keys"], "release": update::release()}));
             r.finish(true)
         }
         "usage" => {
@@ -183,7 +183,7 @@ pub fn run(argv: &[String]) -> String {
                 Err((code, message)) => r.fail(code, &message),
             }
         }
-        "feed" | "status" | "card" | "approve" | "answer" | "send" | "queue" | "commands" | "working" | "model" => {
+        "feed" | "status" | "card" | "approve" | "answer" | "send" | "queue" | "commands" | "working" | "model" | "panel" | "keys" => {
             let Some(terminal) = opt("--terminal") else { return r.fail("usage", &format!("{cmd} needs --terminal <addr>")) };
             let cache_path = opt("--cache").map(PathBuf::from);
             let cache_url = cache_path.as_deref();
@@ -263,6 +263,20 @@ pub fn run(argv: &[String]) -> String {
                     r.out.emit_value(agentmodel::line(&kind, &agentmodel::read(&kind, &s, SystemTime::now())));
                     return r.finish(true);
                 }
+                "panel" => {
+                    // Read only: the panel Claude Code draws in place of its input box, as plain text.
+                    let p = panel::on_pane(&found.pane, &client, log);
+                    r.out.emit_value(panel::line(p.as_ref()));
+                    return r.finish(true);
+                }
+                "keys" => {
+                    let Some(keys) = opt("--keys").and_then(|k| serde_json::from_str::<Vec<String>>(&k).ok()) else {
+                        return r.fail("usage", "keys needs --keys <json list of key names>");
+                    };
+                    let d = panel::send(&found.pane, &client, log, &keys);
+                    r.out.emit(&d);
+                    return r.finish(true);
+                }
                 "card" => {
                     let c = cards::card(&found.pane, &client, log, has("--all"), cache_url);
                     r.out.emit(&c);
@@ -323,7 +337,7 @@ pub fn run(argv: &[String]) -> String {
             }
         }
         // The Swift sidecar's text (parity): `queue` is serve's own, not offered to the mod.
-        _ => r.fail("usage", "commands: version, feed, status, card, approve, answer, send, working, model"),
+        _ => r.fail("usage", "commands: version, feed, status, card, approve, answer, send, working, model, panel, keys"),
     }
 }
 
