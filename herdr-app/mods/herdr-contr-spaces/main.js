@@ -1,6 +1,7 @@
 // Adapted from Herdr's spaces mod (Apache-2.0); changes: the project's favicon, else a folder icon, as the space icon.
 // Also: it is the Projects list. Under each project, its agents (from our copy of Herdr's agents mod), an
 // orchestrator's workers under it; the projects with no agent go into one "N more projects" row (projects.js).
+// On hover an agent row shows Stop and "Open in a new tab"; agent and worker rows have the model as a tooltip.
 // Workspace spaces: stable colored avatars, worktrees under their checkout,
 // grouped by machine when more than one is known. After a space's name, the repo
 // its first terminal is in now, only where unusual: branch, ahead/behind. Agent state lives in the agents list, not here. Click to
@@ -8,8 +9,21 @@
 
 import { View, div, svg, image } from "gpui-kit";
 import { v_flex, h_flex } from "gpui-base";
-import { spaces, machines, panes, agents, terminals, focused, setAgentOrder, run, openOverlay, exec, hc, theme, shared, setShared, watchFolder, window, layout } from "herdr";
-import { bySpace, split, countLine, moreLine, workerText, leadPanes, agentLabel, duration } from "./projects.js";
+import { spaces, machines, panes, agents, terminals, focused, setAgentOrder, run, openOverlay, exec, hc, theme, shared, setShared, watchFolder, window, layout, appHome } from "herdr";
+import { bySpace, split, countLine, moreLine, workerText, leadPanes, agentLabel, duration, modelTip, modelDue, MODEL_MS } from "./projects.js";
+
+// herdr-contr's helper (its `model` command; docs/protocol.md). A mod cannot import another mod, so this is
+// a small copy of herdr-contr's sidecar call.
+const helper = (cmd, args) => exec(`${appHome()}/herdr-contr/bin/herdr-contr-feed`, [cmd, ...args, "--home", appHome()])
+  .then((r) => String(r?.stdout ?? "").split("\n").map((l) => { try { return JSON.parse(l); } catch { return null; } }).filter(Boolean), () => []);
+let hasModel = null;
+const helperHasModel = () => (hasModel ??= helper("version", []).then((ls) => {
+  const v = ls.find((l) => l.type === "version");
+  if (!v) hasModel = null; // Ask again next time.
+  return Boolean(v?.commands?.includes("model"));
+}));
+// For tests: forget the helper's answer.
+export const forgetHelper = () => { hasModel = null; };
 
 // The braille loader, as herdr-contr's loader() in mods/herdr-contr/state.js (a mod cannot import another mod).
 const BRAILLE = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"];
@@ -99,7 +113,12 @@ export default class Spaces extends View {
     this.more = new Set(); // machines whose "N more projects" row is open
     // Each agent's last state and when it changed (ms), kept across restarts.
     this.changed = JSON.parse(localStorage.getItem("changed") ?? "{}");
+    this.hovered = null; // the agent row under the pointer
+    this.models = new Map(); // terminal -> { tip, status, at, busy }: its model tooltip, from the helper
     cx.timer.every(30000, (cx) => cx.notify());
+    // The models, from a timer and never from a draw.
+    cx.timer.after(0, (cx) => this.askModels(cx));
+    cx.timer.every(MODEL_MS, (cx) => this.askModels(cx));
     this.refreshMachines(cx);
     cx.timer.every(15000, cx => this.refreshMachines(cx));
     // Refresh only when the refs could have changed (see `due`).
@@ -534,27 +553,37 @@ export default class Spaces extends View {
   // (when it does not work) and the state mark (when it works or waits). Under the title of an agent with
   // live workers: "Orchestrating · N workers". The shown row is raised, with a 1 px ring; its title is full
   // ink, 500. A finished agent not looked at yet (done) is full ink, 600; any other is muted, 400.
+  // On hover: the age and the mark hide, the controls show, and the icon is at full opacity.
   agentRow({ a, workers }, t) {
     const when = this.changed[a.address]?.at ?? 0;
     const on = a.focused;
     const unread = !on && a.status === "done";
-    return v_flex().id(`ag-${a.address}`).py(6).pl(26).pr(10).gap(2).flex_none().rounded(8)
+    const hot = this.hovered === a.address;
+    const row = v_flex().id(`ag-${a.address}`).relative().py(6).pl(26).pr(10).gap(2).flex_none().rounded(8)
       .when(on, (el) => el.bg(t.raised).border_1().border_color(t.border))
       .when(!on, (el) => el.hover((s) => s.bg(t.hover)))
       .cursor_pointer()
+      .on_hover((over, cx) => {
+        if (over) this.hovered = a.address;
+        else if (this.hovered === a.address) this.hovered = null;
+        else return;
+        cx.notify();
+      })
       .on_click(() => run("pane.focus", { pane: a.pane }))
       .child(h_flex().h(18).gap(8).items_center()
-        .child(agentIcon(a.program, 15, t[a.status] ?? t.muted).when(!on, (el) => el.opacity(0.45)))
+        .child(agentIcon(a.program, 15, t[a.status] ?? t.muted).when(!on && !hot, (el) => el.opacity(0.45)))
         .child(div().flex_1().min_w(0).truncate().text_size(13)
           .when(on, (el) => el.font_medium().text_color(t.foreground))
           .when(unread, (el) => el.font_semibold().text_color(t.foreground))
           .when(!on && !unread, (el) => el.text_color(t.muted))
           .child(this.labels.get(a.address) ?? ""))
-        .when(Boolean(when) && a.status !== "working", (el) => el.child(div().flex_none().font_family("Menlo").text_size(11).text_color(t.muted).child(duration(this.now - when))))
-        .when(a.status === "working" || a.status === "blocked", (el) => el.child(this.mark(t, a.status, 15))))
+        .when(!hot && Boolean(when) && a.status !== "working", (el) => el.child(div().flex_none().font_family("Menlo").text_size(11).text_color(t.muted).child(duration(this.now - when))))
+        .when(!hot && (a.status === "working" || a.status === "blocked"), (el) => el.child(this.mark(t, a.status, 15))))
       .when(workers.length > 0, (el) => el.child(h_flex().h(16).gap(8).items_center()
         .child(div().w(15).flex_none())
-        .child(div().flex_1().min_w(0).truncate().text_size(12).text_color(t.muted).child(countLine(workers.length)))));
+        .child(div().flex_1().min_w(0).truncate().text_size(12).text_color(t.muted).child(countLine(workers.length)))))
+      .when(hot, (el) => el.child(this.controls(a, t)));
+    return this.withModel(row, a.address);
   }
 
   // An orchestrator's workers: 32 px in, with a 1 px guide line at the left.
@@ -564,7 +593,7 @@ export default class Spaces extends View {
       .children(list.map(({ t: k, depth }) => {
         const st = this.listed.get(k.address) ?? (k.status === "error" ? "blocked" : k.status);
         const on = k.address === shown;
-        return h_flex().id(`sub-${k.address}`).h(26).flex_none().pl(8 + 14 * depth).pr(8).gap(8).items_center().rounded(6)
+        return this.withModel(h_flex().id(`sub-${k.address}`).h(26).flex_none().pl(8 + 14 * depth).pr(8).gap(8).items_center().rounded(6)
           .text_size(12)
           .when(on, (el) => el.bg(t.raised))
           .when(!on, (el) => el.hover((s) => s.bg(t.hover)))
@@ -572,7 +601,7 @@ export default class Spaces extends View {
           .on_click(() => run(this.listed.has(k.address) ? "pane.focus" : "terminal.peek", { terminal: k.address }))
           .child(agentIcon(k.program, 13, t[st] ?? t.muted))
           .child(div().flex_1().min_w(0).truncate().text_color(on ? t.foreground : st === "done" ? t.dim : t.muted).child(workerText(k)))
-          .child(this.mark(t, st, 12));
+          .child(this.mark(t, st, 12)), k.address);
       }));
   }
 
@@ -600,6 +629,61 @@ export default class Spaces extends View {
     const listed = new Set(list.map((a) => a.address));
     for (const [k, c] of Object.entries(this.changed)) if (!listed.has(k) && now - c.at > 30 * 86400000) delete this.changed[k];
     localStorage.setItem("changed", JSON.stringify(this.changed));
+  }
+
+  // Asks the helper for the model of each agent and worker the list shows, when modelDue() says so. The answer
+  // is kept in this.models; a changed tooltip draws the list again. Terminals that went are forgotten.
+  askModels(cx, now = Date.now()) {
+    const list = agents();
+    const status = new Map(list.map((a) => [a.address, a.status]));
+    const want = new Map();
+    for (const xs of bySpace(list, terminals()).values()) {
+      for (const { a, workers } of xs) {
+        want.set(a.address, a.status);
+        for (const { t: k } of workers) want.set(k.address, status.get(k.address) ?? k.status);
+      }
+    }
+    for (const k of [...this.models.keys()]) if (!want.has(k)) this.models.delete(k);
+    const due = [...want].filter(([addr, st]) => modelDue(this.models.get(addr), st, now));
+    if (!due.length) return;
+    for (const [addr, st] of due) {
+      const m = this.models.get(addr) ?? { tip: "" };
+      Object.assign(m, { status: st, at: now, busy: true });
+      this.models.set(addr, m);
+    }
+    return helperHasModel().then((has) => Promise.all(due.map(async ([addr]) => {
+      const m = this.models.get(addr);
+      try {
+        if (!has) return;
+        const l = (await helper("model", ["--terminal", addr])).find((x) => x.type === "model");
+        const tip = l ? modelTip(l.model, l.effort) : "";
+        if (tip !== m.tip) { m.tip = tip; cx?.notify?.(); }
+      } finally { m.busy = false; }
+    })));
+  }
+
+  // Sets the tooltip of a row when the model is known.
+  withModel(el, address) {
+    const tip = this.models.get(address)?.tip;
+    return tip ? el.tooltip(tip) : el;
+  }
+
+  // The hover controls of an agent row, at its right: Stop (the agent's terminal ends) and "Open in a new
+  // tab" (the terminal gets a pane in a tab of its own). 22 px buttons, 6 px corners, 12 px icons, muted.
+  controls(a, t) {
+    const button = (id, icon, tip, act) => div().id(`${id}-${a.address}`).size(22).flex_none().flex().items_center().justify_center()
+      .rounded(6).text_color(t.muted).cursor_pointer().hover((s) => s.bg(t.hover).text_color(t.foreground)).tooltip(tip)
+      .on_click((_e, cx) => {
+        cx.stop_propagation();
+        act();
+        // The row can go from under the pointer, and no hover-out comes.
+        this.hovered = null;
+        cx.notify();
+      })
+      .child(svg(icon).size(12));
+    return h_flex().absolute().top(4).right(6).gap(2)
+      .child(button("stop", "mods/workspace-chrome/square.svg", "Stop", () => run("terminal.kill", { terminal: a.address })))
+      .child(button("open-tab", "mods/herdr-contr-spaces/open-tab.svg", "Open in a new tab", () => run("terminal.keep", { terminal: a.address, place: "tab" })));
   }
 
   // The data of one draw: agents by space, their titles, and the time. Read once per draw.
