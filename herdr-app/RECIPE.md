@@ -180,7 +180,7 @@ drawn by Herdr's `frames`; every loader of the mod is this one); done is a check
   switches are off. A missing file shows the defaults;
   the first change creates it (and its folder). A file that is not JSON shows an error and is never
   written.
-- **herdr-contr settings** (the herdr-contr row, or ⌘⇧,): saved in `<herdr-app home>/herdr-contr/config.json`
+- **herdr-contr settings** (a right-click on the sidebar's Settings, or ⌘⇧,): saved in `<herdr-app home>/herdr-contr/config.json`
   as `{"status_row": "show", "remote_helper": "ask"}`. The install never
   creates the file; a missing file or key is the default, and so is a value that is not one of the
   choices. A file that is not JSON is the defaults too: the dialog says so, and its switches do
@@ -231,15 +231,29 @@ drawn by Herdr's `frames`; every loader of the mod is this one); done is a check
     padding 8).
   - The ids `sidebar`, `screen`, `chat` and `tab` are what the mod switches.
 - **Layout** `layouts/herdr-contr.json`: the same `work` column and theme, but `sidebar` is
-  Herdr's, as in Herdr's `main` layout (268 px, shown: the blocks `workspace-chrome`, `projects` (mod
-  `herdr-contr-spaces`, the Projects list) and the `workspace-chrome` footer), with `traffic_lights: [12, 16]`. Between the list and
-  the footer is the mod's `usage` block (56 px, view `usage`): the same plan usage rows as the mod's own
-  sidebar. It starts hidden; the mod shows it (`layout.show`) when a plan has data and hides it when none
-  has. The chat, Needs you and Overview screens start the reads too, so the hidden block can show. Under it, just
-  above the footer, is the mod's `settings-row` block (32 px, view `settings-row`): one row as Herdr's footer rows
-  (28 px, 8 px in, 14 px `sliders` icon, label "herdr-contr", muted, hover background) that opens the herdr-contr
-  settings dialog. On hover it shows the key `⌘⇧,` at the right. On the rail (sidebar under 160 px) it is the icon
-  only, with a tooltip. The mod knows it by
+  Herdr's, as in Herdr's `main` layout (268 px, shown), with `traffic_lights: [12, 16]`, and three blocks (#97, after
+  the owner's design): `brand` (46 px, `window_drag`, mod `herdr-contr-spaces`, view `head`), `projects` (mod
+  `herdr-contr-spaces`, the Projects list) and `foot` (mod `herdr-contr`, view `foot`).
+  - The head (`herdr-contr-spaces/head.js`), padding 0 10 0 20 (76 px at the left on macOS for the traffic lights),
+    gap 4: "Herdr" (14 px semibold), the machine switch (26 px, 6 px corners, padding 0 6, the picked machine's
+    name or "This computer" in 12 px `muted`, a 12 px chevron; it truncates), a spacer, then search (`picker`) and
+    the sidebar toggle (28 px square, 8 px corners, 16 px icons, `muted`). A press on a control is no window drag.
+    On the rail only the toggle shows, and on the macOS rail nothing. A press on the switch opens the machines
+    menu (a popup of the same mod, view `machines`, 240 px): "This computer", then each machine with its state at
+    the right when not connected ("unreachable", "needs login", "rebuilt", in `dim`), a check at the picked one,
+    a line, and "Add machine…". A press picks the machine (`shared("projects.machine")`, null for this computer)
+    and closes the menu. The Projects list writes the machines it knows to `shared("projects.machines")`, only on a
+    change. A picked machine that is not known any more is this computer.
+  - The foot (`herdr-contr/foot.js`): a 1 px `border` line at the top. With plan data, padding 12 20 6, rows 10 px
+    apart: one 16 px row per plan (Claude, then Codex): the name in a 52 px column (12 px, `muted`), a 4 px bar
+    (2 px corners, `hover` track, the used part in `dim`) and the value (Menlo 11, `muted`): the most used window
+    as "41% wk · 4d" (percent used, window, time to its reset). Then, padding 4 10 10, gap 4: Settings (30 px, 8 px
+    corners, padding 0 10, 16 px gear, gap 8, 13 px `muted`) fills the width and opens Herdr's settings; a dot
+    (`accent`) when an app update is ready; a right-click opens the herdr-contr settings, and its tooltip says so.
+    At its right the add machine button (28 px square, 8 px corners, 16 px +, tooltip "Add machine") opens Herdr's
+    `machine-add` dialog. The block is as tall as its rows (`layout.resize` on a change of the plan count: 45 px
+    with no plan, 79 px with one, 105 px with two). On the rail: the bars only, the name and value in a tooltip,
+    and Settings only. The chat, Needs you and Overview screens start the reads too. The mod knows it by
   `shared("layout") === "herdr-contr"`: there the left edge opens no floating sidebar, the
   sidebar shows unless `layouts/.state/herdr-contr.json` hides it, and the bar leaves no room
   for the window buttons while the sidebar shows. ⌘B hides and shows Herdr's sidebar. The top bar
@@ -259,7 +273,13 @@ drawn by Herdr's `frames`; every loader of the mod is this one); done is a check
 - **Mod** `mods/herdr-contr-spaces/`: a copy of Herdr's `spaces` mod (Apache-2.0). It is the **Projects list**
   of the `herdr-contr` layout (#96; after the owner's design, slice 1 of 3). The layout no longer names
   the agents copy: the agent rows are drawn here (`projects.js` holds the grouping).
-  - A head row "Projects" (12 px, `font_medium`, `muted`; padding 6 10 4 20) with a 24 px + (8 px corners, `space.new`).
+  - A head row "Projects" (12 px, `font_medium`, `muted`; padding 6 10 4 20) with a 24 px + (8 px corners, `space.new`
+    on the picked machine).
+  - Only the projects of the machine picked in the head show, with no machine rows. A picked machine that is not
+    connected has a line over its rows ("linux-pc · unreachable", 11 px `dim`): a rebuilt one has Connect (it
+    removes and adds the machine again), one that needs a login shows `hc machine login <name>` with Copy. A
+    machine with no project has "New space on <name>". The git look-ups of the fallback timer run only for
+    the picked machine.
     The list: 10 px at the sides, rows 2 px apart, 10 px under each project and its agents.
   - A project row (30 px, 8 px corners, padding 0 10 0 6, gap 6): a 14 px chevron (only when the project has
     agents; a press on it opens or shuts the project's agents, kept in `localStorage` `projects.closed`, and is no
@@ -298,7 +318,7 @@ drawn by Herdr's `frames`; every loader of the mod is this one); done is a check
     (docs/protocol.md), asked only when the helper has it, from a timer (at start, then every 15 s) and never
     from a draw: for a terminal the first time it shows and when its status changed, at most once in 15 s.
     No model known: no tooltip.
-  - The rail (under 160 px) and the machine group rows are as before. The agents copy's pin and sort menu are
+  - The rail (under 160 px) is as before, for the picked machine. The agents copy's pin and sort menu are
     not here: the owner's design has neither.
 
   The favicon change: the

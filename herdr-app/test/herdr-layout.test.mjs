@@ -17,11 +17,14 @@ beforeEach(() => { reset(); fake.shared.layout = "herdr-contr"; });
 test("the sidebar is Herdr's, shown, and the work area is the mod's screen stack", () => {
   const side = find(layout, "sidebar");
   assert.equal(side.hidden, undefined);
-  assert.deepEqual(mods(side), ["workspace-chrome", "herdr-contr-spaces", "herdr-contr", "herdr-contr", "workspace-chrome"]);
-  // One Projects list (the spaces copy), then the plan usage, hidden until a plan has data, and Herdr's footer.
-  assert.deepEqual(side.children.map((c) => c.id), ["brand", "projects", "usage", "settings-row", "sidebar-footer"]);
-  const usage = find(layout, "usage");
-  assert.deepEqual([usage.content.props.view, usage.size.px, usage.hidden], ["usage", 56, true]);
+  assert.deepEqual(mods(side), ["herdr-contr-spaces", "herdr-contr-spaces", "herdr-contr"]);
+  // The head (a view of the spaces copy, in place of Herdr's brand block), one Projects list, and the foot
+  // (the plan usage, Settings and Add machine), in place of Herdr's footer.
+  assert.deepEqual(side.children.map((c) => c.id), ["brand", "projects", "foot"]);
+  const brand = find(layout, "brand");
+  assert.deepEqual([brand.content.props.view, brand.size.px, brand.window_drag], ["head", 46, true]);
+  const foot = find(layout, "foot");
+  assert.deepEqual([foot.content.props.view, foot.size.px, foot.hidden], ["foot", 45, undefined]);
   const screen = find(layout, "screen");
   assert.equal(screen.type, "stack");
   assert.deepEqual(screen.children.map((c) => c.id), ["chat", "needs", "overview", "tab"]);

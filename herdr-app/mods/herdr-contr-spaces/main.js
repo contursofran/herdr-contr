@@ -3,14 +3,18 @@
 // orchestrator's workers under it; the projects with no agent go into one "N more projects" row (projects.js).
 // On hover an agent row shows Stop and "Open in a new tab"; agent and worker rows have the model as a tooltip.
 // Workspace spaces: stable colored avatars, worktrees under their checkout,
-// grouped by machine when more than one is known. After a space's name, the repo
+// of the machine picked in the head (head.js) only. After a space's name, the repo
 // its first terminal is in now, only where unusual: branch, ahead/behind. Agent state lives in the agents list, not here. Click to
 // switch, right-click for its menu, drag to reorder.
 
 import { View, div, svg, image } from "gpui-kit";
 import { v_flex, h_flex } from "gpui-base";
-import { spaces, machines, panes, agents, terminals, focused, setAgentOrder, run, openOverlay, exec, hc, theme, shared, setShared, watchFolder, window, layout, appHome } from "herdr";
+import { spaces, machines, panes, agents, terminals, focused, setAgentOrder, run, openOverlay, exec, hc, theme, shared, setShared, watchFolder, window, layout, appHome, props } from "herdr";
 import { bySpace, split, countLine, moreLine, workerText, leadPanes, agentLabel, duration, modelTip, modelDue, MODEL_MS } from "./projects.js";
+import { HeadView, MachinesMenu, MACHINES, pickedMachine } from "./head.js";
+
+// The other copies of this mod, by props.view: the sidebar's head and the machines menu (head.js).
+const PARTS = { head: HeadView, machines: MachinesMenu };
 
 // herdr-contr's helper (its `model` command; docs/protocol.md). A mod cannot import another mod, so this is
 // a small copy of herdr-contr's sidecar call.
@@ -90,6 +94,8 @@ export async function findFavicon(folder) {
 
 export default class Spaces extends View {
   init(_props, cx) {
+    const Part = PARTS[props()?.view];
+    if (Part) { this.part = new Part(cx); return; }
     this.git = {}; // where() -> { name, branch, ahead, behind, repo, linked }, null: not a repo
     this.checked = {}; // where() -> when it was last looked at
     this.unsure = new Set(); // where()s git couldn't answer for (a machine away)
@@ -108,7 +114,6 @@ export default class Spaces extends View {
     this.machines = [];
     this.reconnecting = JSON.parse(localStorage.getItem("machines.reconnecting") ?? "{}");
     for (const state of Object.values(this.reconnecting)) state.busy = false;
-    this.folded = new Set(JSON.parse(localStorage.getItem("machines.folded") ?? "[]"));
     this.closed = new Set(JSON.parse(localStorage.getItem("projects.closed") ?? "[]")); // projects folded shut
     this.more = new Set(); // machines whose "N more projects" row is open
     // Each agent's last state and when it changed (ms), kept across restarts.
@@ -163,7 +168,7 @@ export default class Spaces extends View {
     if (window().active) {
       for (const k of keys) {
         const asks = this.git[k] || this.unsure.has(k);
-        if (asks && !this.folded.has(JSON.parse(k)[0]) && now - (this.checked[k] ?? 0) > FALLBACK) due.add(k);
+        if (asks && JSON.parse(k)[0] === pickedMachine() && now - (this.checked[k] ?? 0) > FALLBACK) due.add(k);
       }
     }
     return due;
@@ -238,8 +243,6 @@ export default class Spaces extends View {
         if (machine.session) args.push("--session", machine.session);
         if (machine.temporary) args.push("--temp");
         await ask(args);
-        this.folded.delete(name);
-        localStorage.setItem("machines.folded", JSON.stringify([...this.folded]));
         delete this.reconnecting[name];
       } catch (e) {
         state.error = String(e.message ?? e);
@@ -369,75 +372,72 @@ export default class Spaces extends View {
     return out.filter(r => this.shown.has(r.w.id));
   }
 
-  // The rows, under a header per machine once one isn't this computer.
+  // The machines for the head's switch (head.js): each one but this computer, with its state. Written only
+  // on a change, as every mod draws again on a shared write.
+  publishMachines(remote) {
+    const list = remote.map((name) => {
+      const machine = this.machines.find((k) => k.name === name) ?? this.reconnecting[name]?.machine;
+      const state = this.rebuilt(machine) || this.reconnecting[name] ? "rebuilt"
+        : (machine?.state ?? "asleep").replace(/_/g, " ");
+      return { name, state };
+    });
+    if (JSON.stringify(list) !== JSON.stringify(shared(MACHINES) ?? [])) setShared(MACHINES, list);
+  }
+
+  // The picked machine's rows (head.js picks it; this computer by default). A machine that is not connected
+  // says so in a line over its rows, with what to do: connect to a rebuilt one, or the login to run.
   grouped(t, collapsed) {
     const rows = this.ordered();
-    // Herdr's agent keys go in the order of the projects.
+    // Herdr's agent keys go in the order of the projects, of every machine.
     setAgentOrder(rows.flatMap((r) => this.agentsOf.get(r.w.id) ?? []).map((x) => x.a.address));
     const draw = (r) => (collapsed ? this.compact(r, t) : this.row(r, t));
     const list = (rs, m) => (collapsed ? rs.map(draw) : this.projects(rs, m, t));
     const remote = [...new Set([...rows.map(r => r.w.machine).filter(Boolean), ...this.machines.map(m => m.name), ...Object.keys(this.reconnecting)])].sort();
-    const loading = m => {
+    this.publishMachines(remote);
+    const m = pickedMachine(remote);
+    const loading = (m) => {
       const layout = machines().find(k => k.name === m)?.layout;
       return layout === "loading" || (!layout && this.machines.some(k => k.name === m && k.state === "connected"))
         || spaces().some(s => (s.machine ?? null) === m && !this.shown.has(s.id));
     };
-    const loadingRow = m => h_flex().id(`machine-loading-${m ?? "local"}`).h(28).flex_none().px(collapsed ? 0 : 8).items_center().when(collapsed, el => el.justify_center()).text_size(12).text_color(t.dim).child(collapsed ? "…" : "Loading…");
-    if (!remote.length) return loading(null) && !rows.length ? [loadingRow(null)] : list(rows, null);
-    const machineNames = [null, ...remote];
-    return machineNames.flatMap((m) => {
-      const mine = rows.filter((r) => (r.w.machine ?? null) === m);
-      const repair = this.reconnecting[m];
-      const machine = this.machines.find(k => k.name === m) ?? repair?.machine;
-      const connected = !m || machine?.state === "connected";
-      const rebuilt = this.rebuilt(machine) || !!repair;
-      const login = machine?.state === "needs_login" ? `hc machine login ${m}` : null;
-      const folded = this.folded.has(m);
-      const icon = svg(`mods/workspace-chrome/${m ? "server" : "monitor"}.svg`).size(13).flex_none();
-      const badge = div().absolute().right(-3).bottom(-2).size(6).rounded(3).border_1().border_color(t.chrome).bg(connected ? t.ansi2 : t.dim);
-      const head = h_flex().id(`machine-${m ?? "local"}`).h(26).flex_none().px(collapsed ? 0 : 8).gap(7).items_center().text_size(11).text_color(t.dim)
-        .when(collapsed, el => el.mt(4).w(RAIL_CELL).justify_center().rounded(6).tooltip(login ? `${m} needs a login: run ${login}. Click for Copy.` : m ? `${m} · ${connected ? "connected" : (machine?.state ?? "asleep").replace(/_/g, " ")}` : "This computer"))
-        .cursor_pointer().hover(s => s.bg(t.hover))
-        .on_click((_e, cx) => {
-          if (collapsed && login) { run("app.settings", { section: "machines" }); return; }
-          folded ? this.folded.delete(m) : this.folded.add(m);
-          localStorage.setItem("machines.folded", JSON.stringify([...this.folded]));
-          cx.notify();
-        })
-        .when(!collapsed, el => el.child(icon))
-        .when(collapsed, el => el.child(div().relative().flex_none().child(icon).when(Boolean(m), el => el.child(badge))))
-        .when(!collapsed, el => el.child(div().flex_1().truncate().child(m ?? "This computer"))
-          .when(!connected && !rebuilt && !login, el => el.child(div().flex_none().child((machine?.state ?? "asleep").replace(/_/g, " "))))
-          .when(rebuilt, el => el.child(h_flex().flex_none().gap(3).items_center()
-            .child(div().max_w(140).truncate().child(repair?.error || "rebuilt ·"))
-            .child(div().id(`machine-connect-${m}`).text_color(repair?.error ? t.blocked : t.muted)
-              .hover(s => s.text_color(t.foreground))
-              .tooltip(repair?.error || "This machine was rebuilt or replaced. Click to connect to the new one.")
-              .on_click((_e, cx) => { cx.stop_propagation(); this.reconnect(machine, cx); })
-              .child(repair?.busy ? "Connecting…" : "Connect"))))
-          .when(connected, el => el.child(div().id(`machine-add-${m ?? "local"}`).flex_none().px(4).rounded(4).hover(s => s.bg(t.hover).text_color(t.foreground))
-            .on_click((_e, cx) => { cx.stop_propagation(); run("space.new", { machine: m ?? "" }); }).child("+")))
-          .child(div().size(6).rounded(3).flex_none().bg(connected ? t.ansi2 : t.dim))
-          .child(svg(`mods/workspace-chrome/chevron-${folded ? "right" : "down"}.svg`).size(11).flex_none()));
-      const empty = h_flex().id(`machine-new-${m ?? "local"}`).h(28).flex_none().px(collapsed ? 0 : 8).gap(7).items_center().rounded(7)
-        .text_size(12).text_color(t.dim).hover(s => s.bg(t.hover).text_color(t.foreground))
-        .on_click(() => run("space.new", { machine: m ?? "" }))
-        .when(collapsed, el => el.w(RAIL_CELL).rounded(6).justify_center().tooltip(`New space on ${m ?? "this computer"}`)
-          .child(h_flex().size(18).rounded(5).border_1().border_color(t.dim).items_center().justify_center()
-            .child(svg("mods/workspace-chrome/plus.svg").size(10))))
-        .when(!collapsed, el => el.child(svg("mods/workspace-chrome/plus.svg").size(12)).child("New space there"));
-      if (!collapsed && rebuilt) return [head];
-      const cell = collapsed ? railCell : (el) => el;
-      const guidance = !collapsed && login ? [v_flex().px(8).pb(6).gap(3).flex_none()
-        .child(div().text_size(11).text_color(t.blocked).child("needs a login: run"))
-        .child(h_flex().gap(5).items_center()
-          .child(div().flex_1().min_w(0).truncate().tooltip(login).text_size(11).text_color(t.muted).child(login))
-          .child(div().id(`machine-login-copy-${m}`).flex_none().px(5).py(2).rounded(4)
-            .text_size(11).text_color(t.foreground).bg(t.raised).cursor_pointer().hover(s => s.bg(t.hover))
-            .on_click((_e, cx) => { cx.stop_propagation(); cx.write_to_clipboard(login); this.copiedLogin = login; cx.notify(); })
-            .child(this.copiedLogin === login ? "Copied" : "Copy")))] : [];
-      return [cell(head), ...guidance, ...(folded ? [] : mine.length ? list(mine, m) : [loading(m) ? loadingRow(m) : cell(empty)])];
-    });
+    const loadingRow = h_flex().id(`machine-loading-${m ?? "local"}`).h(28).flex_none().px(collapsed ? 0 : 8).items_center().when(collapsed, el => el.justify_center()).text_size(12).text_color(t.dim).child(collapsed ? "…" : "Loading…");
+    const mine = rows.filter((r) => (r.w.machine ?? null) === m);
+    if (!m) return loading(null) && !mine.length ? [loadingRow] : list(mine, null);
+    const repair = this.reconnecting[m];
+    const machine = this.machines.find(k => k.name === m) ?? repair?.machine;
+    const connected = machine?.state === "connected";
+    const rebuilt = this.rebuilt(machine) || !!repair;
+    const login = machine?.state === "needs_login" ? `hc machine login ${m}` : null;
+    const state = (machine?.state ?? "asleep").replace(/_/g, " ");
+    const status = connected || collapsed ? [] : [h_flex().id(`machine-${m}`).h(26).flex_none().px(8).gap(7).items_center().text_size(11).text_color(t.dim)
+      .child(svg("mods/workspace-chrome/server.svg").size(13).flex_none())
+      .child(div().flex_1().truncate().child(`${m} · ${rebuilt ? "rebuilt" : state}`))
+      .child(div().size(6).rounded(3).flex_none().bg(t.dim))
+      .when(rebuilt, el => el.child(h_flex().flex_none().gap(3).items_center()
+        .when(Boolean(repair?.error), el => el.child(div().max_w(120).truncate().text_color(t.blocked).child(repair.error)))
+        .child(div().id(`machine-connect-${m}`).text_color(repair?.error ? t.blocked : t.muted)
+          .hover(s => s.text_color(t.foreground))
+          .tooltip(repair?.error || "This machine was rebuilt or replaced. Click to connect to the new one.")
+          .on_click((_e, cx) => { cx.stop_propagation(); this.reconnect(machine, cx); })
+          .child(repair?.busy ? "Connecting…" : "Connect"))))];
+    if (rebuilt) return status;
+    const guidance = !collapsed && login ? [v_flex().px(8).pb(6).gap(3).flex_none()
+      .child(div().text_size(11).text_color(t.blocked).child("needs a login: run"))
+      .child(h_flex().gap(5).items_center()
+        .child(div().flex_1().min_w(0).truncate().tooltip(login).text_size(11).text_color(t.muted).child(login))
+        .child(div().id(`machine-login-copy-${m}`).flex_none().px(5).py(2).rounded(4)
+          .text_size(11).text_color(t.foreground).bg(t.raised).cursor_pointer().hover(s => s.bg(t.hover))
+          .on_click((_e, cx) => { cx.stop_propagation(); cx.write_to_clipboard(login); this.copiedLogin = login; cx.notify(); })
+          .child(this.copiedLogin === login ? "Copied" : "Copy")))] : [];
+    const empty = h_flex().id(`machine-new-${m}`).h(28).flex_none().px(collapsed ? 0 : 8).gap(7).items_center().rounded(7)
+      .text_size(12).text_color(t.dim).hover(s => s.bg(t.hover).text_color(t.foreground))
+      .on_click(() => run("space.new", { machine: m }))
+      .when(collapsed, el => el.w(RAIL_CELL).rounded(6).justify_center().tooltip(`New space on ${m}`)
+        .child(h_flex().size(18).rounded(5).border_1().border_color(t.dim).items_center().justify_center()
+          .child(svg("mods/workspace-chrome/plus.svg").size(10))))
+      .when(!collapsed, el => el.child(svg("mods/workspace-chrome/plus.svg").size(12)).child(`New space on ${m}`));
+    const body = mine.length ? list(mine, m) : [loading(m) ? loadingRow : collapsed ? railCell(empty) : empty];
+    return [...status, ...guidance, ...body];
   }
 
   // After the name: the branch (mono 11, muted); at the right, on a shut project its agents' state marks,
@@ -716,7 +716,8 @@ export default class Spaces extends View {
       .child(div().absolute().right(5).text_color(tone(t, w.status)).child(glyph(w.status))));
   }
 
-  render() {
+  render(cx) {
+    if (this.part) return this.part.render(cx);
     const t = theme();
     const collapsed = narrow();
     const palette = ["ansi6", "ansi3", "ansi4", "ansi5", "ansi2", "ansi1"];
@@ -738,7 +739,7 @@ export default class Spaces extends View {
         .when(collapsed, el => el.pl(0).pr(0).justify_center())
         .when(!collapsed, el => el.child("Projects"))
         .child(div().id("space-new").size(24).flex_none().flex().items_center().justify_center().rounded(8).hover(s => s.bg(t.hover).text_color(t.foreground))
-          .on_click(() => run("space.new")).child(svg("mods/workspace-chrome/plus.svg").size(14))))
+          .tooltip("New space").on_click(() => { const m = pickedMachine(); run("space.new", m ? { machine: m } : {}); }).child(svg("mods/workspace-chrome/plus.svg").size(14))))
       .child(v_flex().flex_1().min_h(0).px(collapsed ? 0 : 10).gap(collapsed ? 0 : 2).pb(14).overflow_y_scrollbar().mode("always")
         .on_mouse_up("left", (_e, cx) => { this.pressed = null; cx.notify(); })
         .children(rows));
