@@ -22,7 +22,7 @@ fn run(sock: &str, args: &[&str]) -> Vec<Value> {
 fn protocol_lines() {
     let v = run("/nonexistent.sock", &["version"]);
     assert_eq!(v[0], serde_json::json!({"type":"header","protocol":1,"sidecar":"0.1.0","cmd":"version"}));
-    assert_eq!(v[1]["commands"], serde_json::json!(["version", "feed", "status", "card", "approve", "answer", "send", "paste-image", "mermaid", "pictures", "helper", "queue", "phone", "commands", "working", "model", "usage"]));
+    assert_eq!(v[1]["commands"], serde_json::json!(["version", "feed", "status", "card", "approve", "answer", "send", "paste-image", "mermaid", "pictures", "helper", "queue", "phone", "commands", "working", "model", "usage", "favicon"]));
     assert_eq!(v.last().unwrap()["type"], "end");
     assert_eq!(v.last().unwrap()["ok"], true);
 
@@ -171,4 +171,24 @@ fn usage_reads_the_fake_homes_only() {
     let v: Vec<Value> = String::from_utf8(out.stdout).unwrap().lines().map(|l| serde_json::from_str(l).unwrap()).collect();
     assert_eq!(v[1], serde_json::json!({"type": "usage", "plans": [{"plan": "claude", "windows": [{"kind": "five_hour", "used_percent": 38.0, "resets_at": 100}], "read_at": 7}]}));
     assert_eq!(v.last().unwrap()["ok"], true);
+}
+
+#[test]
+fn favicon_copies_under_the_dir() {
+    let d = std::env::temp_dir().join(format!("hcf-cli-favicon-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&d);
+    std::fs::create_dir_all(d.join("public")).unwrap();
+    let src = d.join("public/apple-touch-icon.png");
+    std::fs::write(&src, b"png").unwrap();
+    let cache = d.join("home/herdr-contr/favicons");
+    let v = run("/nonexistent.sock", &["favicon", "--path", src.to_str().unwrap(), "--dir", cache.to_str().unwrap()]);
+    let p = v[1]["path"].as_str().unwrap();
+    assert!(p.starts_with(cache.to_str().unwrap()) && p.ends_with(".png"));
+    assert_eq!(std::fs::read(p).unwrap(), b"png");
+    let none = run("/nonexistent.sock", &["favicon", "--path", d.join("gone.png").to_str().unwrap(), "--dir", cache.to_str().unwrap()]);
+    assert_eq!(none[1], serde_json::json!({"type": "favicon", "path": null}));
+    let usage = run("/nonexistent.sock", &["favicon", "--path", src.to_str().unwrap()]);
+    assert_eq!(usage[1]["type"], "error");
+    assert_eq!(usage[1]["code"], "usage");
+    let _ = std::fs::remove_dir_all(&d);
 }

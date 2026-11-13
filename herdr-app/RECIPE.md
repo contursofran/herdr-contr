@@ -299,7 +299,10 @@ drawn by Herdr's `frames`; every loader of the mod is this one); done is a check
   a folder is looked at once, and again only when the space moves to a new folder. Files only, the first
   found wins: `favicon.svg`, `favicon.png` in the folder, then in `public/`, `static/`, `app/`,
   `src/app/`, `assets/`, `web/`; then `apple-touch-icon.png`, `icon.png`, `icon.svg` in the same folders.
-  No `.ico`: `image()` names SVG, PNG and JPEG, not ICO.
+  No `.ico`: `image()` names SVG, PNG and JPEG, not ICO. `image()` reads only files under the app home
+  (#116), so the helper's `favicon` command copies the file found to `herdr-contr/favicons` (named from
+  its path, copied again when the source is newer), once per folder, off the UI thread; the icon draws
+  that copy by its path relative to the app home. No copy (no helper, an error): the folder icon.
 - **Mod** `mods/herdr-contr/` (`mod.json`: `place: "none"`): one mod, one view per block, picked
   by `props.view`: `side`, `chat`, `needs`, `overview`, `top`; overlays use `settings` (the herdr-contr
   settings dialog), `termbar` (the terminal window's bar), `menu` (right-click menus) and `side` with `peek: true` (the floating sidebar).
