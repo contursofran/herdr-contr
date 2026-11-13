@@ -113,7 +113,7 @@ Left to right:
      arrow when empty or sending, else `accent`). The model comes from the helper's `model` (asked with the
      status, at most every 15 s), else the status line's tags; not known yet, the button shows the app's name
      alone. Its tooltip: "Opus 5.5 · medium effort · Claude Code" and the folder; the context's: "149k of 250k
-     tokens". A press on the model button in Claude Code puts `/model ` in the box (nothing is sent). No tags
+     tokens · auto-compact at 250k" (the limit is Claude Code's `autoCompactWindow`), else "37% of the model's context window". A press on the model button in Claude Code puts `/model ` in the box (nothing is sent). No tags
      row under the box. File chips above the text: a PNG, JPEG
      or SVG under the app home (a pasted image is in `herdr-contr/paste`) shows as a 56 px high picture
      (8 px corners, `border` frame, × on its top right corner); any other file, and an image from another
