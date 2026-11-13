@@ -28,10 +28,11 @@ Each step is finished and in use before the next one starts.
 4. The inbox: the orchestrator's questions and to-dos in one list.
 5. The orchestrator's workers and its missed messages.
 
-Not in scope: a files panel and a pull request reader. Herdr's sidebar stays
-as Herdr draws it, for now, except the sidebar's agent list, its spaces list
-and the top bar: these are our copies of Herdr's `agents`, `spaces` and `tabs`
-mods, with the braille loader and the project favicons (owner, 2026-11-12).
+Not in scope: a files panel and a pull request reader. The sidebar is
+reworked after the owner's design (owner, 2026-11-13), in slices: #96 one
+Projects list (each project with its agents and their workers), #97 the head
+and the foot, #98 the hover controls and the model tooltip. The agent icons
+stay ours. The top bar is our copy of Herdr's `tabs` mod.
 
 ## Layout
 
@@ -39,7 +40,8 @@ mods, with the braille loader and the project favicons (owner, 2026-11-12).
 |---|---|
 | `herdr-app/layouts`, `herdr-app/themes`, `herdr-app/keys.json` | the layouts (`herdr-contr` with Herdr's sidebar, and `herdr-contr-own` with the mod's own sidebar), the themes and the keys that the mod installs |
 | `herdr-app/mods/herdr-contr` | the mod: one file for each screen or part |
-| `herdr-app/mods/herdr-contr-agents`, `herdr-app/mods/herdr-contr-spaces`, `herdr-app/mods/herdr-contr-tabs` | copies of Herdr's `agents`, `spaces` and `tabs` mods, with the braille loader and the project favicons |
+| `herdr-app/mods/herdr-contr-spaces` | the sidebar's Projects list (#96): a copy of Herdr's `spaces` mod that also draws each project's agents and their workers |
+| `herdr-app/mods/herdr-contr-agents`, `herdr-app/mods/herdr-contr-tabs` | copies of Herdr's `agents` and `tabs` mods, with the braille loader (no layout names the agents copy since #96) |
 | `herdr-app/test` | the mod's tests, with a stub of Herdr's UI in `test/stub` |
 | `herdr-app/RECIPE.md` | each part of the mod in words: sizes, colors, behavior |
 | `herdr-app/docs/protocol.md` | the contract between the mod and the helper (JSON Lines) |

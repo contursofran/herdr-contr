@@ -31,32 +31,12 @@
           }
         },
         {
-          "id": "sidebar-lists",
-          "type": "column",
-          "children": [
-            {
-              "id": "spaces",
-              "type": "block",
-              "size": {
-                "weight": 1
-              },
-              "min": 90,
-              "content": {
-                "mod": "herdr-contr-spaces"
-              }
-            },
-            {
-              "id": "agents",
-              "type": "block",
-              "size": {
-                "weight": 1
-              },
-              "min": 90,
-              "content": {
-                "mod": "herdr-contr-agents"
-              }
-            }
-          ]
+          "id": "projects",
+          "type": "block",
+          "min": 90,
+          "content": {
+            "mod": "herdr-contr-spaces"
+          }
         },
         {
           "id": "usage",
