@@ -12,7 +12,7 @@ import { v_flex, h_flex } from "gpui-base";
 import { spaces, machines, panes, agents, terminals, focused, setAgentOrder, run, openOverlay, exec, hc, theme, shared, setShared, watchFolder, window, layout, appHome, props } from "herdr";
 import { mainKeys, mainKeyHint } from "./mainagents.js";
 import { bySpace, split, countLine, moreLine, workerText, workerWork, leadPanes, agentLabel, duration, modelTip, modelDue, MODEL_MS } from "./projects.js";
-import { HeadView, MachinesMenu, MACHINES, pickedMachine } from "./head.js";
+import { HeadView, MachinesMenu, MACHINES, pickedMachine, toggleSidebar } from "./head.js";
 
 // The other copies of this mod, by props.view: the sidebar's head and the machines menu (head.js).
 const PARTS = { head: HeadView, machines: MachinesMenu };
@@ -738,11 +738,13 @@ export default class Spaces extends View {
       .rounded(6)
       .justify_center()
       .items_center()
+      .gap(3)
       .when(w.active, (el) => el.bg(t.selected))
       .when(!w.active, (el) => el.hover((s) => s.bg(t.hover)))
       .on_click(() => run("space.select", { id: w.id }))
       .child(div().text_color(w.active ? t.foreground : t.muted).child(String(i + 1)))
-      .child(div().absolute().right(5).text_color(tone(t, w.status)).child(glyph(w.status))));
+      // Beside the number, not over it (#144).
+      .child(div().flex_none().text_color(tone(t, w.status)).child(glyph(w.status))));
   }
 
   render(cx) {
@@ -764,6 +766,11 @@ export default class Spaces extends View {
     this.readAgents();
     const rows = this.grouped(t, collapsed);
     return v_flex().size_full().min_h(0).bg(t.chrome).text_size(13)
+      // The macOS rail's head has no room for the toggle (the window buttons fill it), so it is here (#144).
+      .when(collapsed && window()?.platform === "macos", el => el.child(h_flex().pt(6).flex_none().justify_center()
+        .child(div().id("rail-open").size(24).flex_none().flex().items_center().justify_center().rounded(8).text_color(t.muted)
+          .hover(s => s.bg(t.hover).text_color(t.foreground)).tooltip("Show sidebar").on_click(() => toggleSidebar())
+          .child(svg("mods/workspace-chrome/sidebar.svg").size(16)))))
       .child(h_flex().pt(6).pr(10).pb(4).pl(20).flex_none().items_center().justify_between().text_size(12).font_medium().text_color(t.muted)
         .when(collapsed, el => el.pl(0).pr(0).justify_center())
         .when(!collapsed, el => el.child("Projects"))
