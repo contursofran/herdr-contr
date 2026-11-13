@@ -64,7 +64,7 @@ Left to right:
        cannot change it). Code fences are 12 px rounded boxes (`raised`,
        1 px border, Menlo 13 px, 21 px lines: one selectable `TextView` paragraph, so a drag selects across lines; right-click a box: Copy code, the box as written). Tables are 12 px rounded frames: a `raised` header
        row, 1 px lines between rows, columns sized to their content.
-       In prose, pull request and issue references ("PR #51", "#51", "owner/repo#51", GitHub
+       In prose, pull request and issue references ("PR #51", "#51", "PR 51" and "issue 51" with no "#", "owner/repo#51", GitHub
        pull and issue URLs) are links (`refs.js`); a click opens them in the browser. A bare "#51"
        takes the repository of the agent's folder (`git remote get-url origin`, read once); without
        one it stays text. With the name of a known repository before it ("herdr-contr #51",
@@ -323,14 +323,14 @@ drawn by Herdr's `frames`; every loader of the mod is this one); done is a check
     The list: 10 px at the sides, rows 2 px apart, 10 px under each project and its agents.
   - A project row (30 px, 8 px corners, padding 0 10 0 6, gap 6): a 14 px chevron (only when the project has
     agents; a press on it opens or shuts the project's agents, kept in `localStorage` `projects.closed`, and is no
-    select or drag), the favicon or the folder (16 px), the name (13 px, `font_medium`), the branch (Menlo 11 px,
+    select or drag), the favicon (70% opacity) or the folder (16 px, `dim`), the name (13 px, `font_medium`, `muted`; full ink only on the shown project; no hover fill: a project is lighter than its agents, #154), the branch (Menlo 11 px,
     `muted`), and at the right the commits ahead and behind (`↑2`, `↓4`, Menlo 11 px, `muted`). A shut project
     shows its agents' state marks (13 px) before them. The row is `selected` only for the shown space when no
     agent row of it shows. A click selects the space, a right-click opens its menu (rename and the others), a
     drag moves it, as before. Worktree rows stay under their checkout.
   - Under an open project, its agents (`agents()` with that `space`). A row (8 px corners, padding 6 10 6 26,
-    gap 8): the agent's icon (15 px; a tinted glyph takes the state's color; 45% opacity except on the shown
-    row), the title in one line (13 px; a named tab, else the agent's own title, never a tab number), the age
+    gap 8): the agent's icon (15 px; a tinted glyph takes the state's color; always at full
+    opacity, #154), the title in one line (13 px; a named tab, else the agent's own title, never a tab number), the age
     since its state changed (Menlo 11 px, `muted`; not while it works) and the state mark (15 px; only while it
     works or waits). The shown agent's row is `raised` with a 1 px `border` ring, its title `foreground` 500; a
     done agent not looked at yet is `foreground` 600; any other is `muted` 400. A click focuses its pane.
@@ -354,7 +354,7 @@ drawn by Herdr's `frames`; every loader of the mod is this one); done is a check
     shown space is never in it; a checkout and its worktrees go there only together.
   - Herdr's agent order (`setAgentOrder`) is the projects' order, shut projects included.
   - Hover (#98, slice 3): on an agent row under the pointer (`on_hover`, kept in the view; the row is drawn
-    again), the age and the state mark hide, the icon is at full opacity, and two buttons show at the right
+    again), the age and the state mark hide, and two buttons show at the right
     (absolute: top 4, right 6, gap 2): Stop (`terminal.kill`) and "Open in a new tab" (`terminal.keep` with
     `place: "tab"`). Each is 22 px square, 6 px corners, a 12 px icon in `muted`, `hover` fill, with a tooltip.
     A press on one is not a press on the row.
@@ -507,3 +507,11 @@ drawn by Herdr's `frames`; every loader of the mod is this one); done is a check
   out of the bar and releasing moves nothing.
 - Dragging a workspace row onto another row moves that workspace there, in the docked and the
   floating sidebar; dragging it out of the list and releasing moves nothing.
+
+## Layout rules
+
+`test/layout-rules.test.mjs` holds these rules over each view's tree, because the test stub does not lay out or paint:
+
+- Each direct child of a scrolling column (`overflow_y_scrollbar`, `overflow_y_scroll`) has `flex_none`. Without it the rows shrink and draw over each other (#137).
+- A gpui-base `Popover` that must fill its row sits in a wrapper with `flex_1`; it does not grow by itself (#135). The list of such popovers is in the test.
+- In each state of the sidebar (wide or rail, macOS or not), the head or the Projects list has an element that toggles it (#144).

@@ -71,7 +71,8 @@ export class SideView {
     const space = (s) => {
       const { shown, more } = tabMarks(s.tabs ?? []);
       const line = lineOn?.id === s.id ? lineOn : null;
-      return h_flex().id(`space-${s.id}`).relative().h(34).px(10).gap(9).items_center().rounded(7)
+      // flex_none: a row keeps its height in the scroll column (#149).
+      return h_flex().id(`space-${s.id}`).relative().h(34).flex_none().px(10).gap(9).items_center().rounded(7)
         .bg(s.active ? t.selected : t.chrome).when(!dragging, (el) => el.hover((x) => x.bg(s.active ? t.selected : t.hover)))
         .when(dragging?.id === s.id, (el) => el.opacity(0.45))
         .on_mouse_down("left", (e, cx) => { cx.stop_propagation(); drag.press(s.id, e); })

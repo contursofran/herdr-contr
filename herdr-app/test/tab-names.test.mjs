@@ -36,14 +36,15 @@ test("a plain terminal with an automatic name (a number or its address) shows it
   assert.equal(tabLabel({ name: "t2n9" }, { title: "✳ Claude Code", cwd: "/home/me/code/contr", program: claude }), "Claude Code");
 });
 
-test("the + stands right after the tabs, and a box after it fills the bar (#139)", () => {
+test("the + is the last child of the tabs' scroll row, right after the last tab (#139, #146)", () => {
   fake.spaces = [{ id: "s1", active: true, tabs: [{ id: "t1", name: "1", active: true }] }];
   fake.panes = [{ id: "p1", tab: "t1", terminal: true, title: "zsh", program: zsh }];
   const v = new Tabs();
   v.scroll = { scroll_to_item() {} };
-  const ids = v.render().kids.map((k) => k?._a?.id);
-  assert.deepEqual(ids.slice(0, 3), ["tab-scroll", "tab-new", "tab-fill"]);
-  assert.ok(!("flex_1" in byId(v.render(), "tab-scroll")._a));
+  const el = v.render();
+  assert.equal(el.kids[0]._a.id, "tab-scroll");
+  assert.equal(el.kids[0].kids.at(-1)._a.id, "tab-new");
+  assert.equal(byId(el, "tab-fill"), null);
 });
 
 test("the number only when there is nothing else", () => {

@@ -6,6 +6,7 @@ import { fakeCx } from "./fake-cx.mjs";
 import { agent, space } from "./fixtures.mjs";
 import { Composer, tagsFor, shortPath, quoted, withFiles, slashQuery, matchCommands, screenNote, argItems, matchArgs, thumbPath, THUMB_PX, modelName, modelInfo, modelTip, ringIcon, contextTip, contextPercent, MODEL_MS } from "../mods/herdr-contr/composer.js";
 import { ChatView } from "../mods/herdr-contr/chat.js";
+import { scrollBreaks } from "./layout-rules.mjs";
 import { otherModels, effortValues, hasModelMenu, titleCase } from "../mods/herdr-contr/modelmenu.js";
 import { forgetCommands } from "../mods/herdr-contr/sidecar.js";
 import { KEY_CONFIG } from "../mods/herdr-contr/config.js";
@@ -553,6 +554,7 @@ test("typing / in a Claude Code chat shows its commands above the box, filtered 
   await r.type("/");
   assert.equal(r.rows().length, 4);
   assert.match(r.rows()[3], /deploy.*Deploy the app/);
+  assert.deepEqual(scrollBreaks(r.view()), [], "layout rule: no scrolling column breaks it (#149)");
   await r.type("/co");
   assert.deepEqual(r.rows().map((x) => x.split(/\s/)[0]), ["/compact", "/context"]);
   await r.type("/co now");
