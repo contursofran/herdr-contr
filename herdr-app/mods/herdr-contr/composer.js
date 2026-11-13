@@ -110,7 +110,17 @@ export function agentMark(agent, size, t) {
 }
 
 // The box's placeholder follows the agent's name.
-export const placeholderFor = (agent) => `Reply to ${agentName(agent) || "the agent"}`;
+// The agent's name for the placeholder: a tab someone named, else the agent's own title (its status glyph
+// dropped; not a path, not the program's name), else the program's name.
+export function replyName(agent) {
+  const n = agentName(agent);
+  if (!agent) return n;
+  const prog = agent.program?.name ?? agent.app ?? "Agent";
+  if (n && n !== prog) return n;
+  const raw = String(agent.title ?? "").replace(/^[^\p{L}\p{N}~/]+/u, "").trim();
+  return raw && raw !== prog && !/^[~/]|^[A-Za-z]:\\/.test(raw) && !raw.includes("@") ? raw : n;
+}
+export const placeholderFor = (agent) => `Reply to ${replyName(agent) || "the agent"}`;
 
 // The "+" button opens the macOS file dialog through osascript (a mod has no file picker of its own), so it
 // shows on macOS only. Elsewhere, drop files on the chat or paste an image.
@@ -642,7 +652,7 @@ export class Composer {
       .child(v_flex().id("box").w_full().max_w(width).rounded(12).bg(t.raised).border(1).border_color(t.border).shadow_sm()
         .pt(12).pr(10).pb(8).pl(14).gap(10)
         .when(this.files.length > 0, (el) => el.child(h_flex().gap(6).flex_wrap().items_center().children(this.files.map(fileChip))))
-        .child(div().id("slash-keys").w_full().text_size(14).line_height(20)
+        .child(div().id("slash-keys").w_full().text_size(14).line_height(20 / 14)
           .when(Boolean(s), (el) => el.key_context(SLASH_CONTEXT))
           .on_action(SLASH.up, (_e, cx) => this.slashKey("up", cx))
           .on_action(SLASH.down, (_e, cx) => this.slashKey("down", cx))
