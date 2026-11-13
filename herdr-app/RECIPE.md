@@ -267,7 +267,7 @@ drawn by Herdr's `frames`; every loader of the mod is this one); done is a check
     gap 4: "Herdr" (14 px semibold), the machine switch (26 px, 6 px corners, padding 0 6, the picked machine's
     name or "This computer" in 12 px `muted`, a 12 px chevron; it truncates), a spacer, then search (`picker`) and
     the sidebar toggle (28 px square, 8 px corners, 16 px icons, `muted`). A press on a control is no window drag.
-    On the rail only the toggle shows, and on the macOS rail nothing. A press on the switch opens the machines
+    On the rail only the toggle shows, and on the macOS rail nothing: there the Projects list shows the toggle (24 px, "Show sidebar") above New space, and a rail row has its number and its dot side by side. A press on the switch opens the machines
     menu (a popup of the same mod, view `machines`, 240 px): "This computer", then each machine with its state at
     the right when not connected ("unreachable", "needs login", "rebuilt", in `dim`), a check at the picked one,
     a line, and "Add machine…". A press picks the machine (`shared("projects.machine")`, null for this computer)
