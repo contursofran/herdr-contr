@@ -12,6 +12,7 @@
 //!   herdr-contr-feed model  --terminal <addr> [--cache <file>]   (the agent's model and effort; read only)
 //!   herdr-contr-feed usage   (the Claude and Codex plan usage; read only)
 //!   herdr-contr-feed paste-image --dir <folder>   (copied files, else the clipboard's image as a PNG there; path null when none)
+//!   herdr-contr-feed mermaid --dir <folder> [--dark] [--fg|--bg|--fill|--border|--line <#hex>]... --text <s>   (an SVG there)
 //!   herdr-contr-feed send   --terminal <addr> --text <s> [--file <path>]... [--expect-kind <k>] [--expect-path <log>]
 //!   herdr-contr-feed helper install --machine <m> --sha256 <hex>   (the helper on another machine; after the user's yes)
 //!   herdr-contr-feed helper remove --machine <m>
@@ -22,7 +23,7 @@
 //! A terminal `m/tN` on another machine: the command runs there, in the helper there (`remote`). Rust only.
 
 use crate::protocol::{JsonLines, PROTOCOL_VERSION, SIDECAR_VERSION};
-use crate::{agentmodel, cards, config, feed, locate, paste, phone, queue, remote, status, update, usage, working};
+use crate::{agentmodel, cards, config, feed, locate, mermaid, paste, phone, queue, remote, status, update, usage, working};
 use herdr_core::hc::{HcClient, HcSession};
 use herdr_core::PaneScreen;
 use herdr_core::resolver::SessionResolver;
@@ -61,7 +62,7 @@ pub fn run(argv: &[String]) -> String {
     r.out.emit_value(json!({"type": "header", "protocol": PROTOCOL_VERSION, "sidecar": SIDECAR_VERSION, "cmd": cmd}));
     match cmd.as_str() {
         "version" => {
-            r.out.emit_value(json!({"type": "version", "commands": ["version", "feed", "status", "card", "approve", "answer", "send", "paste-image", "helper", "queue", "phone", "commands", "working", "model", "usage"], "release": update::release()}));
+            r.out.emit_value(json!({"type": "version", "commands": ["version", "feed", "status", "card", "approve", "answer", "send", "paste-image", "mermaid", "helper", "queue", "phone", "commands", "working", "model", "usage"], "release": update::release()}));
             r.finish(true)
         }
         "usage" => {
@@ -89,6 +90,29 @@ pub fn run(argv: &[String]) -> String {
                     r.finish(true)
                 }
                 Err(e) => r.fail("write", &format!("cannot save the image: {e}")),
+            }
+        }
+        "mermaid" => {
+            // The options are the ones before --text, so a text that says "--dark" is not taken for one.
+            let Some(at) = args.iter().position(|a| a == "--text") else { return r.fail("usage", "mermaid needs --text <s>") };
+            let Some(text) = args.get(at + 1) else { return r.fail("usage", "mermaid needs --text <s>") };
+            let before = &args[..at];
+            let val = |name: &str| before.iter().position(|a| a == name).and_then(|i| before.get(i + 1)).cloned().unwrap_or_default();
+            let Some(dir) = Some(val("--dir")).filter(|d| !d.is_empty()) else { return r.fail("usage", "mermaid needs --dir <folder>") };
+            let colors = mermaid::Colors {
+                dark: before.iter().any(|a| a == "--dark"),
+                fg: val("--fg"),
+                bg: val("--bg"),
+                fill: val("--fill"),
+                border: val("--border"),
+                line: val("--line"),
+            };
+            match mermaid::draw(text, &colors, Path::new(&dir)) {
+                Ok(d) => {
+                    r.out.emit_value(json!({"type": "mermaid", "path": d.path, "width": d.width, "height": d.height}));
+                    r.finish(true)
+                }
+                Err((code, message)) => r.fail(code, &message),
             }
         }
         "phone" => {

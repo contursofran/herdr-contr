@@ -163,7 +163,7 @@ Targets: `x86_64-unknown-linux-musl`, `aarch64-unknown-linux-musl`, `universal-a
 ### `version`
 
 ```json
-{"commands":["version","feed","status","card","approve","answer","send","paste-image","helper","queue","phone","commands","working","model","usage"],"release":"0.9.0","type":"version"}
+{"commands":["version","feed","status","card","approve","answer","send","paste-image","mermaid","helper","queue","phone","commands","working","model","usage"],"release":"0.9.0","type":"version"}
 ```
 
 `commands`: the commands this sidecar has. The mod hides actions whose command is missing.
@@ -201,6 +201,20 @@ settings and restarts it. `off` stops it and removes that file, only when it has
 {"bytes":4371392,"machine":"box","parts":1,"path":"~/.local/share/herdr-contr/helper/0.1.0/herdr-contr-feed","sha256":"7ac5…","source":"release","type":"installed"}
 {"machine":"box","path":"~/.local/share/herdr-contr/helper","type":"removed"}
 ```
+
+### `mermaid` (`mermaid --dir <folder> [--dark] [--fg|--bg|--fill|--border|--line <#hex>]... --text <s>`)
+
+```json
+{"height":366.0,"path":"/home/you/.config/herdr-app/herdr-contr/mermaid/3f2a…c1.svg","type":"mermaid","width":330.8}
+```
+
+A code block with the language mermaid, drawn to an SVG in the folder (made when missing), with its size in px.
+The file name is a hash of the text and the colors, so the same text in the same theme is drawn once; a second
+call reads the file. `--dark` takes the renderer's dark palette as the base, else its light one; each color (hex
+only, others are ignored) replaces the base's: `fg` the text, `bg` the box behind the diagram, `fill` nodes and
+actors, `border` their borders, `line` edges and lifelines. The options are the ones before `--text`, so a text
+that says `--dark` is not taken for one. Errors: `usage`, `parse` (not a diagram the renderer reads; no file is
+written), `write`. The renderer is mermaid-rs-renderer (pure Rust: no browser and no node).
 
 ### `files`, `image` (`paste-image --dir <folder>`)
 
