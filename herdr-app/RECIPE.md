@@ -212,10 +212,18 @@ drawn by Herdr's `frames`; every loader of the mod is this one); done is a check
   "Terminal", a round close button). ⌃` again closes it.
 - **Chat | Terminal switch** (`herdr-contr` layout): a tab with an agent shows a switch on the right
   of a 36 px strip, over the chat and over the tab's terminal (block `view-switch`, view `switch`).
-  ⌘⇧T does the same. The tab keeps the pick. A tab without an agent hides the block.
+  ⌘J (and ⌘⇧T) does the same; each side's tooltip names ⌘J ("Chat (⌘J)"). The pick is one for the window:
+  it stays when another agent shows or an agent moves to another pane or tab, and over a restart (shared
+  state). A tab without an agent hides the block and does not change the pick.
+- **Main agent keys** (#117): ⌃1-⌃9 show the 1st-9th main agent (an agent that is not a worker of another)
+  in the order of the sidebar's Projects list: this computer's projects first, then each other machine's by
+  name; in a machine, the spaces in order; in a space, the agents in order. Workers have no number. A number
+  with no agent does nothing. The key runs `agent.focus` and the tab's screen follows the window's pick. The
+  order is in `mainagents.js`, with one copy in `herdr-contr` and one in `herdr-contr-spaces` (a test keeps
+  them equal). These keys win over Herdr's global ⌃1-⌃9 (`space.select`) while this layout shows.
 - **Keys** (while this layout shows): ⌘T new tab, ⌘W close tab, ⌘⇧N new space, ⌘1-⌘9 a tab,
   ⌘⇧[ / ⌘⇧] or ⌃Tab / ⌃⇧Tab the tab before or after, ⌘⌥↑ / ⌘⌥↓ the space before or after,
-  ⌘⌃⇧← / ⌘⌃⇧→ move the tab, ⌘⇧I Needs you, ⌘⇧\ Overview, ⌘B sidebar, ⌃` terminal, ⌘⇧T chat or terminal,
+  ⌘⌃⇧← / ⌘⌃⇧→ move the tab, ⌘⇧I Needs you, ⌘⇧\ Overview, ⌘B sidebar, ⌃` terminal, ⌘J or ⌘⇧T chat or terminal, ⌃1-⌃9 a main agent,
   ⌘= / ⌘- / ⌘0 zoom, ⌘, settings, ⌘⇧, herdr-contr settings, ⌘/ help. In the herdr-contr settings,
   Tab moves through the sections, then the choices, and Enter or Space picks one.
 
@@ -303,8 +311,13 @@ drawn by Herdr's `frames`; every loader of the mod is this one); done is a check
     same data the agents copy used for sub-agents. Under its title: "Orchestrating · N workers" (12 px,
     `muted`); N counts all its live sub-agents, depth first. Under it, its workers in a block 32 px in, 9 px
     padding, with a 1 px `border` guide line at the left, rows 2 px apart: a 26 px row (6 px corners, padding
-    0 8, gap 8) with the icon (13 px), what it works on (12 px; its name, else its template or program;
-    `muted`, `dim` when done, `foreground` when shown) and its state mark (12 px). A deeper sub-agent is 14 px
+    0 8, gap 8) with the icon (13 px), what it works on (12 px; `muted`, `dim` when done, `foreground` when shown) and its state mark
+    (12 px). What it works on: the session's own title (the title that the agent sets, cleaned as on an
+    agent row), when it is not the program's name, a path, user@host or the worker's name; then its name
+    stays at the right as a short muted mono text (10 px, `dim`, at most 72 px, truncates last), and the
+    tooltip starts with "name · work". Else its name, else its template or program. The titles are kept in
+    a Map when the agents change, not worked out on each draw. contr keeps no issue number on the hc
+    terminal, so the issue's title is not used. A deeper sub-agent is 14 px
     further in. The shown worker's row is `raised`. A click focuses its pane, or peeks a worker without one. A
     sub-agent with a pane is in `agents()` too and shows only under its parent.
   - The projects with no agent go into one closed row at the end of each machine's group, "N more projects,
@@ -320,7 +333,10 @@ drawn by Herdr's `frames`; every loader of the mod is this one); done is a check
     tooltip: its look and place are the shell's). It comes from the helper's `model` command
     (docs/protocol.md), asked only when the helper has it, from a timer (at start, then every 15 s) and never
     from a draw: for a terminal the first time it shows and when its status changed, at most once in 15 s.
-    No model known: no tooltip.
+    No model known: no tooltip. A main agent's row adds its key at the end: "Opus 5.5 · medium effort · ⌃1",
+    or only "⌃1" with no model (#117). A worker row has no key. The key is not drawn on the row while ⌃ is
+    held: `on_modifiers_changed` fires only on the keyboard focus path, and the focus is in the chat or the
+    terminal, not in the sidebar.
   - The rail (under 160 px) is as before, for the picked machine. The agents copy's pin and sort menu are
     not here: the owner's design has neither.
 
@@ -354,7 +370,7 @@ drawn by Herdr's `frames`; every loader of the mod is this one); done is a check
   `pane.split`, `space.select`, `space.new`, `space.rename`, `space.close`, `agent.focus`,
   `app.settings`. Its own key commands: `herdr-contr.terminal`, `herdr-contr.view`, `herdr-contr.needs`,
   `herdr-contr.sidebar`, `herdr-contr.overview`, `herdr-contr.settings`, `herdr-contr.move-left`,
-  `herdr-contr.move-right`.
+  `herdr-contr.move-right`, `herdr-contr.main-1` … `herdr-contr.main-9`.
 - **Shipped mods**: `new-menu` (the + popup, 250 × 512).
 - **Programs**:
   - `herdr-contr-feed`, a helper program at `<herdr-app home>/herdr-contr/bin/herdr-contr-feed`
