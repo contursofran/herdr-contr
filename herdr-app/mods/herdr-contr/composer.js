@@ -108,6 +108,14 @@ export function replyName(agent) {
 }
 export const placeholderFor = (agent) => `Reply to ${replyName(agent) || "the agent"}`;
 
+// Claude Code's suggested prompt (#125): read with the helper's `suggestion` while the shown Claude Code agent is
+// idle (no card, no panel) and the box is empty: once when it goes idle, then at most every SUGGEST_MS. While the
+// box is empty it is the placeholder; Tab puts it in the box (nothing goes to the terminal). Work, another agent
+// and a send forget it. Tab is bound under SUGGEST_CONTEXT, which the box's wrapper has only while it shows.
+export const SUGGEST_MS = 3000;
+export const SUGGEST_CONTEXT = "HerdrContrSuggest";
+export const SUGGEST_ACCEPT = "herdr_contr_suggest_accept";
+
 // The "+" button opens the macOS file dialog through osascript (a mod has no file picker of its own), so it
 // shows on macOS only. Elsewhere, drop files on the chat or paste an image.
 export const canPick = () => (window()?.platform ?? "macos") === "macos";
@@ -185,7 +193,8 @@ function bindSlash(cx) {
   if (slashBound || typeof cx?.bind_keys !== "function") return;
   try {
     cx.bind_keys([["up", SLASH.up], ["down", SLASH.down], ["tab", SLASH.complete], ["escape", SLASH.close]]
-      .map(([keystroke, action]) => ({ keystroke, action, context: `${SLASH_CONTEXT} > Input` })));
+      .map(([keystroke, action]) => ({ keystroke, action, context: `${SLASH_CONTEXT} > Input` }))
+      .concat([{ keystroke: "tab", action: SUGGEST_ACCEPT, context: `${SUGGEST_CONTEXT} > Input` }]));
     slashBound = true;
   } catch { /* no keys for the list: a click on a row and Enter still complete */ }
 }
@@ -302,6 +311,11 @@ export class Composer {
     this.status = new Map();   // address → status line
     this.statusAt = 0;
     this.statusBusy = false;
+    this.suggest = null;       // { address, text } of the shown agent's suggested prompt (#125)
+    this.suggestAt = 0;
+    this.suggestBusy = false;
+    this.suggestGen = 0;       // a forget makes a read that is under way count for nothing
+    this.calm = false;         // the last poll found the agent idle (a change to idle reads at once)
   }
 
   // One text state with its handlers. A state's placeholder is fixed when it is made (TextareaState has no
@@ -335,7 +349,9 @@ export class Composer {
   // "Reply to <agent>": called from the chat's tick, not while drawing (a text state can only be made outside a
   // draw). A new name gets a new state with the same text; the keyboard stays in the box when it was there.
   syncPlaceholder(agent, cx) {
-    const want = placeholderFor(agent);
+    // A known suggestion stays the placeholder while the owner types (no new state mid-typing); a send forgets it.
+    const sg = this.suggest && agent?.address === this.suggest.address ? this.suggest.text : "";
+    const want = sg || placeholderFor(agent);
     if (want === this.placeholder) return false;
     const old = this.input, text = old.value();
     this.input = this.makeInput(want);
@@ -345,6 +361,47 @@ export class Composer {
     old.release?.();
     cx?.notify?.();
     return true;
+  }
+
+  // The suggested prompt to show for `agent` now, or "": the box is empty and one is known for it.
+  suggestion(agent) {
+    const s = this.suggest;
+    return s && agent?.address === s.address && this.empty && !this.files.length ? s.text : "";
+  }
+
+  forgetSuggestion(cx) {
+    this.suggestGen++;
+    if (this.suggest) { this.suggest = null; cx?.notify?.(); }
+  }
+
+  // From the chat's tick. `calm`: the agent does not work and no card or panel shows.
+  async pollSuggestion(cx, agent, calm) {
+    const a = agent?.address ?? null;
+    const was = this.calm;
+    this.calm = Boolean(calm);
+    if (!calm || !a || a !== this.address || agent.app !== "claude-code") { this.forgetSuggestion(cx); return; }
+    if (!this.empty || this.files.length || this.sending || this.suggestBusy) return;
+    if (was && Date.now() - this.suggestAt < SUGGEST_MS) return;
+    this.suggestBusy = true; this.suggestAt = Date.now();
+    const gen = this.suggestGen;
+    try {
+      if (!(await sidecar.hasCommand("suggestion"))) return;
+      const r = await sidecar.suggestion(a);
+      if (r.error || gen !== this.suggestGen || this.address !== a) return;
+      const text = String(r.lines.find((l) => l.type === "suggestion")?.text ?? "").trim();
+      if (text === (this.suggest?.text ?? "")) return;
+      this.suggest = text ? { address: a, text } : null;
+      this.syncPlaceholder(this.agent, cx);
+      cx.notify();
+    } finally { this.suggestBusy = false; }
+  }
+
+  // Tab in an empty box: the suggestion becomes the box's text, to edit and send as usual.
+  acceptSuggestion(cx) {
+    const text = this.suggestion(this.agent);
+    if (!text || this.input.value()) return;
+    this.setText(text); this.empty = false;
+    cx.notify();
   }
 
   // The model menu (#112) for the shown agent: { address, page } while it is open, else null. `page`: "main",
@@ -435,6 +492,7 @@ export class Composer {
       this.drafts.delete(a);
       this.setText(d.text); this.files = d.files; this.empty = !d.text.trim();
       this.address = a; this.note = null; this.statusAt = 0;
+      this.suggestGen++; this.suggest = null; this.calm = false;
     }
     return a ? this : null;
   }
@@ -572,6 +630,7 @@ export class Composer {
     if (s && !s.items.some((c) => c.name === s.query)) return this.complete(s, s.items[s.pick], cx);
     const files = b.files, sent = withFiles(text, files);
     this.sending = true; this.note = null;
+    this.forgetSuggestion(null);
     b.setText(""); b.files = [];
     const echo = this.onSent?.(a, sent, cx) ?? null;
     cx.notify();
@@ -621,6 +680,7 @@ export class Composer {
         .child(`${s.top + 1}–${s.top + shown.length} of ${s.items.length}`)
       : null;
     const empty = !b.input.value().trim() && !b.files.length;
+    const tip = !s && !b.input.value() ? this.suggestion(agent) : "";
     const unattach = (p, i) => div().id(`file-x-${i}`).size(16).flex().items_center().justify_center().rounded(4).text_color(t.muted).hover((s) => s.bg(t.hover))
       .on_click((_e, cx) => { this.files = this.files.filter((f) => f !== p); cx.notify(); }).child("×");
     // An image under the app home: a THUMB_PX high picture (its width follows the image), the × on its corner.
@@ -699,6 +759,8 @@ export class Composer {
         .when(this.files.length > 0, (el) => el.child(h_flex().gap(6).flex_wrap().items_center().children(this.files.map(fileChip))))
         .child(div().id("slash-keys").w_full().text_size(14).line_height(20 / 14)
           .when(Boolean(s), (el) => el.key_context(SLASH_CONTEXT))
+          .when(Boolean(tip), (el) => el.key_context(SUGGEST_CONTEXT))
+          .on_action(SUGGEST_ACCEPT, (_e, cx) => this.acceptSuggestion(cx))
           .on_action(SLASH.up, (_e, cx) => this.slashKey("up", cx))
           .on_action(SLASH.down, (_e, cx) => this.slashKey("down", cx))
           .on_action(SLASH.complete, (_e, cx) => this.slashKey("complete", cx))
@@ -709,7 +771,9 @@ export class Composer {
             .hover((s) => s.bg(t.hover).text_color(t.foreground))
             .on_click((_e, cx) => cx.spawn((cx) => this.pickFiles(cx))).child(svg(icon("plus")).size(16))))
           .when(showTags, (el) => el.child(modelEl))
-          .child(div().flex_1())
+          // The spacer holds the hint, so nothing else moves.
+          .child(div().flex_1().min_w(0).flex().justify_end()
+            .when(Boolean(tip), (el) => el.child(div().id("suggest-hint").px(8).truncate().text_size(12).text_color(t.dim).child("Tab to use"))))
           .when(showTags && Boolean(context), (el) => el.child(context))
           .when(Boolean(branch), (el) => el.child(mono(h_flex().id("branch").h(28).px(8).gap(6).min_w(0).flex_shrink(1).items_center())
             .child(svg(icon("branch")).size(13).flex_none()).child(div().min_w(0).max_w(200).truncate().child(branch.text))))

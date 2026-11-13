@@ -103,7 +103,12 @@ Left to right:
      Code's background note ("1 shell still running", Menlo 11 px `muted`, also while the agent is idle, with its own
      loader then; it truncates first); on the right contr's orchestration as plain Menlo 11 px `muted` text. The box:
      12 px corners, 1 px `border`, `raised`; padding 12 top, 10 right, 8 bottom, 14 left; 10 px between the text
-     and the bottom row. The text is 14 px on 20 px lines; the placeholder is "Reply to <agent name>". The bottom
+     and the bottom row. The text is 14 px on 20 px lines; the placeholder is "Reply to <agent name>", or
+     Claude Code's suggested prompt (#125) when one is known: the helper's `suggestion` is read while the shown
+     Claude Code agent is idle with no card or panel and the box is empty (once on going idle, then at most every
+     3 s); work, another agent and a send forget it. While it shows in the empty box, the spacer of the bottom row
+     has a 12 px `dim` "Tab to use" at its right, and Tab (bound under `HerdrContrSuggest > Input`) puts it in
+     the box; nothing goes to the terminal. With text in the box, Tab is the box's own. The bottom
      row (gap 4): + (28 px square, 8 px corners, 16 px icon, hover fill; macOS only), the model button (28 px
      high, 8 px corners, 8 px side padding, gap 6, hover fill: the agent's 13 px mark in the program table's tile
      color, the short model name "Fable 5.2" at 12 px, the effort in `muted`, an 11 px `muted` chevron), a
@@ -437,7 +442,7 @@ drawn by Herdr's `frames`; every loader of the mod is this one); done is a check
   `cx.bind_keys` under its own key context (`HerdrContrComposer > Input`), asks `paste-image` first
   (files, then plain text, then an image), and types the text itself when nothing is attached.
 - A `TextareaState` has no placeholder setter, and a state can not be made while drawing. The reply box
-  makes a new state in the chat's tick when the agent's name changes ("Reply to <name>"), moves the text
+  makes a new state in the chat's tick when the agent's name or the suggested prompt changes, moves the text
   into it, gives it the keyboard when the old one had it, and releases the old one.
 - `layout()` is the file, not the live tree. Keep the shown screen and the sidebar state in shared
   state, and select the screen outright.
