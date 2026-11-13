@@ -69,7 +69,7 @@ fn agents_usage_errors() {
     assert_eq!((r.code, r.err.as_str()), (2, AGENTS_USAGE));
     let r = call(&["agents", "flow", "x"], &[], &Fake::default());
     assert_eq!((r.code, r.err.as_str()), (2, "herdr-contr-orch agents flow: takes no arguments\n"));
-    let r = call(&["agents", "watch"], &[], &Fake::default());
+    let r = call(&["agents", "watch"], &[], &Fake::default()); // not ported
     assert_eq!(r.code, 2);
     assert!(r.err.starts_with("herdr-contr-orch agents: unknown command watch\n"));
     let r = call(&["--help"], &[], &Fake::default());
