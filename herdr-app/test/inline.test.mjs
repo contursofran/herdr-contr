@@ -261,3 +261,13 @@ test("off: a coordinator message is drawn as before, one TextView per text block
   assert.deepEqual(el.kids.map((e) => e.tag), ["md", "v", "md"]);
   assert.equal(await inlineTick(new Set(["c"])), false);
 });
+
+test("inlineFit keeps the words of a text: the second call does no work again (#83)", async () => {
+  const { inlineFit } = await import("../mods/herdr-contr/inline.js");
+  const a = inlineFit("See PR #81 for the fix.", "o/r", 600, 1, 100);
+  assert.ok(Array.isArray(a) && a.length > 0);
+  assert.equal(inlineFit("See PR #81 for the fix.", "o/r", 600, 1, 100), a);
+  assert.equal(inlineFit("No reference here.", "o/r", 600, 1, 100), null);
+  // Another width is another entry.
+  assert.notEqual(inlineFit("See PR #81 for the fix.", "o/r", 500, 1, 100), a);
+});

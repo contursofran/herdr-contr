@@ -135,7 +135,7 @@ export async function inlineTick(rowIds, now = Date.now()) {
   const urls = [...drawn.values()].flatMap((u) => [...u]);
   return fetchStates(urls, now);
 }
-export function forgetInline() { drawn.clear(); states.clear(); asking.clear(); }
+export function forgetInline() { drawn.clear(); states.clear(); asking.clear(); fits.clear(); }
 export const inlineDrawn = () => drawn;
 
 // The theme token and icon of a state; neutral (muted) until known.
@@ -158,12 +158,9 @@ export function inlineParagraph(key, rowId, md, repo, t, width, k = 1) {
 // null as above. mdblocks.js gives `width` and `h` for a list item from its indented width.
 // Plain elements only: a wrapping row with one child for each word, and a Link for each reference.
 export function inlinePiece(key, rowId, md, repo, t, width, k, h) {
-  const content = inlineContent(md, repo);
-  if (!content) return null;
+  const words = inlineFit(md, repo, width, k, h);
+  if (!words) return null;
   const fs = FS * k;
-  // The icons would need one more line than the estimate counts: TextView, so the row heights hold.
-  if (inlineLines(content, width, k) * lineHeight(fs) > h + 0.5) return null;
-  const words = inlineWords(inlineRuns(md, repo));
   const urls = new Set();
   let n = 0;
   const seg = (r) => {
@@ -187,6 +184,19 @@ export function inlinePiece(key, rowId, md, repo, t, width, k, h) {
     .children(words.map((w) => w.length === 1 ? seg(w[0]) : h_flex().flex_none().items_center().children(w.map(seg))));
   drawn.set(rowId, new Set([...(drawn.get(rowId) ?? []), ...urls]));
   return row;
+}
+// The words of a piece that fits in `h` px, or null (no reference, or the icons would need one more line
+// than the estimate counts: TextView then, so the row heights hold). Kept for each text: the chat draws
+// each shown row again on each frame, and this work is the slow part (#83).
+const fits = new Map();
+export function inlineFit(md, repo, width, k, h) {
+  const key = `${width}|${k}|${h}|${repo ?? ""}|${md}`;
+  if (fits.has(key)) return fits.get(key);
+  const content = inlineContent(md, repo);
+  const words = content && inlineLines(content, width, k) * lineHeight(FS * k) <= h + 0.5 ? inlineWords(inlineRuns(md, repo)) : null;
+  if (fits.size >= 2000) fits.clear();
+  fits.set(key, words);
+  return words;
 }
 // The paragraph's height as estimate.js counts it (markdownHeight: lines joined, "**" dropped).
 export function paragraphHeight(md, width, k = 1) {
