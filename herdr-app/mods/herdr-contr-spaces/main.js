@@ -206,11 +206,12 @@ export default class Spaces extends View {
   }
 
   // The space's icon: its project's favicon, else a theme-tinted folder.
+  // A project is lighter than its agents (#154): the agents are what the owner presses.
   spaceIcon(w, t) {
     const path = w.machine ? null : this.icons[place(w, panes())];
     return path
-      ? image(path).size(16).flex_none().rounded(4)
-      : h_flex().size(16).flex_none().items_center().justify_center().child(svg("mods/workspace-chrome/folder.svg").size(15).text_color(t.muted));
+      ? image(path).size(16).flex_none().rounded(4).opacity(0.7)
+      : h_flex().size(16).flex_none().items_center().justify_center().child(svg("mods/workspace-chrome/folder.svg").size(15).text_color(t.dim));
   }
 
   // `key` and the other places in its repo (a commit there moves their ahead/behind).
@@ -488,8 +489,8 @@ export default class Spaces extends View {
       .flex_none()
       .justify_center()
       .rounded(8)
+      // No highlight on hover (#154): only the agent rows answer the pointer.
       .when(on, (el) => el.bg(t.selected))
-      .when(!on, (el) => el.hover((s) => s.bg(t.hover)))
       .when(this.pressed === w.id && this.over !== w.id, (el) => el.opacity(0.5))
       .when(this.pressed !== null && this.over === w.id && this.pressed !== w.id, (el) => el.child(
         div().absolute().left(0).right(0).h(2).bg(t.accent)
@@ -527,7 +528,7 @@ export default class Spaces extends View {
           .child(this.chevron(w, t))
           .when(Boolean(tree), el => el.pl(22).child(svg("mods/workspace-chrome/branch.svg").size(13).text_color(t.dim)))
           .when(!tree, el => el.child(this.spaceIcon(w, t)))
-          .child(div().flex_shrink(0).max_w(150).truncate().font_medium().text_color(t.foreground).child(w.name))
+          .child(div().flex_shrink(0).max_w(150).truncate().font_medium().text_color(on ? t.foreground : t.muted).child(w.name))
           .child(this.gitTail(w, g, t)),
       );
   }
@@ -570,7 +571,7 @@ export default class Spaces extends View {
   // (when it does not work) and the state mark (when it works or waits). Under the title of an agent with
   // live workers: "Orchestrating · N workers". The shown row is raised, with a 1 px ring; its title is full
   // ink, 500. A finished agent not looked at yet (done) is full ink, 600; any other is muted, 400.
-  // On hover: the age and the mark hide, the controls show, and the icon is at full opacity.
+  // On hover: the age and the mark hide, and the controls show. The icon is always at full color (#154).
   agentRow({ a, workers }, t) {
     const when = this.changed[a.address]?.at ?? 0;
     const on = a.focused;
@@ -588,7 +589,7 @@ export default class Spaces extends View {
       })
       .on_click(() => run("pane.focus", { pane: a.pane }))
       .child(h_flex().h(18).gap(8).items_center()
-        .child(agentIcon(a.program, 15, t[a.status] ?? t.muted).when(!on && !hot, (el) => el.opacity(0.45)))
+        .child(agentIcon(a.program, 15, t[a.status] ?? t.muted))
         .child(div().flex_1().min_w(0).truncate().text_size(13)
           .when(on, (el) => el.font_medium().text_color(t.foreground))
           .when(unread, (el) => el.font_semibold().text_color(t.foreground))
