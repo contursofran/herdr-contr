@@ -12,6 +12,7 @@ pub mod install;
 pub mod locate;
 pub mod mermaid;
 pub mod models;
+pub mod panel;
 pub mod paste;
 pub mod protocol;
 pub mod queue;

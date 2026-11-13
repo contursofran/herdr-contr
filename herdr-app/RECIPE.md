@@ -167,6 +167,14 @@ drawn by Herdr's `frames`; every loader of the mod is this one); done is a check
   preview layout (an option with a `preview`): the box on the right is not read, the card has no
   own-answer row (`noOther`), and Send moves the focus with Up or Down to the pick, then presses
   Enter.
+- **Panel card** (#141): when Claude Code draws a panel in place of its input box (the screen of
+  `/model`, `/config`, `/agents`, `/resume`) and no approval or question card shows, a card above
+  the reply box shows the panel's plain text in a Menlo box (the lines under the last rule line, or
+  the whole screen). Read every 1.5 s while it shows, every 5 s while the agent is idle and none
+  shows, never while the agent works. Up, Down, Left, Right, Enter, Tab, Space, Escape and 0-9
+  (with the card focused) and the buttons under the box send that key; a press on a row "N. …"
+  sends N, on the row the pointer marks ("❯ …") Enter. hc gives no text styles: a selected row
+  shows only when the panel marks it with a character. The card leaves when the panel closes.
 - **Orchestration settings**: contr's agents.json, the file contr's coordinator reads. The path is
   `CONTR_AGENTS_CONFIG` when set (read through `sh`, as the mod has no environment), else the user
   config folder's `contr/agents.json` (macOS `~/Library/Application Support`, other systems
@@ -384,7 +392,7 @@ drawn by Herdr's `frames`; every loader of the mod is this one); done is a check
     (`~/.claude/projects/`, `~/.codex/sessions/`, `~/.grok/sessions/`, `~/.cursor/projects/`,
     `~/.pi/agent/sessions/`, `~/.gemini/antigravity-cli/`) and talks to herdr-core (`hc`) to read
     screens and send keys and text. Commands: `feed`, `status`, `card`, `approve`, `answer`,
-    `send`, `paste-image`, `pictures`, `helper`, one per `exec`, JSON Lines back
+    `send`, `paste-image`, `pictures`, `helper`, `panel`, `keys`, one per `exec`, JSON Lines back
     (`herdr-app/docs/protocol.md` in that repo). Every call ends with `--home <herdr-app home>`, so
     the helper follows the same config.json. It keeps `<herdr-app home>/herdr-contr/cache.json`, `answered/` beside it, and pastes in
     `<herdr-app home>/herdr-contr/paste/`.
@@ -470,6 +478,7 @@ drawn by Herdr's `frames`; every loader of the mod is this one); done is a check
 - A Claude permission prompt shows the approval card with the same command; 1 allows it once, and
   the buttons turn off until the prompt leaves.
 - A question picker shows the question card; picking and Send answer answers it in the terminal.
+- `/model` typed in the terminal shows the panel card in the chat; Down and Enter there pick a model.
 - ⌘⇧I shows Needs you with the waiting agents; ⌘⇧\ shows Overview with every tab.
 - With the sidebar hidden, moving the pointer to the window's left edge slides out the floating
   sidebar, and it closes when the pointer leaves it.

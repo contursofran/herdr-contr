@@ -25,6 +25,7 @@ import { textScale, setting } from "./config.js";
 const appZoom = () => { const z = Number(settings?.()?.zoom); return z > 0 ? z : 1; };
 import { openMenu } from "./menu.js";
 import { Cards, wanted } from "./cards.js";
+import { PanelCard } from "./panelcard.js";
 import { startTop, overBar, barH, herdrTabBar } from "./top.js";
 import { HelperUI, isRemoteProblem } from "./helpercard.js";
 
@@ -93,6 +94,7 @@ export class ChatView {
     this.top = {}; startTop(cx, this.top);
     this.appear = new Appear();
     this.cards = new Cards(cx);
+    this.panel = new PanelCard(cx);
     this.helper = new HelperUI();
     this.refresh = (cx) => { this.lastPoll = 0; return this.poll(cx); };
     this.composer.onNewConversation = (_address, cx) => this.refresh(cx);
@@ -108,6 +110,7 @@ export class ChatView {
     this.composer.onSendFailed = (address, echo, cx) => { const f = this.feeds.get(address); if (f && echo && dropEcho(f, echo)) cx.notify(); };
     this.composer.onSendDone = (address, cx) => { if (address === this.address) return this.refresh(cx); };
     this.cards.canFocus = () => this.composer?.empty !== false;
+    this.panel.canFocus = this.cards.canFocus;
     this.switchTo(currentAgent()?.address ?? null);
     cx.spawn((cx) => this.poll(cx));
     cx.timer.every(CHECK_MS, (cx) => this.tick(cx));
@@ -124,7 +127,7 @@ export class ChatView {
 
   // Every chat opens at its newest message, also one read before.
   switchTo(address) {
-    this.address = address; this.cards.shown = address;
+    this.address = address; this.cards.shown = address; this.panel.shown = address;
     if (address && !this.feeds.has(address)) this.feeds.set(address, emptyFeed(address));
     this.follow = true; this.open = new Set(); this.autoOlder = 0;
     // A newly shown agent gets its own background read.
@@ -149,7 +152,11 @@ export class ChatView {
     cx.spawn((cx) => this.composer.pollStatus(cx));
     const agent = currentAgent();
     this.composer.syncPlaceholder(agent, cx);
-    cx.spawn((cx) => this.cards.poll(cx, this.address, wanted(agent, this.feed()?.rows)));
+    const want = wanted(agent, this.feed()?.rows);
+    cx.spawn((cx) => this.cards.poll(cx, this.address, want));
+    // A panel in the terminal (#141): read while the agent does not work and no approval or question card shows.
+    const calm = Boolean(agent) && agent.status !== "working" && !want && !this.cards.card(this.address);
+    cx.spawn((cx) => this.panel.poll(cx, this.address, calm));
     if (this.wantOlder) { this.wantOlder = false; cx.spawn((cx) => this.loadOlder(cx)); }
     const f = this.feed();
     if (f && settleEchoes(f)) cx.notify();
@@ -474,6 +481,8 @@ export class ChatView {
       .when(Boolean(f) && f.error?.code !== "not-agent" && !isRemoteProblem(f.error), (el) => {
         const card = this.cards.view(this.address, t, "chat-card", this.colWidth());
         if (card) el.child(this.appear.wrap(h_flex().w_full().px(16).pt(8).justify_center().on_mouse_down("left", stop).child(card), "chat-card-in", `${this.address}:${this.cards.key?.(this.address) ?? ""}`, cx, 10));
+        const panel = card ? null : this.panel.view(this.address, t, "chat-panel", this.colWidth());
+        if (panel) el.child(this.appear.wrap(h_flex().w_full().px(16).pt(8).justify_center().on_mouse_down("left", stop).child(panel), "chat-panel-in", this.address, cx, 10));
         return el.child(div().w_full().on_mouse_down("left", stop).child(this.composer.render(currentAgent(), t, this.colWidth(), this.work?.address === this.address ? this.work : null,
           this.background?.address === this.address ? this.background : null)));
       })
