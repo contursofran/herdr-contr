@@ -130,7 +130,7 @@ Left to right:
      (see below). FLOW: **Plan first** Never | When needed | Always; **Review** None | Code PRs | Every PR;
      **Debugger after** and **Workers at once**, each − <n> <unit> + (24 px buttons, 1 to 99);
      **Merge** Ask me | When CI and review pass. ROLES: Orchestrator, Planner, Builder, Reviewer,
-     Debugger, each a row with its name and what it does, then a model switch (Opus 5.5 | Sonnet 5.5 |
+     Debugger, with first a 24 px button "Use recommended setup" (#90: orchestrator Fable 5.2 medium, builder Opus 5.5 low, reviewer and planner Fable 5.2 low, debugger Fable 5.2 high; one write, only `--model` and `--effort`, a role that is not claude stays). When all five roles are at it, the button is dim and off and "Recommended setup in use" shows in `dim`. Then each role is a row with its name and what it does, then a model switch (Opus 5.5 | Sonnet 5.5 |
      Haiku 5.5 | Fable 5.2) and an effort switch (low | medium | high | xhigh | max). A role whose
      command is not one of these shows "Custom: <command>" and no choice selected. At the bottom
      "Saved in <path>. contr's coordinator reads it." It opens on General. A box with a `blocked`

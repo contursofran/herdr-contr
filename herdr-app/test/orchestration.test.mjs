@@ -6,7 +6,7 @@ import { textOf, byId } from "./stub/ui.mjs";
 import { fakeCx } from "./fake-cx.mjs";
 import { agent, space } from "./fixtures.mjs";
 import { SettingsView } from "../mods/herdr-contr/settings.js";
-import { loadAgents, agentsPath, resetAgentsPath, flowValue, roleValue, setFlow, setRole, setFlag, DEFAULT_FLOW } from "../mods/herdr-contr/orchestration.js";
+import { loadAgents, agentsPath, resetAgentsPath, flowValue, roleValue, setFlow, setRole, setFlag, DEFAULT_FLOW, useRecommended, recommendedInUse } from "../mods/herdr-contr/orchestration.js";
 
 const MAC = "/home/test/Library/Application Support/contr/agents.json";
 let file, env, path;
@@ -145,4 +145,34 @@ test("a write that fails shows why", async () => {
 test("loadAgents reads the file again on each open", async () => {
   await loadAgents(); file = JSON.stringify({ flow: { workers: 7 } }); await loadAgents();
   assert.equal(flowValue("workers"), 7);
+});
+
+test("Use recommended setup: one write, only --model and --effort, a custom command stays (#90)", async () => {
+  const orch = ["env", "CLAUDE_CODE_PLUGIN_DIRS=", "claude", "--plugin-dir", "/k", "--model", "opus", "--effort", "medium", "--permission-mode", "auto"];
+  const build = ["/home/u/.local/bin/claude", "--model", "sonnet", "--permission-mode", "auto"];
+  file = JSON.stringify({ kit: "/k", flow: { plan: "never" }, profiles: { orchestrator: { argv: orch }, builder: { argv: build, note: "x" }, reviewer: { argv: ["codex", "-m", "x"] } } });
+  const { el } = await open();
+  assert.equal(byId(el, "set-recommended-note"), null);
+  await click(byId(el, "set-recommended-use"));
+  assert.equal(log.writes.length, 1);
+  const f = JSON.parse(file);
+  assert.deepEqual(f.profiles.orchestrator.argv, orch.map((a) => a === "opus" ? "claude-fable-5-2" : a));
+  assert.deepEqual(f.profiles.builder.argv, ["/home/u/.local/bin/claude", "--model", "opus", "--effort", "low", "--permission-mode", "auto"]);
+  assert.equal(f.profiles.builder.note, "x"); assert.equal(f.kit, "/k"); assert.deepEqual(f.flow, { plan: "never" });
+  assert.deepEqual(f.profiles.reviewer.argv, ["codex", "-m", "x"]);
+  assert.deepEqual(f.profiles.planner.argv, ["claude", "--model", "claude-fable-5-2", "--effort", "low", "--permission-mode", "auto"]);
+  assert.deepEqual(f.profiles.debugger.argv, ["claude", "--model", "claude-fable-5-2", "--effort", "high", "--permission-mode", "auto"]);
+  // The custom reviewer keeps the setup from being complete.
+  assert.equal(recommendedInUse(), false);
+});
+
+test("all roles at the recommended setup: the button is off and says so (#90)", async () => {
+  file = null;
+  await loadAgents(); await useRecommended();
+  const { el } = await open();
+  assert.equal(recommendedInUse(), true);
+  assert.match(textOf(byId(el, "set-recommended-note")), /Recommended setup in use/);
+  const n = log.writes.length;
+  assert.equal(byId(el, "set-recommended-use")._h?.on_click, undefined);
+  assert.equal(log.writes.length, n);
 });
