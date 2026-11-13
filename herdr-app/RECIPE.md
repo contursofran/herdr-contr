@@ -272,7 +272,10 @@ drawn by Herdr's `frames`; every loader of the mod is this one); done is a check
   `tab-panes`. With a `tabs` block in the layout (`herdrTabBar()`), the chat, Needs you and
   Overview draw no bar and leave no room for one (`barH()` is 0); Needs you is ⌘⇧I and Overview
   ⌘⇧\.
-- **Mod** `mods/herdr-contr-tabs/`: a copy of Herdr's `tabs` mod (Apache-2.0). The one change: the working
+- **Mod** `mods/herdr-contr-tabs/`: a copy of Herdr's `tabs` mod (Apache-2.0). Change one: a tab shows a short name
+  (`label.js`, at most 140 px with an ellipsis, the full text in the tooltip): the name the owner gave it, else
+  its lead agent's title as the sidebar cleans it (a copy of `projects.js`'s `clean`, `leadPanes` and `title`;
+  `test/tab-names.test.mjs` keeps them equal), else the program's name, else its number. Change two: the working
   mark is the braille loader of `mods/herdr-contr/state.js` (12 px, ⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏ in Menlo, `line_height(1)`,
   80 ms a frame), in place of the turning arc. A mod cannot import another mod, so each copy has its own
   `loader()`. The copy keeps its window icons (`win-*.svg`); the icons of other Herdr mods (`workspace-chrome`,
