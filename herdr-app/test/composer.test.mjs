@@ -98,7 +98,7 @@ test("box: radius 12, the design's padding, 14 px text; the bottom row's buttons
   const el = c.render(fake.agents[0], TH);
   const box = byId(el, "box");
   assert.deepEqual([box._a.rounded, box._a.pt, box._a.pr, box._a.pb, box._a.pl, box._a.gap], [12, 12, 10, 8, 14, 10]);
-  assert.deepEqual([byId(el, "slash-keys")._a.text_size, byId(el, "slash-keys")._a.line_height], [14, 20]);
+  assert.deepEqual([byId(el, "slash-keys")._a.text_size, byId(el, "slash-keys")._a.line_height], [14, 20 / 14]); // a multiple of the text size, not px (#106)
   assert.equal(byId(el, "box-row")._a.gap, 4);
   const attach = byId(el, "attach");
   assert.deepEqual([attach._a.size, attach._a.rounded, attach.kids[0]._a.size], [28, 8, 16]);
@@ -841,6 +841,17 @@ test("an image under the app home shows as a 56 px picture with ×; a text file 
   el = c.render(fake.agents[0], t);
   assert.deepEqual(pics(el), []);
   assert.deepEqual(chips(el), ["notes.txt", "far.png"]);
+});
+
+test("the placeholder names the agent by its own title when no tab is named (#106)", async () => {
+  const { replyName, placeholderFor } = await import("../mods/herdr-contr/composer.js");
+  const prog = { name: "Claude Code" };
+  assert.equal(replyName({ program: prog, title: "\u2733 Flockbook layout" }), "Flockbook layout");
+  assert.equal(replyName({ program: prog, tab_name: "Mine", title: "\u2733 Other" }), "Mine");
+  assert.equal(replyName({ program: prog, title: "~/code/contr" }), "Claude Code");
+  assert.equal(replyName({ program: prog, title: "Claude Code" }), "Claude Code");
+  assert.equal(placeholderFor({ program: prog, title: "\u2733 Flockbook layout" }), "Reply to Flockbook layout");
+  assert.equal(placeholderFor(null), "Reply to the agent");
 });
 
 // The model menu (#112). At the end: its rigs bind the "/" keys, which the paste test above sees bound once.
