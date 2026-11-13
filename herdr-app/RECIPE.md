@@ -93,7 +93,10 @@ Left to right:
      against Claude Code's `autoCompactWindow` when it is set, else "ctx 37%" of the model's window; without the wrapper, the tokens come from the session log and
      the tag shows only with `autoCompactWindow`), then a 16 px rounded `raised`
      box with a one-line text area ("Reply to the agent"), + to attach files on the left (macOS only), the
-     branch, and a round 28 px send button (accent when there is text). File chips above the text.
+     branch, and a round 28 px send button (accent when there is text). File chips above the text: a PNG, JPEG
+     or SVG under the app home (a pasted image is in `herdr-contr/paste`) shows as a 56 px high picture
+     (8 px corners, `border` frame, × on its top right corner); any other file, and an image from another
+     folder, is a chip with its name.
    - **Card** between the chat and the reply box, as wide as the reply box (the chat's column), 14 px corners, `raised`, 14 px
      padding, an orange 8 px dot before the title.
      - Approval: the title (the prompt's own, for example "Bash command"; else "<tool> wants to
