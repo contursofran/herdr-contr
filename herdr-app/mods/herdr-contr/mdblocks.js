@@ -43,7 +43,7 @@ function codeBox(key, b, t, k, width) {
   const d = isMermaid(b) ? mermaidOf(b.text, t) : null;
   if (d) {
     const s = mermaidSize(d, width);
-    return v_flex().w_full().my(6).px(14).py(10).rounded(12).bg(t.raised).border(1).border_color(t.border)
+    return v_flex().w_full().items_center().my(6).px(14).py(10).rounded(12).bg(t.raised).border(1).border_color(t.border)
       .child(image(d.path).w(s.w).h(s.h).flex_none());
   }
   return v_flex().w_full().my(6).px(14).py(10).rounded(12).bg(t.raised).border(1).border_color(t.border)
