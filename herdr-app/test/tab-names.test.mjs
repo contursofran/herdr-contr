@@ -52,5 +52,5 @@ test("the copies of clean, leadPanes and title equal the sidebar's", () => {
   const part = (s, start) => { const i = s.indexOf(start); assert.ok(i >= 0, start); return s.slice(i, s.indexOf("\n}\n", i) + 3); };
   const cleanLine = (s) => s.split("\n").find((l) => l.startsWith("const clean ="));
   assert.equal(cleanLine(b), cleanLine(a));
-  for (const f of ["export function leadPanes(", "function title("]) assert.equal(part(b, f), part(a, f));
+  for (const f of ["function telling(", "export function leadPanes(", "function title("]) assert.equal(part(b, f), part(a, f));
 });

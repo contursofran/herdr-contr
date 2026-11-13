@@ -1,7 +1,15 @@
-// A tab's short name. clean(), leadPanes() and title() are copies of those in
+// A tab's short name. clean(), telling(), leadPanes() and title() are copies of those in
 // mods/herdr-contr-spaces/projects.js (a mod cannot import another mod); a test keeps them equal.
 
 const clean = (s) => (s ?? "").replace(/^[^\p{L}\p{N}]+/u, "").trim();
+
+// A title that says something: not empty, not the program's name or key, not a path, not user@host.
+function telling(raw, program) {
+  const live = clean(raw);
+  // clean() would strip a path's leading ~ or /: test the title with only its status glyph gone.
+  const path = /^[~/]|^[A-Za-z]:\\/.test((raw ?? "").replace(/^[^\p{L}\p{N}~/]+/u, ""));
+  return live && live !== program?.name && !path && !live.includes("@") && live.toLowerCase() !== program?.key ? live : "";
+}
 
 // Each tab's lead pane: its first agent, else its first focused terminal, else its first terminal.
 export function leadPanes(all) {
@@ -15,12 +23,8 @@ export function leadPanes(all) {
 }
 
 function title(tab, l) {
-  const prog = l?.program?.name;
-  const live = clean(l?.title);
-  // clean() would strip a path's leading ~ or /: test the title with only its status glyph gone.
-  const path = /^[~/]|^[A-Za-z]:\\/.test((l?.title ?? "").replace(/^[^\p{L}\p{N}~/]+/u, ""));
-  const telling = live && live !== prog && !path && !live.includes("@") && live.toLowerCase() !== l?.program?.key;
-  return (tab.name === prog || !tab.named) && telling ? live : tab.name;
+  const live = telling(l?.title, l?.program);
+  return (tab.name === l?.program?.name || !tab.named) && live ? live : tab.name;
 }
 
 // The name the owner gave the tab, else its lead's title (as the sidebar cleans it), else the
