@@ -1,4 +1,6 @@
 // Adapted from Herdr's spaces mod (Apache-2.0); changes: the project's favicon, else a folder icon, as the space icon.
+// Also: it is the Projects list. Under each project, its agents (from our copy of Herdr's agents mod), an
+// orchestrator's workers under it; the projects with no agent go into one "N more projects" row (projects.js).
 // Workspace spaces: stable colored avatars, worktrees under their checkout,
 // grouped by machine when more than one is known. After a space's name, the repo
 // its first terminal is in now, only where unusual: branch, ahead/behind. Agent state lives in the agents list, not here. Click to
@@ -6,7 +8,21 @@
 
 import { View, div, svg, image } from "gpui-kit";
 import { v_flex, h_flex } from "gpui-base";
-import { spaces, machines, panes, run, openOverlay, exec, hc, theme, shared, setShared, watchFolder, window, layout } from "herdr";
+import { spaces, machines, panes, agents, terminals, focused, setAgentOrder, run, openOverlay, exec, hc, theme, shared, setShared, watchFolder, window, layout } from "herdr";
+import { bySpace, split, countLine, moreLine, workerText, leadPanes, agentLabel, duration } from "./projects.js";
+
+// The braille loader, as herdr-contr's loader() in mods/herdr-contr/state.js (a mod cannot import another mod).
+const BRAILLE = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"];
+const loader = (size) => div().flex_none().w(size).h(size).flex().items_center().justify_center()
+  .font_family("Menlo").text_size(size).line_height(1).frames(BRAILLE, 80).child(BRAILLE[0]);
+
+// The agent's icon from the app's program table: a one-color glyph tinted by its state, or a picture.
+function agentIcon(p, size, color) {
+  if (!p?.icon) return div().w(size).flex_none();
+  return p.tint ? svg(p.icon).size(size).flex_none().text_color(color) : image(p.icon).w(size).h(size).flex_none();
+}
+// The left edge of a project's icon, and of its agents' icons: past the chevron.
+const INDENT = 22;
 
 function find(node, id) {
   if (node?.id === id) return node;
@@ -79,6 +95,11 @@ export default class Spaces extends View {
     this.reconnecting = JSON.parse(localStorage.getItem("machines.reconnecting") ?? "{}");
     for (const state of Object.values(this.reconnecting)) state.busy = false;
     this.folded = new Set(JSON.parse(localStorage.getItem("machines.folded") ?? "[]"));
+    this.closed = new Set(JSON.parse(localStorage.getItem("projects.closed") ?? "[]")); // projects folded shut
+    this.more = new Set(); // machines whose "N more projects" row is open
+    // Each agent's last state and when it changed (ms), kept across restarts.
+    this.changed = JSON.parse(localStorage.getItem("changed") ?? "{}");
+    cx.timer.every(30000, (cx) => cx.notify());
     this.refreshMachines(cx);
     cx.timer.every(15000, cx => this.refreshMachines(cx));
     // Refresh only when the refs could have changed (see `due`).
@@ -332,7 +353,10 @@ export default class Spaces extends View {
   // The rows, under a header per machine once one isn't this computer.
   grouped(t, collapsed) {
     const rows = this.ordered();
+    // Herdr's agent keys go in the order of the projects.
+    setAgentOrder(rows.flatMap((r) => this.agentsOf.get(r.w.id) ?? []).map((x) => x.a.address));
     const draw = (r) => (collapsed ? this.compact(r, t) : this.row(r, t));
+    const list = (rs, m) => (collapsed ? rs.map(draw) : this.projects(rs, m, t));
     const remote = [...new Set([...rows.map(r => r.w.machine).filter(Boolean), ...this.machines.map(m => m.name), ...Object.keys(this.reconnecting)])].sort();
     const loading = m => {
       const layout = machines().find(k => k.name === m)?.layout;
@@ -340,7 +364,7 @@ export default class Spaces extends View {
         || spaces().some(s => (s.machine ?? null) === m && !this.shown.has(s.id));
     };
     const loadingRow = m => h_flex().id(`machine-loading-${m ?? "local"}`).h(28).flex_none().px(collapsed ? 0 : 8).items_center().when(collapsed, el => el.justify_center()).text_size(12).text_color(t.dim).child(collapsed ? "…" : "Loading…");
-    if (!remote.length) return loading(null) && !rows.length ? [loadingRow(null)] : rows.map(draw);
+    if (!remote.length) return loading(null) && !rows.length ? [loadingRow(null)] : list(rows, null);
     const machineNames = [null, ...remote];
     return machineNames.flatMap((m) => {
       const mine = rows.filter((r) => (r.w.machine ?? null) === m);
@@ -393,30 +417,22 @@ export default class Spaces extends View {
             .text_size(11).text_color(t.foreground).bg(t.raised).cursor_pointer().hover(s => s.bg(t.hover))
             .on_click((_e, cx) => { cx.stop_propagation(); cx.write_to_clipboard(login); this.copiedLogin = login; cx.notify(); })
             .child(this.copiedLogin === login ? "Copied" : "Copy")))] : [];
-      return [cell(head), ...guidance, ...(folded ? [] : mine.length ? mine.map(draw) : [loading(m) ? loadingRow(m) : cell(empty)])];
+      return [cell(head), ...guidance, ...(folded ? [] : mine.length ? list(mine, m) : [loading(m) ? loadingRow(m) : cell(empty)])];
     });
   }
 
-  // Only what's unusual, after the name: "herdr \u00b7 spike \u21912 \u21931". The repo or
-  // branch goes when the name already says it (a worktree is named after its branch),
-  // and master/main go: nearly every space is on one.
-  gitTail(g, tree, name, t) {
-    const raw = g.branch ?? "detached";
-    const same = (a) => a.toLowerCase() === name.toLowerCase();
-    const branch = same(raw) || raw === "master" || raw === "main" ? "" : raw;
-    const repo = tree || same(g.name) ? "" : g.name;
-    const where = [repo, branch].filter(Boolean).join(" \u00b7 ");
+  // After the name: the branch in mono and dim, and at the right the commits ahead and behind ("\u21914").
+  gitTail(g, t) {
     return h_flex()
       .flex_1()
       .min_w(0)
       .gap(5)
-      .justify_end()
       .items_center()
       .text_size(11.5)
       .text_color(t.dim)
-      .when(Boolean(where), (el) => el.child(div().min_w(0).truncate().child(where)))
-      .when(g.ahead > 0, (el) => el.child(div().flex_none().text_color(t.ansi2).child(`\u2191${g.ahead}`)))
-      .when(g.behind > 0, (el) => el.child(div().flex_none().text_color(t.ansi1).child(`\u2193${g.behind}`)));
+      .child(div().flex_1().min_w(0).truncate().font_family("Menlo").child(g.branch ?? "detached"))
+      .when(g.ahead > 0, (el) => el.child(div().flex_none().child(`\u2191${g.ahead}`)))
+      .when(g.behind > 0, (el) => el.child(div().flex_none().child(`\u2193${g.behind}`)));
   }
 
   row({ w, i, g, tree }, t) {
@@ -464,13 +480,126 @@ export default class Spaces extends View {
       .on_mouse_down("right", () => this.menu(w))
       .child(
         h_flex()
-          .gap(9)
+          .gap(8)
           .items_center()
+          .child(this.chevron(w, t))
           .when(Boolean(tree), el => el.pl(22).child(svg("mods/workspace-chrome/branch.svg").size(13).text_color(t.dim)))
           .when(!tree, el => el.child(this.spaceIcon(w, t)))
-          .child(div().flex_shrink(0).max_w(150).truncate().text_color(t.foreground).child(w.name))
-          .child(g ? this.gitTail(g, tree, w.name, t) : div().flex_1()),
+          .child(div().flex_shrink(0).max_w(150).truncate().font_medium().text_color(t.foreground).child(w.name))
+          .child(g ? this.gitTail(g, t) : div().flex_1()),
       );
+  }
+
+  // A project's chevron: it opens and shuts the project's agents. A press on it is not a drag or a select.
+  chevron(w, t) {
+    const has = this.agentsOf?.has(w.id);
+    const shut = this.closed.has(w.id);
+    return div().id(`fold-${w.id}`).size(14).flex_none().flex().items_center().justify_center().text_color(t.dim)
+      .when(Boolean(has), (el) => el.rounded(4).hover((s) => s.text_color(t.foreground))
+        .on_mouse_down("left", (_e, cx) => {
+          cx.stop_propagation();
+          shut ? this.closed.delete(w.id) : this.closed.add(w.id);
+          localStorage.setItem("projects.closed", JSON.stringify([...this.closed]));
+          cx.notify();
+        })
+        .child(svg(`mods/workspace-chrome/chevron-${shut ? "right" : "down"}.svg`).size(11)));
+  }
+
+  // One machine's projects: each with its agents under it, then the "N more projects, no agents" row.
+  projects(rows, m, t) {
+    const { shown, idle } = split(rows, (id) => this.agentsOf.has(id));
+    const out = shown.flatMap((r) => [this.row(r, t), ...(this.closed.has(r.w.id) ? [] : (this.agentsOf.get(r.w.id) ?? []).flatMap((x) =>
+      [this.agentRow(x, t), ...(x.workers.length ? [this.workersBox(x.workers, t)] : [])]))]);
+    if (!idle.length) return out;
+    const key = m ?? "";
+    const open = this.more.has(key);
+    const more = h_flex().id(`more-${m ?? "local"}`).h(30).flex_none().mt(6).px(8).gap(8).items_center().rounded(8)
+      .text_color(t.muted).cursor_pointer().hover((s) => s.bg(t.hover).text_color(t.foreground))
+      .on_click((_e, cx) => { open ? this.more.delete(key) : this.more.add(key); cx.notify(); })
+      .child(div().size(14).flex_none().flex().items_center().justify_center()
+        .child(svg(`mods/workspace-chrome/chevron-${open ? "down" : "right"}.svg`).size(11)))
+      .child(div().flex_1().min_w(0).truncate().child(moreLine(idle.length)));
+    return [...out, more, ...(open ? idle.map((r) => this.row(r, t)) : [])];
+  }
+
+  // An agent under its project: its icon tinted by its state, the title, the time, the state mark. An
+  // orchestrator's title is bold, with "Orchestrating · N workers" under it.
+  agentRow({ a, workers }, t) {
+    const orch = workers.length > 0;
+    const when = this.changed[a.address]?.at ?? 0;
+    const quiet = a.status === "idle" && !a.focused;
+    return v_flex().id(`ag-${a.address}`).pl(INDENT + 8).pr(8).py(orch ? 4 : 0).flex_none().justify_center().rounded(8)
+      .when(a.focused, (el) => el.bg(t.selected).border_1().border_color(t.border))
+      .when(!a.focused, (el) => el.hover((s) => s.bg(t.hover)))
+      .cursor_pointer()
+      .on_click(() => run("pane.focus", { pane: a.pane }))
+      .child(h_flex().h(28).gap(9).items_center()
+        .child(agentIcon(a.program, 15, t[a.status] ?? t.muted))
+        .child(div().flex_1().min_w(0).truncate().when(orch, (el) => el.font_semibold())
+          .text_color(quiet ? t.muted : t.foreground).child(this.labels.get(a.address) ?? ""))
+        .when(Boolean(when), (el) => el.child(div().flex_none().font_family("Menlo").text_size(11).text_color(t.dim).child(duration(this.now - when))))
+        .child(this.mark(t, a.status)))
+      .when(orch, (el) => el.child(h_flex().h(18).gap(9).items_center()
+        .child(div().w(15).flex_none())
+        .child(div().flex_1().min_w(0).truncate().text_size(12).text_color(t.muted).child(countLine(workers.length)))));
+  }
+
+  // An orchestrator's workers, indented, with a thin guide line at the left.
+  workersBox(list, t) {
+    const shown = focused()?.agent;
+    return v_flex().flex_none().ml(INDENT + 15).my(2).border_l(1).border_color(t.border)
+      .children(list.map(({ t: k, depth }) => {
+        const st = this.listed.get(k.address) ?? (k.status === "error" ? "blocked" : k.status);
+        const on = k.address === shown;
+        return h_flex().id(`sub-${k.address}`).h(26).flex_none().ml(4).pl(10 + 14 * depth).pr(8).gap(8).items_center().rounded(8)
+          .text_size(12.5)
+          .when(on, (el) => el.bg(t.selected))
+          .when(!on, (el) => el.hover((s) => s.bg(t.hover)))
+          .cursor_pointer()
+          .on_click(() => run(this.listed.has(k.address) ? "pane.focus" : "terminal.peek", { terminal: k.address }))
+          .child(agentIcon(k.program, 14, t[st] ?? t.muted))
+          .child(div().flex_1().min_w(0).truncate().text_color(st === "idle" && !on ? t.muted : t.foreground).child(workerText(k)))
+          .child(this.mark(t, st));
+      }));
+  }
+
+  // The state mark at the far right: the braille loader while it works, a check when done, "Needs you"
+  // when it waits for the owner; idle shows nothing.
+  mark(t, status) {
+    if (status === "working") return loader(12).mx(1).text_color(t.working);
+    if (status === "done") return h_flex().size(14).flex_none().justify_center().child(svg("mods/workspace-chrome/check.svg").size(12).text_color(t.done));
+    if (status === "blocked") return div().flex_none().px(6).h(18).rounded(5).bg(t.blocked + "26").text_size(10.5).font_semibold().text_color(t.blocked).flex().items_center().child("Needs you");
+    return div().w(14).flex_none();
+  }
+
+  // Stamps agents whose state changed. Done and idle count as one: looking at a finished agent turns
+  // done into idle, and looking isn't the agent doing anything.
+  track(list, now) {
+    let dirty = false;
+    for (const a of list) {
+      const s = a.status === "done" ? "idle" : a.status;
+      if (this.changed[a.address]?.s === s) continue;
+      this.changed[a.address] = { s, at: now };
+      dirty = true;
+    }
+    if (!dirty) return;
+    const listed = new Set(list.map((a) => a.address));
+    for (const [k, c] of Object.entries(this.changed)) if (!listed.has(k) && now - c.at > 30 * 86400000) delete this.changed[k];
+    localStorage.setItem("changed", JSON.stringify(this.changed));
+  }
+
+  // The data of one draw: agents by space, their titles, and the time. Read once per draw.
+  readAgents() {
+    const list = agents();
+    this.now = Date.now();
+    this.listed = new Map(list.map((a) => [a.address, a.status]));
+    this.track(list, this.now);
+    this.agentsOf = bySpace(list, terminals());
+    const leads = leadPanes(panes());
+    const tabs = new Map(spaces().flatMap((s) => s.tabs ?? []).map((tab) => [tab.id, tab]));
+    const perTab = new Map();
+    for (const a of list) perTab.set(a.tab, (perTab.get(a.tab) ?? 0) + 1);
+    this.labels = new Map(list.map((a) => [a.address, agentLabel(a, tabs, leads, perTab.get(a.tab) > 1)]));
   }
 
   compact({ w, i }, t) {
@@ -504,14 +633,16 @@ export default class Spaces extends View {
       changed = true;
     }
     if (changed) setShared("space.colors", kept);
+    this.readAgents();
+    const rows = this.grouped(t, collapsed);
     return v_flex().size_full().min_h(0).bg(t.chrome).text_size(13)
-      .child(h_flex().h(31).pl(16).pr(10).items_center().justify_between().text_size(11.5).text_color(t.dim)
+      .child(h_flex().h(34).pl(16).pr(10).items_center().justify_between().text_size(12.5).text_color(t.muted)
         .when(collapsed, el => el.pl(0).pr(0).justify_center())
-        .when(!collapsed, el => el.child("Spaces"))
+        .when(!collapsed, el => el.child("Projects"))
         .child(div().id("space-new").size(26).flex_none().flex().items_center().justify_center().rounded(6).hover(s => s.bg(t.hover).text_color(t.foreground))
           .on_click(() => run("space.new")).child(svg("mods/workspace-chrome/plus.svg").size(14))))
       .child(v_flex().flex_1().min_h(0).px(collapsed ? 0 : 8).pb(14).overflow_y_scrollbar().mode("always")
         .on_mouse_up("left", (_e, cx) => { this.pressed = null; cx.notify(); })
-        .children(this.grouped(t, collapsed)));
+        .children(rows));
   }
 }

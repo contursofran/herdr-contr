@@ -254,8 +254,8 @@ drawn by Herdr's `frames`; every loader of the mod is this one); done is a check
     padding 8).
   - The ids `sidebar`, `screen`, `chat` and `tab` are what the mod switches.
 - **Layout** `layouts/herdr-contr.json`: the same `work` column and theme, but `sidebar` is
-  Herdr's own, as in Herdr's `main` layout (268 px, shown: the blocks `workspace-chrome`, `herdr-contr-spaces`,
-  `herdr-contr-agents` and the `workspace-chrome` footer), with `traffic_lights: [12, 16]`. Between the lists and
+  Herdr's, as in Herdr's `main` layout (268 px, shown: the blocks `workspace-chrome`, `projects` (mod
+  `herdr-contr-spaces`, the Projects list) and the `workspace-chrome` footer), with `traffic_lights: [12, 16]`. Between the list and
   the footer is the mod's `usage` block (56 px, view `usage`): the same plan usage rows as the mod's own
   sidebar. It starts hidden; the mod shows it (`layout.show`) when a plan has data and hides it when none
   has. The chat, Needs you and Overview screens start the reads too, so the hidden block can show. Under it, just
@@ -274,7 +274,8 @@ drawn by Herdr's `frames`; every loader of the mod is this one); done is a check
   Overview draw no bar and leave no room for one (`barH()` is 0); Needs you is ⌘⇧I and Overview
   ⌘⇧\.
 - **Mods** `mods/herdr-contr-agents/` and `mods/herdr-contr-tabs/`: copies of Herdr's `agents` and
-  `tabs` mods (Apache-2.0). The one change: the working mark is the braille loader of
+  `tabs` mods (Apache-2.0). Since #96 no layout names the agents copy (the Projects list draws the agents);
+  it stays installed until slice 3 moves its model line into a tooltip. The one change: the working mark is the braille loader of
   `mods/herdr-contr/state.js` (12 px, ⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏ in Menlo, `line_height(1)`, 80 ms a frame), in place
   of the turning arc. A mod cannot import another mod, so each copy has its own `loader()`. The tabs
   copy keeps its window icons (`win-*.svg`); the icons of other Herdr mods (`workspace-chrome`,
@@ -285,7 +286,36 @@ drawn by Herdr's `frames`; every loader of the mod is this one); done is a check
   26 px sub-agent). In a sub-agent row, a `│` or `├` tree line goes on through line 2. It comes from the
   helper's `model` command (docs/protocol.md), asked only when the helper has it, when a terminal first
   shows and when its status changes (at most once in 15 s; no timer). Unknown parts are left out.
-- **Mod** `mods/herdr-contr-spaces/`: a copy of Herdr's `spaces` mod (Apache-2.0). The one change: the
+- **Mod** `mods/herdr-contr-spaces/`: a copy of Herdr's `spaces` mod (Apache-2.0). It is the **Projects list**
+  of the `herdr-contr` layout (#96; after the owner's design, slice 1 of 3). The layout no longer names
+  `herdr-contr-agents`: the agent rows are drawn here (`projects.js` holds the grouping).
+  - A head row "Projects" (34 px, 12.5 px, `muted`) with a + (`space.new`).
+  - A project row (30 px, 8 px corners): a 14 px chevron (only when the project has agents; a press on it
+    opens or shuts the project's agents, kept in `localStorage` `projects.closed`, and is no select or
+    drag), the favicon or the folder, the name (`font_medium`), the branch in Menlo 11.5 px `dim`, and at
+    the right the commits ahead and behind (`↑2`, `↓4`, `dim`). A click selects the space, a right-click
+    opens its menu (rename and the others), a drag moves it, as before. Worktree rows stay under their checkout.
+  - Under an open project, its agents (`agents()` with that `space`). A row (28 px line, 30 px in from the
+    list edge, so the icon is under the project's icon): the agent's icon (15 px, a tinted glyph takes
+    the state's color), the title (a named tab, else the agent's own title, never a tab number), the time
+    since its state changed (Menlo 11 px, `dim`) and the state mark: the braille loader while it works, a
+    `check.svg` in `done` when done, "Needs you" when blocked, nothing when idle. The shown agent's row
+    is `selected` with a 1 px `border` and 8 px corners. A click focuses its pane.
+  - An orchestrator is an agent with live sub-agents: hc gives each terminal its `parent` (`terminals()`),
+    the same data the agents copy used for sub-agents. Its title is `font_semibold`, with a second line
+    "Orchestrating · N workers" (12 px, `muted`); N counts all its live sub-agents, depth first. Under it,
+    its workers in a box 37 px in, with a 1 px `border` guide line at the left: a 26 px row (12.5 px) with
+    the icon, what it works on (its name, else its template or program) and the state mark; a deeper
+    sub-agent is 14 px further in. A click focuses its pane, or peeks a worker without one. A sub-agent
+    with a pane is in `agents()` too and shows only under its parent.
+  - The projects with no agent go into one closed row at the end of each machine's group, "N more
+    projects, no agents" (`muted`). Open (in memory), it lists them as project rows. The shown space is
+    never in it; a checkout and its worktrees go there only together.
+  - Herdr's agent order (`setAgentOrder`) is the projects' order, shut projects included.
+  - The rail (under 160 px) and the machine group rows are as before. Not yet here: the pin, the sort
+    menu and the model line of the agents copy (slice 3, #98, brings the hover controls and the model tooltip).
+
+  The favicon change: the
   space icon (18 px) is the project's favicon (`image()`, full color, 4 px corners), else a folder icon
   (`workspace-chrome/folder.svg`, 15 px, `muted`), in place of the colored letter. Worktree rows keep
   the branch icon. Only spaces on this computer look; a space on another machine shows the folder. The
