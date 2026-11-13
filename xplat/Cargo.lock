@@ -526,6 +526,7 @@ name = "herdr-contr-orch"
 version = "0.1.0"
 dependencies = [
  "chrono",
+ "herdr-core",
  "libc",
  "serde",
  "serde_json",
