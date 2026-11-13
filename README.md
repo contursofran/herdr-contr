@@ -11,13 +11,14 @@ rules and the layout of the repository.
 | `herdr-app/` | the layout, the themes, the keys and the mod, with its tests ([README](herdr-app/README.md)) |
 | `xplat/herdr-contr-feed` | the helper: reads the agents' session logs and talks to hc |
 | `xplat/herdr-core` | the helper's hc client and conversation parsers |
+| `xplat/herdr-contr-orch` | the orchestration tool: the profiles and the flow of the workers, the owner file |
 | `web/` | the source of the phone page that the helper embeds |
 
 ## Checks
 
 ```sh
 cd herdr-app && npm test
-cargo test --locked --manifest-path xplat/Cargo.toml -p herdr-contr-feed -p herdr-core
+cargo test --locked --manifest-path xplat/Cargo.toml -p herdr-contr-feed -p herdr-core -p herdr-contr-orch
 ```
 
 To run the mod's tests against the real helper too:

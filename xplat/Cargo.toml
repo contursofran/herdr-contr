@@ -1,6 +1,6 @@
 [workspace]
 resolver = "2"
-members = ["herdr-core", "herdr-contr-feed"]
+members = ["herdr-core", "herdr-contr-feed", "herdr-contr-orch"]
 
 [workspace.package]
 edition = "2021"

@@ -48,6 +48,7 @@ stay ours. The top bar is our copy of Herdr's `tabs` mod.
 | `herdr-app/install.sh`, `herdr-app/install-isolated.sh` | the install into a Herdr home, and into a test home |
 | `xplat/herdr-contr-feed` | the helper (Rust): reads the agents' session logs and talks to hc |
 | `xplat/herdr-core` | the helper's hc client |
+| `xplat/herdr-contr-orch` | the orchestration tool (Rust), ported from contr slice by slice (#160): the profiles and the flow, the owner file |
 | `xplat/fixtures` | the session logs and hub answers that the helper's tests read |
 | `xplat/herdr-contr-feed/web` | the phone page that the helper embeds (built output; do not edit) |
 | `web`, `scripts/web-build.mjs`, `scripts/sw-test.mjs` | the phone page's source, its build into `xplat/herdr-contr-feed/web`, and its service worker test |
@@ -59,7 +60,7 @@ and `gpui-kit.d.ts`. Read them there. Do not copy them into this repository.
 ## Checks
 
 - Mod: `cd herdr-app && npm test`.
-- Helper: `cargo test --locked --manifest-path xplat/Cargo.toml -p herdr-contr-feed -p herdr-core`.
+- Helper: `cargo test --locked --manifest-path xplat/Cargo.toml -p herdr-contr-feed -p herdr-core -p herdr-contr-orch`.
 - Both must pass, and the `CI` check on the PR, before you report done.
 
 ## Design rules (lessons from contr)
