@@ -147,6 +147,7 @@ export class ChatView {
     if (refsVersion() !== this.refsSeen) { this.refsSeen = refsVersion(); cx.notify(); }
     cx.spawn((cx) => this.composer.pollStatus(cx));
     const agent = currentAgent();
+    this.composer.syncPlaceholder(agent, cx);
     cx.spawn((cx) => this.cards.poll(cx, this.address, wanted(agent, this.feed()?.rows)));
     if (this.wantOlder) { this.wantOlder = false; cx.spawn((cx) => this.loadOlder(cx)); }
     const f = this.feed();

@@ -1,5 +1,6 @@
-// Under the chat: the status tag row (model, effort, context, cost, folder, branch, agent) and the
-// box to reply in. Enter sends through the sidecar's `send`; "+" or a drop attaches files.
+// Under the chat: a quiet status line (the working verb, contr's orchestration) and the box to reply in, with its
+// bottom row (+, the model button, the context ring, the branch, send). Enter sends through the sidecar's `send`;
+// "+" or a drop attaches files.
 import { div, svg, image } from "gpui-kit";
 import { v_flex, h_flex, Textarea, TextareaState } from "gpui-base";
 import { theme, panes, home, exec, window } from "herdr";
@@ -9,6 +10,7 @@ import { setting } from "./config.js";
 import { appRel } from "./phone.js";
 
 export const STATUS_MS = 5000;
+export const MODEL_MS = 15000;   // the helper's `model` is asked again after this long
 
 // The pane of a terminal address: its folder and branch.
 export function paneOf(address) {
@@ -28,7 +30,7 @@ export function shortPath(path) {
 const FROM_SIDECAR = ["model", "effort", "context", "cost"];
 export function tagsFor(agent, status) {
   const out = (status?.tags ?? []).filter((t) => FROM_SIDECAR.includes(t.kind))
-    .map((t) => ({ kind: t.kind, text: t.text, warn: Boolean(t.warn) }));
+    .map((t) => ({ kind: t.kind, text: t.text, warn: Boolean(t.warn), ...(Number.isFinite(t.percent) ? { percent: t.percent } : {}) }));
   const pane = agent ? paneOf(agent.address) : null;
   if (pane?.cwd) out.push({ kind: "cwd", text: shortPath(pane.cwd), warn: false });
   if (pane?.branch) out.push({ kind: "branch", text: pane.branch, warn: false });
@@ -36,6 +38,79 @@ export function tagsFor(agent, status) {
   const seen = new Set();
   return out.filter((t) => t.text && !seen.has(t.text) && seen.add(t.text));
 }
+
+// A model id as people say it: "claude-opus-5-5" → "Opus 5.5", "claude-fable-5-2" → "Fable 5.2", "gpt-6" → "GPT-6".
+// A name that is short already ("Opus 5.5", from the status line) stays. Kept by id: each draw asks.
+const CLAUDE_ID = /^claude-(?:(\d+)-(\d+)-)?([a-z]+)(?:-(\d+)(?:-(\d{1,2}))?)?(?:-\d{8})?$/;
+const names = new Map();
+export function modelName(id) {
+  const m = String(id ?? "").trim();
+  if (names.has(m)) return names.get(m);
+  let out = m;
+  const c = m.match(CLAUDE_ID);
+  if (c) {
+    const ver = c[1] ? `${c[1]}.${c[2]}` : c[4] ? (c[5] ? `${c[4]}.${c[5]}` : c[4]) : "";
+    out = [c[3][0].toUpperCase() + c[3].slice(1), ver].filter(Boolean).join(" ");
+  } else if (/^gpt-\d/i.test(m)) out = `GPT-${m.split("-")[1]}`;
+  else if (/^(opus|sonnet|haiku|fable)$/i.test(m)) out = m[0].toUpperCase() + m.slice(1).toLowerCase();
+  if (names.size >= 100) names.clear();
+  names.set(m, out);
+  return out;
+}
+
+// The model button's text: { name, effort }. The helper's `model` line first (the session log, the settings), then
+// the status line's tags. A model not known yet: the app's name alone ("Claude Code").
+export function modelInfo(agent, status, line) {
+  const tag = (k) => (status?.tags ?? []).find((t) => t.kind === k)?.text || "";
+  const name = modelName(line?.model || tag("model"));
+  const effort = String(line?.effort || tag("effort") || "").trim();
+  if (!name) return { name: agent?.program?.name || agent?.app || "Agent", effort: "", known: false };
+  return { name, effort, known: true };
+}
+
+// The model button's tooltip: "Opus 5.5 · medium effort · Claude Code", and the folder on a second line.
+export function modelTip(agent, model) {
+  const app = agent?.program?.name || agent?.app || "";
+  const first = model.known ? [model.name, model.effort && `${model.effort} effort`, app].filter(Boolean).join(" · ") : app;
+  const cwd = agent ? paneOf(agent.address)?.cwd : null;
+  const folder = cwd ? (cwd === home() || cwd.startsWith(home() + "/") ? "~" + cwd.slice(home().length) : cwd) : "";
+  return [first, folder].filter(Boolean).join("\n");
+}
+
+// The context tag's percent (0–100), or null: the helper's `percent`, else a "ctx 37%" text.
+export function contextPercent(tag) {
+  const p = Number.isFinite(tag?.percent) ? tag.percent : Number(/(\d+(?:\.\d+)?)\s*%/.exec(tag?.text ?? "")?.[1]);
+  return Number.isFinite(p) ? Math.max(0, Math.min(100, Math.round(p))) : null;
+}
+
+// "ctx 149k / 250k" → "149k of 250k tokens"; else "37% of the context".
+export function contextTip(tag) {
+  const m = /([\d.]+[kKmM]?)\s*\/\s*([\d.]+[kKmM]?)/.exec(tag?.text ?? "");
+  if (m) return `${m[1]} of ${m[2]} tokens`;
+  const p = contextPercent(tag);
+  return p === null ? "" : `${p}% of the context`;
+}
+
+// The ring: a track and an arc file for each 5% (icons/ring), so a draw only picks a path. 0% has no arc;
+// a small use shows the first step.
+export const RING_TRACK = icon("ring/track");
+export function ringIcon(percent) {
+  const p = Number(percent);
+  if (!Number.isFinite(p) || p <= 0) return null;
+  const step = Math.max(5, Math.min(100, Math.round(p / 5) * 5));
+  return icon(`ring/arc-${String(step).padStart(3, "0")}`);
+}
+
+// The agent's mark from the app's program table, in the agent's color: a one-color glyph in its tile's color (the
+// table's brand color; `color` is the glyph's color on that tile), else the foreground; or a picture.
+export function agentMark(agent, size, t) {
+  const p = agent?.program;
+  if (!p?.icon) return null;
+  return p.tint ? svg(p.icon).size(size).flex_none().text_color(p.tile || t.foreground) : image(p.icon).w(size).h(size).flex_none();
+}
+
+// The box's placeholder follows the agent's name.
+export const placeholderFor = (agent) => `Reply to ${agentName(agent) || "the agent"}`;
 
 // The "+" button opens the macOS file dialog through osascript (a mod has no file picker of its own), so it
 // shows on macOS only. Elsewhere, drop files on the chat or paste an image.
@@ -200,31 +275,17 @@ export class Composer {
   // One input box, made here: herdr-app does not let a view make input state while it draws.
   // Each agent's unsent text and files are kept in `drafts` and swapped in when the agent changes.
   constructor(_cx) {
-    this.input = TextareaState.new({ placeholder: "Reply to the agent", rows: 1 });
-    this.input.set_auto_grow?.(1, 8);
+    this.placeholder = placeholderFor(null);
+    this.focused = false;
+    this.input = this.makeInput(this.placeholder);
     bindPaste(_cx);
     bindSlash(_cx);
-    // A paste that found no text, when the binding above is missing: the clipboard's image, if any.
-    this.input.on("paste_other", (_e, cx) => cx.spawn((cx) => this.paste(cx, undefined)));
-    // Enter sends. On Shift+Enter the box puts the new line in itself (at the cursor, over a selection);
-    // the submit with shift only reports it, so do nothing here. Adding "\n" here gives two new lines.
-    this.input.on("submit", (e, cx) => {
-      if (e?.shift) return;
-      cx.spawn((cx) => this.submit(cx));
-    });
     this.empty = true;
     // The last two texts the box reported, so a submit knows the text before Enter's new line (the box
     // reports that line's change before or after the submit).
     this.typed = ["", ""];
-    this.input.on("change", (_e, cx) => {
-      const v = this.input.value();
-      if (v !== this.typed[1]) this.typed = [this.typed[1], v];
-      const e = !v.trim(); if (e !== this.empty) { this.empty = e; cx.notify(); }
-      if (this.slashClosed !== null && v !== this.slashClosed) this.slashClosed = null;
-      this.pick = 0; this.top = 0; this.wheel = 0;
-      if (slashQuery(v) !== null || argQuery(v) !== null) cx.spawn((cx) => this.loadCommands(cx));
-      cx.notify();
-    });
+    this.models = new Map();   // address → { at, line } of the helper's `model` answer
+    this.modelBusy = false;
     this.cmds = new Map();      // address → { at, list } of a Claude Code agent's "/" commands
     this.cmdsBusy = false;
     this.agent = null;          // the agent the box is for (its kind decides the list)
@@ -244,6 +305,75 @@ export class Composer {
     this.status = new Map();   // address → status line
     this.statusAt = 0;
     this.statusBusy = false;
+  }
+
+  // One text state with its handlers. A state's placeholder is fixed when it is made (TextareaState has no
+  // setter), so syncPlaceholder makes a new one when the agent's name changes.
+  makeInput(placeholder) {
+    const input = TextareaState.new({ placeholder, rows: 1 });
+    input.set_auto_grow?.(1, 8);
+    // A paste that found no text, when the binding above is missing: the clipboard's image, if any.
+    input.on("paste_other", (_e, cx) => cx.spawn((cx) => this.paste(cx, undefined)));
+    // Enter sends. On Shift+Enter the box puts the new line in itself (at the cursor, over a selection);
+    // the submit with shift only reports it, so do nothing here. Adding "\n" here gives two new lines.
+    input.on("submit", (e, cx) => {
+      if (e?.shift) return;
+      cx.spawn((cx) => this.submit(cx));
+    });
+    input.on("focus", () => { this.focused = true; });
+    input.on("blur", () => { this.focused = false; });
+    input.on("change", (_e, cx) => {
+      if (input !== this.input) return;
+      const v = this.input.value();
+      if (v !== this.typed[1]) this.typed = [this.typed[1], v];
+      const e = !v.trim(); if (e !== this.empty) { this.empty = e; cx.notify(); }
+      if (this.slashClosed !== null && v !== this.slashClosed) this.slashClosed = null;
+      this.pick = 0; this.top = 0; this.wheel = 0;
+      if (slashQuery(v) !== null || argQuery(v) !== null) cx.spawn((cx) => this.loadCommands(cx));
+      cx.notify();
+    });
+    return input;
+  }
+
+  // "Reply to <agent>": called from the chat's tick, not while drawing (a text state can only be made outside a
+  // draw). A new name gets a new state with the same text; the keyboard stays in the box when it was there.
+  syncPlaceholder(agent, cx) {
+    const want = placeholderFor(agent);
+    if (want === this.placeholder) return false;
+    const old = this.input, text = old.value();
+    this.input = this.makeInput(want);
+    this.placeholder = want;
+    if (text) this.input.set_value(text);
+    if (this.focused) this.input.focus?.();
+    old.release?.();
+    cx?.notify?.();
+    return true;
+  }
+
+  // The model button in a Claude Code session: "/model " in the box, and its values in the list. Nothing is sent.
+  askModel(cx) {
+    this.setText("/model "); this.empty = false; this.slashClosed = null; this.pick = 0; this.top = 0;
+    this.input.focus?.();
+    cx.spawn((cx) => this.loadCommands(cx));
+    cx.notify();
+  }
+
+  // The helper's `model` answer for the shown agent, at most every MODEL_MS. An older helper has none: the
+  // status line's tags name the model.
+  async pollModel(cx) {
+    const a = this.address;
+    if (!a || this.modelBusy) return;
+    const had = this.models.get(a);
+    if (had && Date.now() - had.at < MODEL_MS) return;
+    this.modelBusy = true;
+    try {
+      this.models.set(a, { at: Date.now(), line: had?.line ?? null });
+      if (!(await sidecar.hasCommand("model"))) return;
+      const r = await sidecar.model(a);
+      const line = r.error ? had?.line ?? null : r.lines.find((l) => l.type === "model") ?? null;
+      this.models.set(a, { at: Date.now(), line });
+      if (JSON.stringify(line) !== JSON.stringify(had?.line ?? null)) cx.notify();
+    } finally { this.modelBusy = false; }
   }
 
   // Sets the box's text from here (no change report counts on it).
@@ -349,6 +479,7 @@ export class Composer {
       this.status.set(a, line);
       if (JSON.stringify(line) !== before) cx.notify();
     } finally { this.statusBusy = false; }
+    await this.pollModel(cx);
   }
 
   addFiles(paths, cx) {
@@ -443,12 +574,6 @@ export class Composer {
         .child(`${s.top + 1}–${s.top + shown.length} of ${s.items.length}`)
       : null;
     const empty = !b.input.value().trim() && !b.files.length;
-    const tag = (x) => h_flex().h(22).px(8).gap(4).items_center().rounded(11).flex_none().text_size(11.5)
-      // A warning is an outline: no fill, so it never turns into a solid block (#43).
-      .bg(t.chrome).text_color(x.warn ? t.foreground : t.muted).border(1).border_color(x.warn ? t.blocked : t.border)
-      .when(x.kind === "branch", (el) => el.child(svg(icon("branch")).size(11)))
-      .when(x.kind === "cwd", (el) => el.child(svg(icon("folder")).size(11)))
-      .child(div().max_w(220).truncate().child(x.text));
     const unattach = (p, i) => div().id(`file-x-${i}`).size(16).flex().items_center().justify_center().rounded(4).text_color(t.muted).hover((s) => s.bg(t.hover))
       .on_click((_e, cx) => { this.files = this.files.filter((f) => f !== p); cx.notify(); }).child("×");
     // An image under the app home: a THUMB_PX high picture (its width follows the image), the × on its corner.
@@ -463,64 +588,80 @@ export class Composer {
         .child(div().max_w(180).truncate().child(base(p)))
         .child(unattach(p, i));
     };
-    // Top right of the box: contr's orchestration. Orchestrating with the worker count, or for a
-    // Claude Code session an Orchestrate button that starts /contr:orchestrate in the box.
+    // Right of the status line: contr's orchestration as plain text (Orchestrating with the worker count), or for a
+    // Claude Code session a quiet Orchestrate that starts /contr:orchestrate in the box.
     const orch = orchestration(agent);
-    const pill = orch
-      ? h_flex().id("orchestrating").h(22).px(8).gap(5).items_center().rounded(11).flex_shrink(1).min_w(0).overflow_hidden().text_size(11.5)
-        .bg(t.selected).text_color(t.foreground).border(1).border_color(t.border)
-        .child(div().size(6).flex_none().rounded(3).bg(t.working)).child(div().flex_none().child("Orchestrating"))
-        .when(orch.workers > 0, (el) => el.child(div().min_w(0).truncate().text_color(t.muted).child(`· ${orch.workers} ${orch.workers === 1 ? "worker" : "workers"}`)))
+    // The setting that hid the status tags now hides the model button and the context (#99).
+    const showTags = setting("status_row") !== "hide";
+    const ctxTag = tags.find((x) => x.kind === "context");
+    const ctxPct = ctxTag ? contextPercent(ctxTag) : null;
+    const model = modelInfo(agent, this.status.get(agent.address), this.models.get(agent.address)?.line);
+    const mono = (el) => el.font_family("Menlo").text_size(11).text_color(t.muted);
+    // A 28 px button of the bottom row: radius 8, side padding 8, a fill on hover.
+    const btn = (id) => h_flex().id(id).h(28).px(8).gap(6).flex_none().items_center().rounded(8).hover((st) => st.bg(t.hover));
+    const mark = agentMark(agent, 13, t);
+    const modelBtn = btn("model").min_w(0).flex_shrink(1).tooltip(modelTip(agent, model))
+      .when(agent.app === "claude-code", (el) => el.on_click((_e, cx) => this.askModel(cx)))
+      .when(Boolean(mark), (el) => el.child(mark))
+      .child(div().min_w(0).truncate().text_size(12).text_color(t.foreground).child(model.name))
+      .when(Boolean(model.effort), (el) => el.child(div().flex_none().text_size(12).text_color(t.muted).child(model.effort)))
+      .child(svg(icon("chevron-down")).size(11).flex_none().text_color(t.muted));
+    const ctxColor = ctxTag?.warn ? t.blocked : t.muted;
+    const ring = ctxPct === null ? null : div().id("ctx-ring").relative().size(14).flex_none()
+      .child(svg(RING_TRACK).size(14).text_color(t.border))
+      .when(Boolean(ringIcon(ctxPct)), (el) => el.child(svg(ringIcon(ctxPct)).absolute().top(0).left(0).size(14).text_color(ctxColor)));
+    const context = ring && h_flex().id("context").h(28).px(8).gap(6).flex_none().items_center().rounded(8).tooltip(contextTip(ctxTag))
+      .child(ring).child(mono(div()).text_color(ctxColor).child(`${ctxPct}%`));
+    const right = orch
+      ? mono(h_flex().id("orchestrating").flex_shrink(1).min_w(0).gap(4).items_center())
+        .child(div().flex_none().child("Orchestrating"))
+        .when(orch.workers > 0, (el) => el.child(div().min_w(0).truncate().child(`· ${orch.workers} ${orch.workers === 1 ? "worker" : "workers"}`)))
       : agent?.app === "claude-code"
-        ? h_flex().id("orchestrate").h(22).px(8).items_center().rounded(11).flex_none().text_size(11.5)
-          .text_color(t.muted).border(1).border_color(t.border).hover((st) => st.bg(t.hover).text_color(t.foreground))
+        ? mono(div().id("orchestrate").flex_none()).hover((st) => st.text_color(t.foreground))
           .on_click((_e, cx) => { b.setText("/contr:orchestrate "); b.empty = false; cx.notify(); })
           .child("Orchestrate")
         : null;
-    const showTags = setting("status_row") !== "hide";
-    const ctxTag = tags.find((x) => x.kind === "context");
-    const below = tags.filter((x) => x.kind !== "context" && x.kind !== "branch");
-    return v_flex().id("composer").w_full().px(16).pb(14).pt(6).gap(6).items_center()
+    return v_flex().id("composer").w_full().px(16).pb(14).pt(6).gap(8).items_center()
       .key_context(PASTE_CONTEXT)
       .on_action(PASTE_ACTION, (_e, cx) => { const text = cx.read_from_clipboard?.(); cx.spawn((cx) => this.paste(cx, text)); })
-      // Above the box: the agent's working line on the left (#47), the context tag and the pill on the right (#40).
-      // Claude Code's background note ("1 shell still running", #61) follows it, muted; it truncates first.
-      .when(Boolean(work) || Boolean(background) || (showTags && Boolean(ctxTag)) || Boolean(pill), (el) => el.child(h_flex().id("tags-row").w_full().max_w(width).min_w(0).overflow_hidden().gap(5).items_center()
-        .child(h_flex().flex_1().min_w(0).gap(12).items_center()
-          .when(Boolean(work), (r) => r.child(h_flex().id("working").min_w(0).gap(8).items_center().text_size(12.5)
-            .child(loader(12).flex_none().text_color(t.working))
-            .child(div().flex_none().text_color(t.foreground).child(work.text))
-            .when(Boolean(work.detail), (w) => w.child(div().min_w(0).truncate().text_color(t.muted).child(`(${work.detail})`)))))
-          .when(Boolean(background), (r) => r.child(h_flex().id("background").flex_1().min_w(0).gap(6).items_center().text_size(12).text_color(t.muted)
-            .child(loader(10).flex_none())
-            .child(div().min_w(0).truncate().child(background.text)))))
-        .when(showTags && Boolean(ctxTag), (r) => r.child(div().id("ctx-tag").flex_none().child(tag(ctxTag))))
-        .when(Boolean(pill), (r) => r.child(pill))))
+      // Above the box, one quiet line (#99): the working verb and its detail on the left (#47), Claude Code's
+      // background note after it ("1 shell still running", #61; it truncates first), contr's orchestration on the right.
+      .when(Boolean(work) || Boolean(background) || Boolean(right), (el) => el.child(h_flex().id("status-line").w_full().max_w(width).min_w(0).overflow_hidden().px(4).gap(8).items_center()
+        .child(h_flex().flex_1().min_w(0).gap(8).items_center().overflow_hidden()
+          .when(Boolean(work), (r) => r.child(h_flex().id("working").flex_none().gap(8).items_center()
+            .child(loader(14).text_color(t.foreground))
+            .child(div().flex_none().text_size(13).text_color(t.foreground).child(work.text))
+            .when(Boolean(work.detail), (w) => w.child(mono(div()).flex_none().child(work.detail)))))
+          .when(Boolean(background), (r) => r.child(h_flex().id("background").flex_1().min_w(0).gap(6).items_center().text_color(t.muted)
+            .when(!work, (x) => x.child(loader(14)))
+            .child(mono(div()).min_w(0).truncate().child(background.text)))))
+        .when(Boolean(right), (r) => r.child(right))))
       .when(Boolean(s), (el) => el.child(v_flex().id("slash").w_full().max_w(width).p(4).gap(0).rounded(12).bg(t.raised)
         .border(1).border_color(t.border).shadow_sm().on_scroll_wheel((e, cx) => this.slashWheel(e, cx))
         .children(shown.map(row)).when(Boolean(more), (l) => l.child(more))))
-      .child(v_flex().id("box").w_full().max_w(width).rounded(16).bg(t.raised).border(1).border_color(t.border).shadow_sm().px(12).pt(10).pb(8).gap(6)
+      .child(v_flex().id("box").w_full().max_w(width).rounded(12).bg(t.raised).border(1).border_color(t.border).shadow_sm()
+        .pt(12).pr(10).pb(8).pl(14).gap(10)
         .when(this.files.length > 0, (el) => el.child(h_flex().gap(6).flex_wrap().items_center().children(this.files.map(fileChip))))
-        .child(div().id("slash-keys").w_full()
+        .child(div().id("slash-keys").w_full().text_size(14).line_height(20)
           .when(Boolean(s), (el) => el.key_context(SLASH_CONTEXT))
           .on_action(SLASH.up, (_e, cx) => this.slashKey("up", cx))
           .on_action(SLASH.down, (_e, cx) => this.slashKey("down", cx))
           .on_action(SLASH.complete, (_e, cx) => this.slashKey("complete", cx))
           .on_action(SLASH.close, (_e, cx) => this.slashKey("close", cx))
           .child(Textarea.new(b.input).w_full()))
-        .child(h_flex().gap(8).items_center()
-          .when(canPick(), (el) => el.child(div().id("attach").size(28).flex_none().flex().items_center().justify_center().rounded(14).text_color(t.muted)
+        .child(h_flex().id("box-row").w_full().min_w(0).gap(4).items_center()
+          .when(canPick(), (el) => el.child(div().id("attach").size(28).flex_none().flex().items_center().justify_center().rounded(8).text_color(t.muted)
             .hover((s) => s.bg(t.hover).text_color(t.foreground))
-            .on_click((_e, cx) => cx.spawn((cx) => this.pick(cx))).child(svg(icon("plus")).size(15))))
+            .on_click((_e, cx) => cx.spawn((cx) => this.pick(cx))).child(svg(icon("plus")).size(16))))
+          .when(showTags, (el) => el.child(modelBtn))
           .child(div().flex_1())
-          .when(Boolean(branch), (el) => el.child(h_flex().gap(4).items_center().text_size(12).text_color(t.muted)
-            .child(svg(icon("branch")).size(12)).child(div().max_w(200).truncate().child(branch.text))))
-          .child(div().id("send").size(28).flex_none().flex().items_center().justify_center().rounded(14)
+          .when(showTags && Boolean(context), (el) => el.child(context))
+          .when(Boolean(branch), (el) => el.child(mono(h_flex().id("branch").h(28).px(8).gap(6).min_w(0).flex_shrink(1).items_center())
+            .child(svg(icon("branch")).size(13).flex_none()).child(div().min_w(0).max_w(200).truncate().child(branch.text))))
+          .child(div().id("send").size(28).ml(4).flex_none().flex().items_center().justify_center().rounded(8)
             .bg(empty || this.sending ? t.chrome : t.accent).text_color(empty || this.sending ? t.dim : t.background)
             .on_click((_e, cx) => cx.spawn((cx) => this.submit(cx)))
             .child(this.sending ? loader(13) : svg(icon("send")).size(14)))))
-      // Below the box: the status tags. The branch is in the box already, so it is not here.
-      .when(showTags && below.length > 0, (el) => el.child(h_flex().id("tags").w_full().max_w(width).gap(5).items_center().overflow_x_scroll().children(below.map(tag))))
       .when(Boolean(this.note), (el) => el.child(div().id("send-note").w_full().max_w(width).text_size(12)
         .text_color(this.note.bad ? t.blocked : t.muted).child(this.note.text)));
   }

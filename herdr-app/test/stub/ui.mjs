@@ -47,7 +47,7 @@ export const InputState = {
 };
 export const made = { textarea: 0 };
 export const TextareaState = {
-  new: () => { made.textarea++; let v = ""; const h = {}; return { value: () => v, set_value: (x) => { v = x; }, replace: (x) => { v += x; }, on: (e, f) => { h[e] = f; return true; }, focus() {}, _h: h }; },
+  new: (o = {}) => { made.textarea++; let v = ""; const h = {}; const s = { placeholder: o.placeholder, released: false, focusCalls: 0, value: () => v, set_value: (x) => { v = x; }, replace: (x) => { v += x; }, on: (e, f) => { h[e] = f; return true; }, focus() { s.focusCalls++; }, release() { s.released = true; return true; }, _h: h }; return s; },
 };
 export let lastList = null;
 export const v_virtual_list = (id, n, sizes, key, render) => { const e = mk("vl"); e._args = { id, n, sizes, key, render }; lastList = e; return e; };

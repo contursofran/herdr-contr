@@ -513,11 +513,12 @@ test("while the agent works, its working line is above the input, not in the fee
   const cx = fakeCx(); const v = new ChatView(cx); await cx.settle(); v.width = 900;
   await v.tick(cx); await cx.settle();
   const work = () => byId(v.render(cx), "working");
-  assert.match(textOf(work()), /Improvising….*\(1m 16s · ↓ 6\.0k tokens · thought for 1s\)/);
+  assert.match(textOf(work()), /Improvising… 1m 16s · ↓ 6\.0k tokens · thought for 1s/);
+  assert.doesNotMatch(textOf(work()), /\(/, "no parentheses (#99)");
   // Read again after WORK_MS: the new time shows.
   line = { ...line, detail: "1m 17s" }; v.lastWork = 0;
   await v.tick(cx); await cx.settle();
-  assert.match(textOf(work()), /\(1m 17s\)/);
+  assert.match(textOf(work()), /1m 17s/);
   assert.equal(lastList._args.n, 1, "the feed has no working row (#47)");
   // No line on screen: the row goes.
   line = { type: "working", text: null, detail: null }; v.lastWork = 0;
@@ -617,7 +618,7 @@ test("the reply box is as wide as the chat's column", async () => {
     v.width = w;
     const el = v.render(cx);
     assert.equal(byId(el, "box")._a.max_w, v.colWidth(), `pane ${w}`);
-    assert.equal(byId(el, "tags-row")._a.max_w, v.colWidth());
+    assert.equal(byId(el, "status-line")._a.max_w, v.colWidth());
     // A card above the box: as wide as the box.
     v.cards.entry(v.address).card = { kind: "approval", request: "toolu_1", title: "Bash command", command: "ls", tool: "Bash" };
     assert.equal(byId(v.render(cx), "chat-card")?._a.max_w, v.colWidth(), `card, pane ${w}`);
