@@ -73,6 +73,8 @@ export const phone = (what) => call("phone", [what]);
 // A Claude Code terminal's "/" commands (read from files; nothing goes to the agent).
 export const working = (terminal) => call("working", ["--terminal", terminal, "--cache", cachePath()]);
 export const model = (terminal) => call("model", ["--terminal", terminal, "--cache", cachePath()]);
+// Claude Code's dim suggested prompt in its empty input box (read only; observer attach): text "" when none.
+export const suggestion = (terminal) => call("suggestion", ["--terminal", terminal, "--cache", cachePath()]);
 export const commands = (terminal) => call("commands", ["--terminal", terminal, "--cache", cachePath()]);
 // The panel the agent's terminal shows in place of its input box, as plain text (read only), and the keys the panel
 // card sends (arrows, Enter, Tab, Space, Escape, digits; on the owner's key or press only).

@@ -160,6 +160,9 @@ export class ChatView {
     // A panel in the terminal (#141): read while the agent does not work and no approval or question card shows.
     const calm = Boolean(agent) && agent.status !== "working" && !want && !this.cards.card(this.address);
     cx.spawn((cx) => this.panel.poll(cx, this.address, calm));
+    // Claude Code's suggested prompt (#125): only while idle with no card and no panel.
+    const quiet = calm && !this.panel.lines(this.address);
+    cx.spawn((cx) => this.composer.pollSuggestion(cx, agent, quiet));
     cx.spawn((cx) => this.owner.poll(cx, this.address));   // reads the owner file at most every OWNER_MS
     if (this.wantOlder) { this.wantOlder = false; cx.spawn((cx) => this.loadOlder(cx)); }
     const f = this.feed();

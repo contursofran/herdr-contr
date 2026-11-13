@@ -343,6 +343,8 @@ test("paste: the mod binds ⌘V (Ctrl+V on Linux) for its own box only, once", a
   // The "/" list's keys, once, under the context its wrapper has only while the list shows.
   assert.deepEqual(bound.filter((x) => x.action.startsWith("herdr_contr_slash")).map((x) => [x.keystroke, x.context]),
     [["up", "HerdrContrSlash > Input"], ["down", "HerdrContrSlash > Input"], ["tab", "HerdrContrSlash > Input"], ["escape", "HerdrContrSlash > Input"]]);
+  // The suggestion's Tab (#125), under its own context.
+  assert.deepEqual(bound.filter((x) => x.action === "herdr_contr_suggest_accept").map((x) => [x.keystroke, x.context]), [["tab", "HerdrContrSuggest > Input"]]);
   const el = byId(v.render(cx), "composer");
   assert.equal(el._a.key_context, "HerdrContrComposer");
   assert.equal(typeof el._h.on_action, "function");
@@ -1001,4 +1003,95 @@ test("model menu: the model poll reads the commands once per agent, so the butto
   r.c.models.get("t1").at -= MODEL_MS;
   await r.c.pollModel(r.cx);
   assert.equal(r.asked.length, 1);
+});
+
+// #125: Claude Code's suggested prompt in the reply box.
+function suggestRig({ has = true, text = "run the tests" } = {}) {
+  forgetCommands();
+  const calls = [];
+  fake.agents = [agent("t1", "idle", { tab_name: "api" }), agent("t2", "idle")];
+  const prev = fake.exec;
+  fake.exec = (cmd, args) => {
+    if (args[0] === "version") return jl(header("version"), { type: "version", commands: ["version", "send", ...(has ? ["suggestion"] : [])] }, end);
+    if (args[0] === "suggestion") { calls.push(args[2]); return jl(header("suggestion"), { type: "suggestion", text: rig.text }, end); }
+    return prev(cmd, args);
+  };
+  const cx = fakeCx(); const c = new Composer(cx);
+  const rig = { cx, c, calls, text, a: fake.agents[0] };
+  c.box(rig.a); c.syncPlaceholder(rig.a, cx);
+  rig.poll = async (calm = true, ag = rig.a) => { await c.pollSuggestion(cx, ag, calm); await cx.settle(); };
+  return rig;
+}
+
+test("suggestion: an idle Claude Code agent with an empty box reads it; it becomes the placeholder with a Tab hint", async () => {
+  const { c, calls, poll, a } = suggestRig();
+  await poll();
+  assert.deepEqual(calls, ["t1"]);
+  assert.equal(c.input.placeholder, "run the tests");
+  assert.ok(byId(c.render(a, TH), "suggest-hint"));
+  assert.ok(textOf(c.render(a, TH)).includes("Tab to use"));
+});
+
+test("suggestion: read once on going idle, then at most every 3 s; never while working, typing or for other agents", async () => {
+  const { c, calls, poll, a } = suggestRig();
+  await poll(); await poll();
+  assert.equal(calls.length, 1, "within 3 s: no new read");
+  c.suggestAt -= 3001; await poll();
+  assert.equal(calls.length, 2, "after 3 s: read again");
+  await poll(false);
+  assert.equal(c.suggest, null, "work forgets it");
+  assert.equal(c.syncPlaceholder(a, null), true);
+  assert.equal(c.input.placeholder, "Reply to api");
+  await poll(true);
+  assert.equal(calls.length, 3, "back to idle: read at once");
+  c.empty = false; c.suggestAt = 0; c.calm = true; await poll();
+  assert.equal(calls.length, 3, "text in the box: no read");
+  c.empty = true;
+  await poll(true, { ...a, app: "codex" });
+  assert.equal(calls.length, 3, "not Claude Code: no read");
+  await poll(true, fake.agents[1]);
+  assert.equal(calls.length, 3, "not the shown agent: no read");
+});
+
+test("suggestion: hidden when the helper has no suggestion command; empty text keeps the placeholder", async () => {
+  const r = suggestRig({ has: false });
+  await r.poll();
+  assert.deepEqual(r.calls, []);
+  assert.equal(r.c.input.placeholder, "Reply to api");
+  const e = suggestRig({ text: "" });
+  await e.poll();
+  assert.equal(e.calls.length, 1);
+  assert.equal(e.c.input.placeholder, "Reply to api");
+  assert.equal(byId(e.c.render(e.a, TH), "suggest-hint"), null);
+});
+
+test("suggestion: Tab in an empty box puts it in the box and sends nothing; with text Tab is not taken", async () => {
+  const { c, cx, poll, a } = suggestRig();
+  await poll();
+  const keys = () => byId(c.render(a, TH), "slash-keys");
+  assert.equal(keys()._a.key_context, "HerdrContrSuggest");
+  keys()._h["on_action:herdr_contr_suggest_accept"](null, cx);
+  assert.equal(c.input.value(), "run the tests");
+  assert.equal(sent.length, 0);
+  assert.notEqual(keys()._a.key_context, "HerdrContrSuggest", "text in the box: Tab does what it did");
+  assert.equal(byId(c.render(a, TH), "suggest-hint"), null);
+  c.setText("mine"); c.acceptSuggestion(cx);
+  assert.equal(c.input.value(), "mine");
+});
+
+test("suggestion: a send and another agent forget it; a read under way when forgotten counts for nothing", async () => {
+  const { c, cx, poll, a } = suggestRig();
+  await poll();
+  c.input.set_value("go"); c.typed = ["go", "go"]; c.empty = false;
+  await c.submit(cx); await cx.settle();
+  assert.equal(c.suggest, null, "a send forgets it");
+  c.empty = true; c.suggestAt = 0; await poll();
+  assert.ok(c.suggest);
+  c.box(fake.agents[1]);
+  assert.equal(c.suggest, null, "another agent forgets it");
+  c.box(a); c.calm = false; c.empty = true;
+  const p = c.pollSuggestion(cx, a, true);
+  c.forgetSuggestion(cx);
+  await p; await cx.settle();
+  assert.equal(c.suggest, null);
 });
