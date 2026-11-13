@@ -1,21 +1,37 @@
-//! The command line: `agents flow`, and `owner ask | answer | done`. Ported from contr's `contr agents` and
-//! `contr owner`; the worker commands of `agents` come with the next slice (#160).
+//! The command line: `agents flow | ls | send | interrupt | stop | rm | read`, and `owner ask | answer | done`.
+//! Ported from contr's `contr agents` and `contr owner`; `agents spawn`, `prompt` and `watch` come with the
+//! next parts of the slice (#160).
 use std::io::Write;
 use std::path::PathBuf;
 
 use crate::config::{Config, Flow};
 use crate::owner::{Question, Store};
+use crate::workers::{self, Core, Manager};
 
 pub const USAGE: &str = "Usage:
-  herdr-contr-orch agents flow             print the flow: how the coordinator takes an issue to a merge
-  herdr-contr-orch owner <command> [args…] answer questions and mark to-dos done (herdr-contr-orch owner help)
-  herdr-contr-orch --help, -h              print this text
+  herdr-contr-orch agents <command> [args…] list and control the workers (herdr-contr-orch agents help)
+  herdr-contr-orch owner <command> [args…]  answer questions and mark to-dos done (herdr-contr-orch owner help)
+  herdr-contr-orch --help, -h               print this text
 ";
 
 pub const AGENTS_USAGE: &str = "Usage:
-  herdr-contr-orch agents flow   print the flow: how the coordinator takes an issue to a merge
+  herdr-contr-orch agents ls [--all] [--json]      list the workers
+  herdr-contr-orch agents send <name> <text…>      type text and press Enter
+  herdr-contr-orch agents interrupt <name>         press the stop key
+  herdr-contr-orch agents stop <name> [--keep]     end the worker's program and remove its
+                                                   terminal; --keep leaves the finished one
+  herdr-contr-orch agents rm <name>                remove a finished worker's terminal
+  herdr-contr-orch agents rm --ended               remove all finished workers that this
+                                                   terminal started
+  herdr-contr-orch agents read <name> [--lines N]  print the screen and history
+  herdr-contr-orch agents flow                     print the flow: how the coordinator takes an issue to a merge
+
+Flags can come before or after the other arguments. After --, every word is
+an argument.
 
 Environment:
+  HC_SOCKET, HC_SESSION the hc core to talk to (default: the session \"default\")
+  HC_TERMINAL_ID        set inside hc: the terminal that this tool runs in
   CONTR_AGENTS_CONFIG   profiles file (default: the user config folder, contr/agents.json).
                         Built-in profiles: orchestrator (claude opus, medium effort), builder,
                         planner, reviewer, debugger, explorer. A profile in the file replaces the
@@ -50,20 +66,6 @@ stays saved and the command exits 1.
 Environment:
   CONTR_OWNER_FILE   the owner file (default: the user config folder, contr/owner.json)
 ";
-
-/// Tells a coordinator's terminal what the owner did.
-pub trait Coordinator {
-    fn send(&mut self, terminal: &str, text: &str) -> Result<(), String>;
-}
-
-/// The coordinator of this slice: the send to a terminal comes with the worker commands (#160).
-pub struct NoCoordinator;
-
-impl Coordinator for NoCoordinator {
-    fn send(&mut self, _terminal: &str, _text: &str) -> Result<(), String> {
-        Err("this tool cannot send to a terminal yet".into())
-    }
-}
 
 /// The user config folder: on macOS ~/Library/Application Support; else $XDG_CONFIG_HOME, or ~/.config.
 fn config_dir(env: &dyn Fn(&str) -> String) -> Result<PathBuf, String> {
@@ -125,10 +127,10 @@ fn is_help(a: &str) -> bool {
 
 /// Runs the command line (`args` without the program name). The exit code: 0 on success, 1 on an error, 2 on a
 /// usage error.
-pub fn run(args: &[String], env: &dyn Fn(&str) -> String, out: &mut dyn Write, err: &mut dyn Write, coordinator: &mut dyn Coordinator) -> i32 {
+pub fn run(args: &[String], env: &dyn Fn(&str) -> String, out: &mut dyn Write, err: &mut dyn Write, core: &dyn Core) -> i32 {
     match args.first().map(String::as_str) {
-        Some("agents") => run_agents(&args[1..], env, out, err),
-        Some("owner") => run_owner(&args[1..], env, out, err, coordinator),
+        Some("agents") => run_agents(&args[1..], env, out, err, core),
+        Some("owner") => run_owner(&args[1..], env, out, err, core),
         Some(a) if is_help(a) => {
             let _ = out.write_all(USAGE.as_bytes());
             0
@@ -144,7 +146,7 @@ pub fn run(args: &[String], env: &dyn Fn(&str) -> String, out: &mut dyn Write, e
     }
 }
 
-fn run_agents(args: &[String], env: &dyn Fn(&str) -> String, out: &mut dyn Write, err: &mut dyn Write) -> i32 {
+fn run_agents(args: &[String], env: &dyn Fn(&str) -> String, out: &mut dyn Write, err: &mut dyn Write, core: &dyn Core) -> i32 {
     let Some(sub) = args.first() else {
         let _ = err.write_all(AGENTS_USAGE.as_bytes());
         return 2;
@@ -157,6 +159,9 @@ fn run_agents(args: &[String], env: &dyn Fn(&str) -> String, out: &mut dyn Write
             }
         }
         return 0;
+    }
+    if ["ls", "send", "interrupt", "stop", "rm", "read"].contains(&sub.as_str()) {
+        return run_worker_command(sub, &args[1..], env, out, err, core);
     }
     if sub != "flow" {
         let _ = write!(err, "herdr-contr-orch agents: unknown command {sub}\n{AGENTS_USAGE}");
@@ -178,7 +183,124 @@ fn run_agents(args: &[String], env: &dyn Fn(&str) -> String, out: &mut dyn Write
     }
 }
 
-fn run_owner(args: &[String], env: &dyn Fn(&str) -> String, out: &mut dyn Write, err: &mut dyn Write, coordinator: &mut dyn Coordinator) -> i32 {
+/// The flags of the worker commands, and the names of those that the command line gave.
+#[derive(Default)]
+struct Flags {
+    all: bool,
+    json: bool,
+    keep: bool,
+    ended: bool,
+    lines: i64,
+    seen: Vec<String>,
+}
+
+/// Reads the flags before and after the other arguments, which it gives in order. A flag is -name or --name;
+/// `lines` takes its value after "=" or as the next argument. After "--" every word is an argument.
+fn parse_flags(args: &[String]) -> Result<(Flags, Vec<String>), String> {
+    let mut f = Flags::default();
+    let mut pos = Vec::new();
+    let mut i = 0;
+    while i < args.len() {
+        let a = args[i].as_str();
+        i += 1;
+        if a == "--" {
+            pos.extend(args[i..].iter().cloned());
+            break;
+        }
+        let Some(flag) = a.strip_prefix("--").or_else(|| a.strip_prefix('-')).filter(|x| !x.is_empty()) else {
+            pos.push(a.to_string());
+            continue;
+        };
+        let (name, value) = match flag.split_once('=') {
+            Some((n, v)) => (n, Some(v.to_string())),
+            None => (flag, None),
+        };
+        if name == "lines" {
+            let Some(v) = value.or_else(|| args.get(i).cloned().inspect(|_| i += 1)) else {
+                return Err("flag needs an argument: -lines".into());
+            };
+            f.lines = v.parse().map_err(|_| format!("--lines {v:?} is not a number"))?;
+        } else {
+            let on = match value.as_deref() {
+                None | Some("true") => true,
+                Some("false") => false,
+                Some(v) => return Err(format!("--{name} {v:?} is not true or false")),
+            };
+            match name {
+                "all" => f.all = on,
+                "json" => f.json = on,
+                "keep" => f.keep = on,
+                "ended" => f.ended = on,
+                _ => return Err(format!("flag provided but not defined: -{name}")),
+            }
+        }
+        f.seen.push(name.to_string());
+    }
+    Ok((f, pos))
+}
+
+/// `agents ls | send | interrupt | stop | rm | read`: one command on the workers of the hc core.
+fn run_worker_command(sub: &str, rest: &[String], env: &dyn Fn(&str) -> String, out: &mut dyn Write, err: &mut dyn Write, core: &dyn Core) -> i32 {
+    let (flags, pos) = match parse_flags(rest) {
+        Ok(x) => x,
+        Err(e) => {
+            let _ = writeln!(err, "herdr-contr-orch agents {sub}: {e}");
+            return 2;
+        }
+    };
+    let allowed: &[&str] = match sub {
+        "ls" => &["all", "json"],
+        "read" => &["lines"],
+        "stop" => &["keep"],
+        "rm" => &["ended"],
+        _ => &[],
+    };
+    if let Some(bad) = flags.seen.iter().find(|f| !allowed.contains(&f.as_str())) {
+        let _ = write!(err, "herdr-contr-orch agents {sub}: flag --{bad} does not apply\n{AGENTS_USAGE}");
+        return 2;
+    }
+    let count_ok = match sub {
+        "ls" => pos.is_empty(),
+        "send" => pos.len() >= 2,
+        "rm" => true,
+        _ => pos.len() == 1,
+    };
+    if !count_ok {
+        let _ = write!(err, "herdr-contr-orch agents {sub}: wrong number of arguments\n{AGENTS_USAGE}");
+        return 2;
+    }
+    if sub == "rm" && (flags.ended == (pos.len() == 1) || pos.len() > 1) {
+        let _ = write!(err, "herdr-contr-orch agents rm: give one name, or --ended\n{AGENTS_USAGE}");
+        return 2;
+    }
+    let m = Manager::new(core, env("HC_TERMINAL_ID"));
+    let mut text = String::new();
+    let res = match sub {
+        "ls" => m.list(flags.all).and_then(|ws| {
+            text = if flags.json { serde_json::to_string_pretty(&ws).map_err(|e| e.to_string())? + "\n" } else { workers::table(&ws) };
+            Ok(())
+        }),
+        "send" => m.send(&pos[0], &pos[1..].join(" ")),
+        "interrupt" => m.interrupt(&pos[0]).map(|o| text = o + "\n"),
+        "stop" => m.stop(&pos[0], flags.keep),
+        "rm" if !flags.ended => m.remove(&pos[0]),
+        "rm" => {
+            let mut names = Vec::new();
+            let res = m.remove_ended(&mut names);
+            text = names.iter().map(|n| format!("{n}\n")).collect();
+            res
+        }
+        _ => m.read(&pos[0], flags.lines).map(|t| text = t.trim_end_matches('\n').to_string() + "\n"),
+    };
+    let _ = out.write_all(text.as_bytes());
+    if let Err(e) = res {
+        let _ = writeln!(err, "herdr-contr-orch agents {sub}: {e}");
+        return 1;
+    }
+    0
+}
+
+fn run_owner(args: &[String], env: &dyn Fn(&str) -> String, out: &mut dyn Write, err: &mut dyn Write, core: &dyn Core) -> i32 {
     let Some(sub) = args.first().map(String::as_str) else {
         let _ = err.write_all(OWNER_USAGE.as_bytes());
         return 2;
@@ -221,7 +343,7 @@ fn run_owner(args: &[String], env: &dyn Fn(&str) -> String, out: &mut dyn Write,
     if terminal.is_empty() {
         return 0;
     }
-    if let Err(e) = coordinator.send(&terminal, &text) {
+    if let Err(e) = Manager::new(core, env("HC_TERMINAL_ID")).send(&terminal, &text) {
         let _ = writeln!(err, "herdr-contr-orch owner {sub}: saved; coordinator not reached: {e}");
         return 1;
     }
