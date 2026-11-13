@@ -2,5 +2,5 @@
   "name": "herdr-contr-mod",
   "private": true,
   "type": "module",
-  "scripts": { "test": "node --import ./test/stub/register.mjs --test test/*.test.mjs" }
+  "scripts": { "test": "node ../scripts/sync-copies.mjs --check && node --import ./test/stub/register.mjs --test test/*.test.mjs" }
 }
