@@ -1,0 +1,24 @@
+[package]
+name = "herdr-contr-orch"
+version = "0.1.0"
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+description = "herdr-contr's orchestration tool: the profiles and the flow of the workers, and what waits for the owner."
+
+[[bin]]
+name = "herdr-contr-orch"
+path = "src/main.rs"
+
+[lib]
+name = "orch"
+path = "src/lib.rs"
+
+[dependencies]
+serde.workspace = true
+serde_json.workspace = true
+chrono = { version = "0.4.43", default-features = false, features = ["clock", "std"] }
+libc = "0.2"
+
+[dev-dependencies]
+tempfile = "3"

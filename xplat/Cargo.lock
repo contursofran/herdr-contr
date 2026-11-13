@@ -522,6 +522,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "herdr-contr-orch"
+version = "0.1.0"
+dependencies = [
+ "chrono",
+ "libc",
+ "serde",
+ "serde_json",
+ "tempfile",
+]
+
+[[package]]
 name = "herdr-core"
 version = "0.0.0"
 dependencies = [

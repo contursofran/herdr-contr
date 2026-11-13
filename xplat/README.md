@@ -10,7 +10,7 @@ The helper and its library, in one Cargo workspace.
 `fixtures/` holds the session logs and hub answers that the tests of both crates read.
 
 ```sh
-cargo test --locked -p herdr-contr-feed -p herdr-core
+cargo test --locked -p herdr-contr-feed -p herdr-core -p herdr-contr-orch
 cargo build -p herdr-contr-feed
 HERDR_CONTR_FEED=$PWD/target/debug/herdr-contr-feed npm --prefix ../herdr-app test   # the mod against this binary
 ```
