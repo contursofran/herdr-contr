@@ -10,6 +10,7 @@
 import { View, div, svg, image } from "gpui-kit";
 import { v_flex, h_flex } from "gpui-base";
 import { spaces, machines, panes, agents, terminals, focused, setAgentOrder, run, openOverlay, exec, hc, theme, shared, setShared, watchFolder, window, layout, appHome, props } from "herdr";
+import { mainKeys, mainKeyHint } from "./mainagents.js";
 import { bySpace, split, countLine, moreLine, workerText, workerWork, leadPanes, agentLabel, duration, modelTip, modelDue, MODEL_MS } from "./projects.js";
 import { HeadView, MachinesMenu, MACHINES, pickedMachine } from "./head.js";
 
@@ -100,6 +101,10 @@ export async function cacheFavicon(src) {
   const p = ls.find((l) => l.type === "favicon")?.path;
   return typeof p === "string" && p.startsWith(`${home}/`) ? p.slice(home.length + 1) : null;
 }
+
+// The width the hover controls take in an agent row's title line: two 22 px buttons and their 2 px gap, less the
+// 4 px they stand nearer to the row's edge than the line does.
+export const CONTROLS_W = 42;
 
 export default class Spaces extends View {
   init(_props, cx) {
@@ -590,12 +595,14 @@ export default class Spaces extends View {
           .when(!on && !unread, (el) => el.text_color(t.muted))
           .child(this.labels.get(a.address) ?? ""))
         .when(!hot && Boolean(when) && a.status !== "working", (el) => el.child(div().flex_none().font_family("Menlo").text_size(11).text_color(t.muted).child(duration(this.now - when))))
-        .when(!hot && (a.status === "working" || a.status === "blocked"), (el) => el.child(this.mark(t, a.status, 15))))
+        .when(!hot && (a.status === "working" || a.status === "blocked"), (el) => el.child(this.mark(t, a.status, 15)))
+        // The hover controls draw over this line's right end: keep their place free, so the title ends before them.
+        .when(hot, (el) => el.child(div().id(`ctl-space-${a.address}`).w(CONTROLS_W).flex_none())))
       .when(workers.length > 0, (el) => el.child(h_flex().h(16).gap(8).items_center()
         .child(div().w(15).flex_none())
         .child(div().flex_1().min_w(0).truncate().text_size(12).text_color(t.muted).child(countLine(workers.length)))))
       .when(hot, (el) => el.child(this.controls(a, t)));
-    return this.withModel(row, a.address);
+    return this.withModel(row, a.address, "", this.keys?.get(a.address));
   }
 
   // An orchestrator's workers: 32 px in, with a 1 px guide line at the left.
@@ -678,8 +685,10 @@ export default class Spaces extends View {
 
   // Sets the tooltip of a row when the model is known.
   // `pre`: a first tooltip line (a worker's name and work), or "".
-  withModel(el, address, pre = "") {
-    const tip = [pre, this.models.get(address)?.tip].filter(Boolean).join("\n");
+  // `key`: a main agent's number (Control+N), added at the end: "Opus 5.5 · medium effort · ⌃1".
+  withModel(el, address, pre = "", key) {
+    const line = [this.models.get(address)?.tip, key && mainKeyHint(key)].filter(Boolean).join(" · ");
+    const tip = [pre, line].filter(Boolean).join("\n");
     return tip ? el.tooltip(tip) : el;
   }
 
@@ -708,6 +717,7 @@ export default class Spaces extends View {
     this.listed = new Map(list.map((a) => [a.address, a.status]));
     this.track(list, this.now);
     this.agentsOf = bySpace(list, terminals());
+    this.keys = mainKeys(spaces(), list, terminals());
     const leads = leadPanes(panes());
     const tabs = new Map(spaces().flatMap((s) => s.tabs ?? []).map((tab) => [tab.id, tab]));
     const perTab = new Map();

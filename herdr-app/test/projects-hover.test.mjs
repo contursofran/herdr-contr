@@ -90,6 +90,9 @@ test("hover: the age and the mark hide, Stop and 'Open in a new tab' show, the i
     assert.deepEqual([b._a.size, b._a.rounded, b._a.text_color], [22, 6, "#muted"]);
     assert.equal(b.kids[0]._a.size, 12);
   }
+  // The title line keeps the controls' place free (#123): 2 × 22 + 2 px, less the 4 px nearer to the edge.
+  assert.deepEqual([byId(row, "ctl-space-a2")._a.w, "flex_none" in byId(row, "ctl-space-a2")._a], [42, true]);
+  assert.ok(!ids(byId(v.render(), "ag-a1")).includes("ctl-space-a1"));
   assert.equal(stop._a.tooltip, "Stop");
   assert.equal(open._a.tooltip, "Open in a new tab");
   assert.ok(!ids(byId(v.render(), "ag-a1")).includes("stop-a1"), "only the row under the pointer");
@@ -137,9 +140,9 @@ test("the model tooltip on agent and worker rows, asked from the timer and never
   assert.deepEqual(modelCalls().map(([, a]) => a.slice(0, 3)).sort(), [["model", "--terminal", "a1"], ["model", "--terminal", "a2"], ["model", "--terminal", "w1"]]);
   assert.ok(cx.notified >= 1);
   const el = v.render();
-  assert.equal(byId(el, "ag-a1")._a.tooltip, "Opus 5.5 · medium effort");
-  assert.equal(byId(el, "sub-w1")._a.tooltip, "Sonnet 5.5 · low effort");
-  assert.equal(byId(el, "ag-a2")._a.tooltip, undefined, "no model known: no tooltip");
+  assert.equal(byId(el, "ag-a1")._a.tooltip, "Opus 5.5 · medium effort · ⌃1", "a main agent: its key at the end");
+  assert.equal(byId(el, "sub-w1")._a.tooltip, "Sonnet 5.5 · low effort", "a worker has no key");
+  assert.equal(byId(el, "ag-a2")._a.tooltip, "⌃2", "no model known: only the key");
 
   // The same status: not asked again. A new status: asked again, once MODEL_MS went by.
   await v.askModels(cx, Date.now() + MODEL_MS);
@@ -156,7 +159,8 @@ test("a helper without the model command is not asked for models; a terminal tha
   const { v, cx } = make();
   await v.askModels(cx);
   assert.equal(modelCalls().length, 0);
-  assert.equal(byId(v.render(), "ag-a1")._a.tooltip, undefined);
+  assert.equal(byId(v.render(), "ag-a1")._a.tooltip, "⌃1");
+  assert.equal(byId(v.render(), "sub-w1")._a.tooltip, undefined, "a worker with no model: no tooltip");
   fake.agents = [fake.agents[0]];
   fake.terminals = [{ address: "a1", state: "live" }];
   await v.askModels(cx);

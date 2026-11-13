@@ -22,6 +22,7 @@
     "cmd-ctrl-shift-right": "herdr-contr.move-right",
     "ctrl-`": "herdr-contr.terminal",
     "cmd-shift-t": "herdr-contr.view",
+    "cmd-j": "herdr-contr.view",
     "cmd-shift-i": "herdr-contr.needs",
     "cmd-b": "herdr-contr.sidebar",
     "cmd-=": "app.zoom_in",
@@ -33,7 +34,16 @@
     "cmd-shift-\\": "herdr-contr.overview",
     "cmd-alt--": "herdr-contr.text-smaller",
     "cmd-alt-=": "herdr-contr.text-larger",
-    "cmd-alt-0": "herdr-contr.text-default"
+    "cmd-alt-0": "herdr-contr.text-default",
+    "ctrl-1": "herdr-contr.main-1",
+    "ctrl-2": "herdr-contr.main-2",
+    "ctrl-3": "herdr-contr.main-3",
+    "ctrl-4": "herdr-contr.main-4",
+    "ctrl-5": "herdr-contr.main-5",
+    "ctrl-6": "herdr-contr.main-6",
+    "ctrl-7": "herdr-contr.main-7",
+    "ctrl-8": "herdr-contr.main-8",
+    "ctrl-9": "herdr-contr.main-9"
   },
   "layout:herdr-contr": {
     "cmd-t": "tab.new",
@@ -58,6 +68,7 @@
     "cmd-ctrl-shift-right": "herdr-contr.move-right",
     "ctrl-`": "herdr-contr.terminal",
     "cmd-shift-t": "herdr-contr.view",
+    "cmd-j": "herdr-contr.view",
     "cmd-shift-i": "herdr-contr.needs",
     "cmd-b": "herdr-contr.sidebar",
     "cmd-=": "app.zoom_in",
@@ -69,6 +80,15 @@
     "cmd-shift-\\": "herdr-contr.overview",
     "cmd-alt--": "herdr-contr.text-smaller",
     "cmd-alt-=": "herdr-contr.text-larger",
-    "cmd-alt-0": "herdr-contr.text-default"
+    "cmd-alt-0": "herdr-contr.text-default",
+    "ctrl-1": "herdr-contr.main-1",
+    "ctrl-2": "herdr-contr.main-2",
+    "ctrl-3": "herdr-contr.main-3",
+    "ctrl-4": "herdr-contr.main-4",
+    "ctrl-5": "herdr-contr.main-5",
+    "ctrl-6": "herdr-contr.main-6",
+    "ctrl-7": "herdr-contr.main-7",
+    "ctrl-8": "herdr-contr.main-8",
+    "ctrl-9": "herdr-contr.main-9"
   }
 }

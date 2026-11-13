@@ -192,7 +192,7 @@ drawn by Herdr's `frames`; every loader of the mod is this one); done is a check
   switches are off. A missing file shows the defaults;
   the first change creates it (and its folder). A file that is not JSON shows an error and is never
   written.
-- **herdr-contr settings** (a right-click on the sidebar's Settings, or ⌘⇧,): saved in `<herdr-app home>/herdr-contr/config.json`
+- **herdr-contr settings** (the sidebar's Settings menu, a right-click on Settings, or ⌘⇧,): saved in `<herdr-app home>/herdr-contr/config.json`
   as `{"status_row": "show", "remote_helper": "ask"}`. The install never
   creates the file; a missing file or key is the default, and so is a value that is not one of the
   choices. A file that is not JSON is the defaults too: the dialog says so, and its switches do
@@ -224,10 +224,18 @@ drawn by Herdr's `frames`; every loader of the mod is this one); done is a check
   "Terminal", a round close button). ⌃` again closes it.
 - **Chat | Terminal switch** (`herdr-contr` layout): a tab with an agent shows a switch on the right
   of a 36 px strip, over the chat and over the tab's terminal (block `view-switch`, view `switch`).
-  ⌘⇧T does the same. The tab keeps the pick. A tab without an agent hides the block.
+  ⌘J (and ⌘⇧T) does the same; each side's tooltip names ⌘J ("Chat (⌘J)"). The pick is one for the window:
+  it stays when another agent shows or an agent moves to another pane or tab, and over a restart (shared
+  state). A tab without an agent hides the block and does not change the pick.
+- **Main agent keys** (#117): ⌃1-⌃9 show the 1st-9th main agent (an agent that is not a worker of another)
+  in the order of the sidebar's Projects list: this computer's projects first, then each other machine's by
+  name; in a machine, the spaces in order; in a space, the agents in order. Workers have no number. A number
+  with no agent does nothing. The key runs `agent.focus` and the tab's screen follows the window's pick. The
+  order is in `mainagents.js`, with one copy in `herdr-contr` and one in `herdr-contr-spaces` (a test keeps
+  them equal). These keys win over Herdr's global ⌃1-⌃9 (`space.select`) while this layout shows.
 - **Keys** (while this layout shows): ⌘T new tab, ⌘W close tab, ⌘⇧N new space, ⌘1-⌘9 a tab,
   ⌘⇧[ / ⌘⇧] or ⌃Tab / ⌃⇧Tab the tab before or after, ⌘⌥↑ / ⌘⌥↓ the space before or after,
-  ⌘⌃⇧← / ⌘⌃⇧→ move the tab, ⌘⇧I Needs you, ⌘⇧\ Overview, ⌘B sidebar, ⌃` terminal, ⌘⇧T chat or terminal,
+  ⌘⌃⇧← / ⌘⌃⇧→ move the tab, ⌘⇧I Needs you, ⌘⇧\ Overview, ⌘B sidebar, ⌃` terminal, ⌘J or ⌘⇧T chat or terminal, ⌃1-⌃9 a main agent,
   ⌘= / ⌘- / ⌘0 zoom, ⌘, settings, ⌘⇧, herdr-contr settings, ⌘/ help. In the herdr-contr settings,
   Tab moves through the sections, then the choices, and Enter or Space picks one.
 
@@ -260,11 +268,14 @@ drawn by Herdr's `frames`; every loader of the mod is this one); done is a check
     apart: one 16 px row per plan (Claude, then Codex): the name in a 52 px column (12 px, `muted`), a 4 px bar
     (2 px corners, `hover` track, the used part in `dim`) and the value (Menlo 11, `muted`): the most used window
     as "41% wk · 4d" (percent used, window, time to its reset). Then, padding 4 10 10, gap 4: Settings (30 px, 8 px
-    corners, padding 0 10, 16 px gear, gap 8, 13 px `muted`) fills the width and opens Herdr's settings; a dot
-    (`accent`) when an app update is ready; a right-click opens the herdr-contr settings, and its tooltip says so.
+    corners, padding 0 10, 16 px gear, gap 8, 13 px `muted`) fills the width; a dot (`accent`) when an app update is
+    ready. A press opens a menu above it (#120; a mod cannot add a section to Herdr's settings window): the look of
+    the model menu (240 px, `raised`, border, 12 px corners), two 32 px rows "Herdr settings" (⌘,) and
+    "herdr-contr settings" (⌘⇧,), the key in 13 px `muted`. A right-click opens the herdr-contr settings too.
     At its right the add machine button (28 px square, 8 px corners, 16 px +, tooltip "Add machine") opens Herdr's
     `machine-add` dialog. The block is as tall as its rows (`layout.resize` on a change of the plan count: 45 px
-    with no plan, 79 px with one, 105 px with two). On the rail: the bars only, the name and value in a tooltip,
+    with no plan, 79 px with one, 105 px with two; checked against the block's height in the layout every 30 s
+    with no read, so a layout that loads again gets it back, #133). On the rail: the bars only, the name and value in a tooltip,
     and Settings only. The chat, Needs you and Overview screens start the reads too. The mod knows it by
   `shared("layout") === "herdr-contr"`: there the left edge opens no floating sidebar, the
   sidebar shows unless `layouts/.state/herdr-contr.json` hides it, and the bar leaves no room
@@ -276,7 +287,10 @@ drawn by Herdr's `frames`; every loader of the mod is this one); done is a check
   `tab-panes`. With a `tabs` block in the layout (`herdrTabBar()`), the chat, Needs you and
   Overview draw no bar and leave no room for one (`barH()` is 0); Needs you is ⌘⇧I and Overview
   ⌘⇧\.
-- **Mod** `mods/herdr-contr-tabs/`: a copy of Herdr's `tabs` mod (Apache-2.0). The one change: the working
+- **Mod** `mods/herdr-contr-tabs/`: a copy of Herdr's `tabs` mod (Apache-2.0). Change one: a tab shows a short name
+  (`label.js`, at most 140 px with an ellipsis, the full text in the tooltip): the name the owner gave it, else
+  its lead agent's title as the sidebar cleans it (a copy of `projects.js`'s `clean`, `leadPanes` and `title`;
+  `test/tab-names.test.mjs` keeps them equal), else the program's name, else its number. Change two: the working
   mark is the braille loader of `mods/herdr-contr/state.js` (12 px, ⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏ in Menlo, `line_height(1)`,
   80 ms a frame), in place of the turning arc. A mod cannot import another mod, so each copy has its own
   `loader()`. The copy keeps its window icons (`win-*.svg`); the icons of other Herdr mods (`workspace-chrome`,
@@ -334,7 +348,10 @@ drawn by Herdr's `frames`; every loader of the mod is this one); done is a check
     tooltip: its look and place are the shell's). It comes from the helper's `model` command
     (docs/protocol.md), asked only when the helper has it, from a timer (at start, then every 15 s) and never
     from a draw: for a terminal the first time it shows and when its status changed, at most once in 15 s.
-    No model known: no tooltip.
+    No model known: no tooltip. A main agent's row adds its key at the end: "Opus 5.5 · medium effort · ⌃1",
+    or only "⌃1" with no model (#117). A worker row has no key. The key is not drawn on the row while ⌃ is
+    held: `on_modifiers_changed` fires only on the keyboard focus path, and the focus is in the chat or the
+    terminal, not in the sidebar.
   - The rail (under 160 px) is as before, for the picked machine. The agents copy's pin and sort menu are
     not here: the owner's design has neither.
 
@@ -368,7 +385,7 @@ drawn by Herdr's `frames`; every loader of the mod is this one); done is a check
   `pane.split`, `space.select`, `space.new`, `space.rename`, `space.close`, `agent.focus`,
   `app.settings`. Its own key commands: `herdr-contr.terminal`, `herdr-contr.view`, `herdr-contr.needs`,
   `herdr-contr.sidebar`, `herdr-contr.overview`, `herdr-contr.settings`, `herdr-contr.move-left`,
-  `herdr-contr.move-right`.
+  `herdr-contr.move-right`, `herdr-contr.main-1` … `herdr-contr.main-9`.
 - **Shipped mods**: `new-menu` (the + popup, 250 × 512).
 - **Programs**:
   - `herdr-contr-feed`, a helper program at `<herdr-app home>/herdr-contr/bin/herdr-contr-feed`

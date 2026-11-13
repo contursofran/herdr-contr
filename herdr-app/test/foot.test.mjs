@@ -45,18 +45,44 @@ test("no plan with data: no usage rows, only Settings and the add machine button
   const el = new FootView(null).render();
   assert.equal(byId(el, "foot-usage-claude"), null);
   assert.equal(el.kids.length, 1);
-  assert.deepEqual(el.kids[0].kids.map((k) => k._a.id), ["foot-settings", "foot-add-machine"]);
+  assert.deepEqual(el.kids[0].kids.map((k) => k._a.id), ["settings-popover", "foot-add-machine"]);
 });
 
-test("Settings fills the width and opens Herdr's settings; a right-click opens the herdr-contr settings", () => {
-  const s = byId(new FootView(null).render(), "foot-settings");
+test("Settings fills the width; the Popover owns the press; a right-click opens the herdr-contr settings", () => {
+  const el = new FootView(null).render();
+  const s = byId(el, "foot-settings");
   assert.ok("flex_1" in s._a, "fills the width");
   assert.equal(textOf(s), "Settings");
   assert.equal(s._a.tooltip, SETTINGS_TIP);
-  s._h.on_click();
-  assert.deepEqual(log.run.at(-1), ["app.settings", undefined]);
+  assert.equal(s._h.on_click, undefined);
+  const pop = byId(el, "settings-popover");
+  assert.equal(pop._a.anchor, "bottom_left", "above the row");
+  assert.equal(pop._a.open, false);
+  assert.equal(pop._trigger._a.id, "foot-settings");
   s._h.on_mouse_down_right();
   assert.equal(log.overlays.at(-1).props.view, "settings");
+});
+
+test("the Settings menu (#120): two items with the model menu's look; each opens its settings and closes the menu", async () => {
+  const cx = fakeCx();
+  const v = new FootView(cx);
+  byId(v.render(), "settings-popover")._h.on_open_change(true, cx);
+  let el = v.render();
+  assert.equal(byId(el, "settings-popover")._a.open, true);
+  assert.equal(byId(el, "foot-settings")._a.tooltip, undefined, "no tooltip over the open menu");
+  const m = byId(el, "settings-menu");
+  assert.deepEqual([m._a.rounded, m._a.bg, m._a.border], [12, "#raised", 1]);
+  assert.equal(textOf(byId(m, "settings-menu-herdr")), "Herdr settings ⌘,");
+  assert.equal(textOf(byId(m, "settings-menu-contr")), "herdr-contr settings ⌘⇧,");
+  byId(el, "settings-menu-herdr")._h.on_click({}, cx);
+  assert.deepEqual(log.run.at(-1), ["app.settings", undefined]);
+  assert.equal(byId(v.render(), "settings-popover")._a.open, false);
+  v.openMenu(true, cx);
+  byId(v.render(), "settings-menu-contr")._h.on_click({}, cx);
+  assert.equal(log.overlays.at(-1).props.view, "settings");
+  assert.equal(v.menu, false);
+  v.openMenu(true, cx); v.openMenu(false, cx);
+  assert.equal(byId(v.render(), "settings-popover")._a.open, false, "a press outside or Escape closes it");
 });
 
 test("the add machine button: an icon with a tooltip that opens Herdr's add machine dialog", () => {
