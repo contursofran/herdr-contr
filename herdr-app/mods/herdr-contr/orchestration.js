@@ -87,10 +87,18 @@ const argvOf = (name) => {
   const p = agents().file?.profiles?.[name];
   return Array.isArray(p?.argv) && p.argv.length ? p.argv : DEFAULT_PROFILES[name];
 };
+// Where claude is in a command: the first argument whose base name is "claude", at the start or after
+// "env" and its NAME=value arguments (#80). -1 when the command is not claude.
+export function claudeAt(argv) {
+  let i = 0;
+  if (argv[0] === "env") { i = 1; while (i < argv.length && /^[A-Za-z_][A-Za-z0-9_]*=/.test(String(argv[i]))) i++; }
+  return String(argv[i] ?? "").split("/").pop() === "claude" ? i : -1;
+}
+export const roleIsClaude = (name) => claudeAt(argvOf(name)) >= 0;
 // The model or effort that a role starts with; "" when it is not one of the choices (a custom command).
 export function roleValue(name, what) {
   const argv = argvOf(name);
-  if (argv[0] !== "claude") return "";
+  if (claudeAt(argv) < 0) return "";
   const v = flagOf(argv, what === "model" ? "--model" : "--effort");
   return (what === "model" ? MODELS : EFFORTS).some(([x]) => x === v) ? v : "";
 }
@@ -102,7 +110,7 @@ export function setFlag(argv, flag, v) {
     if (out[i] === flag && i + 1 < out.length) { out[i + 1] = v; return out; }
     if (typeof out[i] === "string" && out[i].startsWith(flag + "=")) { out[i] = `${flag}=${v}`; return out; }
   }
-  let at = 1;
+  let at = claudeAt(out) + 1 || 1;
   if (flag === "--effort") out.forEach((a, i) => { if (a === "--model" && i + 1 < out.length) at = i + 2; else if (String(a).startsWith("--model=")) at = i + 1; });
   out.splice(Math.min(at, out.length), 0, flag, v);
   return out;
@@ -114,7 +122,7 @@ async function update(change) {
   for (let i = 0; i < 2; i++) {
     const c = await loadAgents();
     if (c.bad) return false;
-    const file = structuredClone(c.file);
+    const file = JSON.parse(JSON.stringify(c.file));   // Herdr's runtime has no structuredClone (#80)
     change(file);
     const text = JSON.stringify(file, null, 2) + "\n";
     if (c.text == null) {
@@ -137,13 +145,14 @@ export function setFlow(key, value) {
   });
 }
 
-// One role's model or effort. A profile that is not claude starts again from the role's default
-// (as contr's pickRole does); the profile's other keys stay.
+// One role's model or effort: only that flag changes in the command as it is; the profile's other keys
+// stay. A command that is not claude is never replaced (#80): no change.
 export function setRole(name, what, value) {
   return update((f) => {
     if (!f.profiles || typeof f.profiles !== "object" || Array.isArray(f.profiles)) f.profiles = {};
     const p = f.profiles[name] && typeof f.profiles[name] === "object" ? f.profiles[name] : {};
-    let argv = Array.isArray(p.argv) && p.argv[0] === "claude" ? p.argv : DEFAULT_PROFILES[name];
+    let argv = Array.isArray(p.argv) && p.argv.length ? p.argv : DEFAULT_PROFILES[name];
+    if (claudeAt(argv) < 0) return;
     argv = setFlag(argv, what === "model" ? "--model" : "--effort", value);
     f.profiles[name] = { ...p, argv };
   });
@@ -152,7 +161,11 @@ export function setRole(name, what, value) {
 // The section's body. `ui`: { seg, small, heading, about, t } from settings.js.
 export function orchestrationBody({ t, seg, small, heading, about, div, h_flex, v_flex }, view) {
   const bad = agentsBad();
-  const run = (p, cx) => cx.spawn(async (cx) => { await p(); cx.notify(); });
+  // A change that throws shows its error; it is not dropped (#80).
+  const run = (p, cx) => cx.spawn(async (cx) => {
+    try { await p(); } catch (e) { setShared(KEY_AGENTS, { ...agents(), error: `The change failed: ${e?.message ?? e}` }); }
+    cx.notify();
+  });
   const body = v_flex().w_full();
   const st = agents();
   if (bad) body.child(div().id("set-agents-bad").mt(12).p(10).rounded(8).bg(t.raised).border(1).border_color(t.blocked)
@@ -179,12 +192,13 @@ export function orchestrationBody({ t, seg, small, heading, about, div, h_flex, 
     .child(line("set-flow-merge", "Merge", "Ask each time, or merge when CI and review pass.", pick("merge")));
   body.child(heading("ROLES"));
   for (const [name, title, does] of ROLES) {
-    const custom = roleValue(name, "model") === "" || roleValue(name, "effort") === "";
+    // A command that is not claude: its text shows and the switches are off; it is never replaced (#80).
+    const custom = !roleIsClaude(name);
     body.child(v_flex().id(`set-role-${name}`).w_full().py(14).gap(10).border_b(1).border_color(t.border)
       .child(about(title, custom ? `${does} Custom: ${argvOf(name).join(" ")}` : does))
-      .child(h_flex().w_full().gap(12).items_center()
-        .child(seg(`role-${name}-model`, MODELS, (v, cx) => run(() => setRole(name, "model", v), cx), roleValue(name, "model"), bad))
-        .child(seg(`role-${name}-effort`, EFFORTS, (v, cx) => run(() => setRole(name, "effort", v), cx), roleValue(name, "effort"), bad))));
+      .child(h_flex().w_full().flex_wrap().gap(12).items_center()
+        .child(seg(`role-${name}-model`, MODELS, (v, cx) => run(() => setRole(name, "model", v), cx), roleValue(name, "model"), bad || custom))
+        .child(seg(`role-${name}-effort`, EFFORTS, (v, cx) => run(() => setRole(name, "effort", v), cx), roleValue(name, "effort"), bad || custom))));
   }
   body.child(div().pt(12).text_size(11).text_color(t.dim).child(`Saved in ${st.path ?? "contr's agents.json"}. contr's coordinator reads it.`));
   return body;
