@@ -90,6 +90,9 @@ test("hover: the age and the mark hide, Stop and 'Open in a new tab' show, the i
     assert.deepEqual([b._a.size, b._a.rounded, b._a.text_color], [22, 6, "#muted"]);
     assert.equal(b.kids[0]._a.size, 12);
   }
+  // The title line keeps the controls' place free (#123): 2 × 22 + 2 px, less the 4 px nearer to the edge.
+  assert.deepEqual([byId(row, "ctl-space-a2")._a.w, "flex_none" in byId(row, "ctl-space-a2")._a], [42, true]);
+  assert.ok(!ids(byId(v.render(), "ag-a1")).includes("ctl-space-a1"));
   assert.equal(stop._a.tooltip, "Stop");
   assert.equal(open._a.tooltip, "Open in a new tab");
   assert.ok(!ids(byId(v.render(), "ag-a1")).includes("stop-a1"), "only the row under the pointer");

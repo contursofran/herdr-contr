@@ -113,7 +113,18 @@ Left to right:
      arrow when empty or sending, else `accent`). The model comes from the helper's `model` (asked with the
      status, at most every 15 s), else the status line's tags; not known yet, the button shows the app's name
      alone. Its tooltip: "Opus 5.5 · medium effort · Claude Code" and the folder; the context's: "149k of 250k
-     tokens · auto-compact at 250k" (the limit is Claude Code's `autoCompactWindow`), else "37% of the model's context window". A press on the model button in Claude Code puts `/model ` in the box (nothing is sent). No tags
+     tokens · auto-compact at 250k" (the limit is Claude Code's `autoCompactWindow`), else "37% of the model's
+     context window". A press on the model button opens the model menu above it (#112; a gpui-base `Popover`, anchored
+     `bottom_left`, 6 px over the button): a 280 px `raised` panel, 1 px `border`, 12 px corners, 4 px padding,
+     rows of 15 px text with 8 px corners and a hover fill. Row 1: the current model and its family's fixed line
+     (13 px `muted`; none for an unknown family), a 14 px check in `accent`. A 1 px `border` divider, then
+     "Effort" with its value in `muted` ("Medium") and a 12 px chevron; a divider, then "More models" with a
+     chevron. A chevron row shows its values in the same panel, under a back row: the efforts with a check on the
+     current one, or the other models (at most 320 px high, it scrolls). A press on a value sends `/model <id>`
+     or `/effort <level>` through the helper's `send` (the box keeps its text), closes the menu and reads the
+     model and the status again at the next poll. A press outside or Esc closes it. The values are the helper's
+     `commands` answer (`/model`'s and `/effort`'s values, read once per agent with the model): an agent whose
+     `/model` has none has no menu, and with no `/effort` values the Effort row shows the value only. No tags
      row under the box. File chips above the text: a PNG, JPEG
      or SVG under the app home (a pasted image is in `herdr-contr/paste`) shows as a 56 px high picture
      (8 px corners, `border` frame, × on its top right corner); any other file, and an image from another
@@ -169,7 +180,7 @@ drawn by Herdr's `frames`; every loader of the mod is this one); done is a check
   switches are off. A missing file shows the defaults;
   the first change creates it (and its folder). A file that is not JSON shows an error and is never
   written.
-- **herdr-contr settings** (the herdr-contr row, or ⌘⇧,): saved in `<herdr-app home>/herdr-contr/config.json`
+- **herdr-contr settings** (a right-click on the sidebar's Settings, or ⌘⇧,): saved in `<herdr-app home>/herdr-contr/config.json`
   as `{"status_row": "show", "remote_helper": "ask"}`. The install never
   creates the file; a missing file or key is the default, and so is a value that is not one of the
   choices. A file that is not JSON is the defaults too: the dialog says so, and its switches do
@@ -227,15 +238,29 @@ drawn by Herdr's `frames`; every loader of the mod is this one); done is a check
     padding 8).
   - The ids `sidebar`, `screen`, `chat` and `tab` are what the mod switches.
 - **Layout** `layouts/herdr-contr.json`: the same `work` column and theme, but `sidebar` is
-  Herdr's, as in Herdr's `main` layout (268 px, shown: the blocks `workspace-chrome`, `projects` (mod
-  `herdr-contr-spaces`, the Projects list) and the `workspace-chrome` footer), with `traffic_lights: [12, 16]`. Between the list and
-  the footer is the mod's `usage` block (56 px, view `usage`): the same plan usage rows as the mod's own
-  sidebar. It starts hidden; the mod shows it (`layout.show`) when a plan has data and hides it when none
-  has. The chat, Needs you and Overview screens start the reads too, so the hidden block can show. Under it, just
-  above the footer, is the mod's `settings-row` block (32 px, view `settings-row`): one row as Herdr's footer rows
-  (28 px, 8 px in, 14 px `sliders` icon, label "herdr-contr", muted, hover background) that opens the herdr-contr
-  settings dialog. On hover it shows the key `⌘⇧,` at the right. On the rail (sidebar under 160 px) it is the icon
-  only, with a tooltip. The mod knows it by
+  Herdr's, as in Herdr's `main` layout (268 px, shown), with `traffic_lights: [12, 16]`, and three blocks (#97, after
+  the owner's design): `brand` (46 px, `window_drag`, mod `herdr-contr-spaces`, view `head`), `projects` (mod
+  `herdr-contr-spaces`, the Projects list) and `foot` (mod `herdr-contr`, view `foot`).
+  - The head (`herdr-contr-spaces/head.js`), padding 0 10 0 20 (76 px at the left on macOS for the traffic lights),
+    gap 4: "Herdr" (14 px semibold), the machine switch (26 px, 6 px corners, padding 0 6, the picked machine's
+    name or "This computer" in 12 px `muted`, a 12 px chevron; it truncates), a spacer, then search (`picker`) and
+    the sidebar toggle (28 px square, 8 px corners, 16 px icons, `muted`). A press on a control is no window drag.
+    On the rail only the toggle shows, and on the macOS rail nothing. A press on the switch opens the machines
+    menu (a popup of the same mod, view `machines`, 240 px): "This computer", then each machine with its state at
+    the right when not connected ("unreachable", "needs login", "rebuilt", in `dim`), a check at the picked one,
+    a line, and "Add machine…". A press picks the machine (`shared("projects.machine")`, null for this computer)
+    and closes the menu. The Projects list writes the machines it knows to `shared("projects.machines")`, only on a
+    change. A picked machine that is not known any more is this computer.
+  - The foot (`herdr-contr/foot.js`): a 1 px `border` line at the top. With plan data, padding 12 20 6, rows 10 px
+    apart: one 16 px row per plan (Claude, then Codex): the name in a 52 px column (12 px, `muted`), a 4 px bar
+    (2 px corners, `hover` track, the used part in `dim`) and the value (Menlo 11, `muted`): the most used window
+    as "41% wk · 4d" (percent used, window, time to its reset). Then, padding 4 10 10, gap 4: Settings (30 px, 8 px
+    corners, padding 0 10, 16 px gear, gap 8, 13 px `muted`) fills the width and opens Herdr's settings; a dot
+    (`accent`) when an app update is ready; a right-click opens the herdr-contr settings, and its tooltip says so.
+    At its right the add machine button (28 px square, 8 px corners, 16 px +, tooltip "Add machine") opens Herdr's
+    `machine-add` dialog. The block is as tall as its rows (`layout.resize` on a change of the plan count: 45 px
+    with no plan, 79 px with one, 105 px with two). On the rail: the bars only, the name and value in a tooltip,
+    and Settings only. The chat, Needs you and Overview screens start the reads too. The mod knows it by
   `shared("layout") === "herdr-contr"`: there the left edge opens no floating sidebar, the
   sidebar shows unless `layouts/.state/herdr-contr.json` hides it, and the bar leaves no room
   for the window buttons while the sidebar shows. ⌘B hides and shows Herdr's sidebar. The top bar
@@ -255,7 +280,13 @@ drawn by Herdr's `frames`; every loader of the mod is this one); done is a check
 - **Mod** `mods/herdr-contr-spaces/`: a copy of Herdr's `spaces` mod (Apache-2.0). It is the **Projects list**
   of the `herdr-contr` layout (#96; after the owner's design, slice 1 of 3). The layout no longer names
   the agents copy: the agent rows are drawn here (`projects.js` holds the grouping).
-  - A head row "Projects" (12 px, `font_medium`, `muted`; padding 6 10 4 20) with a 24 px + (8 px corners, `space.new`).
+  - A head row "Projects" (12 px, `font_medium`, `muted`; padding 6 10 4 20) with a 24 px + (8 px corners, `space.new`
+    on the picked machine).
+  - Only the projects of the machine picked in the head show, with no machine rows. A picked machine that is not
+    connected has a line over its rows ("linux-pc · unreachable", 11 px `dim`): a rebuilt one has Connect (it
+    removes and adds the machine again), one that needs a login shows `hc machine login <name>` with Copy. A
+    machine with no project has "New space on <name>". The git look-ups of the fallback timer run only for
+    the picked machine.
     The list: 10 px at the sides, rows 2 px apart, 10 px under each project and its agents.
   - A project row (30 px, 8 px corners, padding 0 10 0 6, gap 6): a 14 px chevron (only when the project has
     agents; a press on it opens or shuts the project's agents, kept in `localStorage` `projects.closed`, and is no
@@ -276,8 +307,13 @@ drawn by Herdr's `frames`; every loader of the mod is this one); done is a check
     same data the agents copy used for sub-agents. Under its title: "Orchestrating · N workers" (12 px,
     `muted`); N counts all its live sub-agents, depth first. Under it, its workers in a block 32 px in, 9 px
     padding, with a 1 px `border` guide line at the left, rows 2 px apart: a 26 px row (6 px corners, padding
-    0 8, gap 8) with the icon (13 px), what it works on (12 px; its name, else its template or program;
-    `muted`, `dim` when done, `foreground` when shown) and its state mark (12 px). A deeper sub-agent is 14 px
+    0 8, gap 8) with the icon (13 px), what it works on (12 px; `muted`, `dim` when done, `foreground` when shown) and its state mark
+    (12 px). What it works on: the session's own title (the title that the agent sets, cleaned as on an
+    agent row), when it is not the program's name, a path, user@host or the worker's name; then its name
+    stays at the right as a short muted mono text (10 px, `dim`, at most 72 px, truncates last), and the
+    tooltip starts with "name · work". Else its name, else its template or program. The titles are kept in
+    a Map when the agents change, not worked out on each draw. contr keeps no issue number on the hc
+    terminal, so the issue's title is not used. A deeper sub-agent is 14 px
     further in. The shown worker's row is `raised`. A click focuses its pane, or peeks a worker without one. A
     sub-agent with a pane is in `agents()` too and shows only under its parent.
   - The projects with no agent go into one closed row at the end of each machine's group, "N more projects,
@@ -297,7 +333,7 @@ drawn by Herdr's `frames`; every loader of the mod is this one); done is a check
     or only "⌃1" with no model (#117). A worker row has no key. The key is not drawn on the row while ⌃ is
     held: `on_modifiers_changed` fires only on the keyboard focus path, and the focus is in the chat or the
     terminal, not in the sidebar.
-  - The rail (under 160 px) and the machine group rows are as before. The agents copy's pin and sort menu are
+  - The rail (under 160 px) is as before, for the picked machine. The agents copy's pin and sort menu are
     not here: the owner's design has neither.
 
   The favicon change: the
@@ -309,7 +345,10 @@ drawn by Herdr's `frames`; every loader of the mod is this one); done is a check
   a folder is looked at once, and again only when the space moves to a new folder. Files only, the first
   found wins: `favicon.svg`, `favicon.png` in the folder, then in `public/`, `static/`, `app/`,
   `src/app/`, `assets/`, `web/`; then `apple-touch-icon.png`, `icon.png`, `icon.svg` in the same folders.
-  No `.ico`: `image()` names SVG, PNG and JPEG, not ICO.
+  No `.ico`: `image()` names SVG, PNG and JPEG, not ICO. `image()` reads only files under the app home
+  (#116), so the helper's `favicon` command copies the file found to `herdr-contr/favicons` (named from
+  its path, copied again when the source is newer), once per folder, off the UI thread; the icon draws
+  that copy by its path relative to the app home. No copy (no helper, an error): the folder icon.
 - **Mod** `mods/herdr-contr/` (`mod.json`: `place: "none"`): one mod, one view per block, picked
   by `props.view`: `side`, `chat`, `needs`, `overview`, `top`; overlays use `settings` (the herdr-contr
   settings dialog), `termbar` (the terminal window's bar), `menu` (right-click menus) and `side` with `peek: true` (the floating sidebar).
@@ -347,8 +386,8 @@ drawn by Herdr's `frames`; every loader of the mod is this one); done is a check
 - **Themes** `themes/herdr-contr.json`, `herdr-contr-light.json`, `herdr-contr-mac.json`,
   `herdr-contr-mac-light.json`.
 - **Keys** `keys.json`: the sections `layout:herdr-contr-own` and `layout:herdr-contr`, with the same keys.
-- **Art** `mods/herdr-contr/icons/`: arrow-down, bell, branch, check, close, doc, folder, gear, grid,
-  plus, search, send, sidebar, sliders, split, terminal, tool (16 × 16 SVG, 1.8 px round strokes, `currentColor`).
+- **Art** `mods/herdr-contr/icons/`: arrow-down, bell, branch, check, chevron-down, chevron-left, chevron-right,
+  close, doc, folder, gear, grid, plus, search, send, sidebar, sliders, split, terminal, tool (16 × 16 SVG, 1.8 px round strokes, `currentColor`).
 
 ## Watch out
 
