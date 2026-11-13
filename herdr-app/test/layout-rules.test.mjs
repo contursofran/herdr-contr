@@ -105,7 +105,6 @@ test("sidebar toggle: wide and rail, macOS and not, some element runs layout.res
       return log.run.slice(n).some(([cmd, a]) => cmd === "layout.resize" && a?.id === "sidebar");
     });
     const state = `${platform}, ${wide ? "wide" : "rail"}`;
-    if (platform === "macos" && !wide) continue; // rail-open comes with #145
     assert.ok(toggles.length > 0, `${state}: an element toggles the sidebar`);
   }
 });
