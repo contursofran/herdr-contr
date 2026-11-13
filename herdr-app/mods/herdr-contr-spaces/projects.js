@@ -78,3 +78,32 @@ export function duration(ms) {
   const h = Math.floor(m / 60);
   return h < 24 ? `${h}h` : `${Math.floor(h / 24)}d`;
 }
+
+const CLAUDE = /^claude-(?:(\d+)-(\d+)-)?([a-z]+)(?:-(\d+)(?:-(\d{1,2}))?)?(?:-\d{8})?$/;
+// "claude-opus-5-5" -> "Opus 5.5", "gpt-6" -> "GPT-6"; another name as it is.
+export function modelName(model) {
+  const m = (model ?? "").trim();
+  const c = m.match(CLAUDE);
+  if (c) {
+    const ver = c[1] ? `${c[1]}.${c[2]}` : c[4] ? (c[5] ? `${c[4]}.${c[5]}` : c[4]) : "";
+    return [c[3][0].toUpperCase() + c[3].slice(1), ver].filter(Boolean).join(" ");
+  }
+  if (/^gpt-/i.test(m)) return `GPT-${m.split("-")[1]}`;
+  if (/^(opus|sonnet|haiku|fable)$/i.test(m)) return m[0].toUpperCase() + m.slice(1).toLowerCase();
+  return m;
+}
+
+// The tooltip of an agent or worker row: "Opus 5.5 · medium effort". No model: no tooltip ("").
+export function modelTip(model, effort) {
+  const name = modelName(model);
+  if (!name) return "";
+  const e = (effort ?? "").trim();
+  return e ? `${name} · ${e} effort` : name;
+}
+
+// How often the helper is asked for one terminal's model, at most.
+export const MODEL_MS = 15000;
+// Whether to ask the helper for a terminal's model now. `m`: what was asked last ({ status, at, busy }), or
+// undefined. Asked when the terminal is new and when its status changed (a turn can change the model or
+// the effort), never twice in MODEL_MS.
+export const modelDue = (m, status, now) => !m || (!m.busy && m.status !== status && now - m.at >= MODEL_MS);
