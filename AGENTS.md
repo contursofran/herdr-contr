@@ -82,6 +82,8 @@ and `gpui-kit.d.ts`. Read them there. Do not copy them into this repository.
   edits. Register each test fixture in a file of its own.
 - **The life of a PR is code.** Worktree, CI wait, merge and cleanup are
   commands, not steps that a model does by hand.
+  `scripts/land.sh <pr> [--after <pr>] [--shot <file>]` lands a PR: update,
+  CI wait, squash merge of the exact head, install of merged `main`.
 - **One thing at a time.** Do not start a new screen while the one before
   it is not in use by the owner.
 
