@@ -70,7 +70,10 @@ Left to right:
        one it stays text. With the name of a known repository before it ("herdr-contr #51",
        "herdr-contr PR #51", "herdr-contr#51"), it takes that repository; the name stays text. Known: the
        repositories of all agents' folders in the app, each read once. Two with the same name: the one
-       of the agent's own owner, else the agent's own repository. Code, links, other URLs, words and colors such as "#fff" stay as written.
+       of the agent's own owner, else the agent's own repository. A name that no folder gives is asked
+       on GitHub once for the app's run (`gh api repos/<owner of the agent's repository>/<name>`, from the
+       chat's tick, at most 2 at a time); a yes makes it known and the rows draw again. Common words
+       before a reference ("issue", "PR", "fixes", "see", "and" and others) are not asked. Code, links, other URLs, words and colors such as "#fff" stay as written.
        With **Inline PR icons** on (experimental, off by default; `inline.js`), a text block is cut at
        its paragraphs and top-level list items (`splitPieces`; an item with a nested list stays whole).
        Each piece with a reference is a wrapping row of plain elements (chat text size, line height
