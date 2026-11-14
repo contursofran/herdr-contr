@@ -13,8 +13,9 @@ next. The Herdr app gives the window, the sidebar, the tabs and the terminal.
 - Keep `LICENSE` and the copyright lines.
 - The orchestration (worker profiles, spawn, the owner's questions and
   to-dos, the MCP tools, the kit) moves here from the contr repository
-  (#160): `xplat/herdr-contr-orch` and `kit/`. Until the install part of
-  #160 lands, the owner's coordinators run the `contr` command.
+  (#160): `xplat/herdr-contr-orch` and `kit/`. The helper's `install` puts both in
+  the Herdr home (`herdr-contr/kit`, `herdr-contr/bin`). The owner's
+  coordinators run the `contr` command until the owner switches them.
 
 ## Goal: one thing at a time (owner, 2026-11-11)
 
@@ -101,8 +102,9 @@ and `gpui-kit.d.ts`. Read them there. Do not copy them into this repository.
   the owner's window. Check the mod with `npm test`. The coordinator looks at
   merged `main` in the owner's app (see below).
 - An agent can install merged `main` into the real Herdr home with the
-  helper's `install` (owner, 2026-11-12): build the helper, run `install
-  --dry-run` first, then `install --helper`. After it, `herdr-app do
+  helper's `install` (owner, 2026-11-12): build the helper and the
+  orchestration tool, run `install --dry-run` first, then `install --helper
+  <file> --orch <file>`. After it, `herdr-app do
   layout.switch` and `herdr-app shot` are allowed, to look at the result.
   Do not install a branch that is not merged.
 - Tests use fakes and fixtures. No test reads the owner's session logs

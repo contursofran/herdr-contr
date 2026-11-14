@@ -45,10 +45,12 @@ fn each_hook_runs_a_hook_of_the_tool() {
 
 #[test]
 fn the_mcp_server_is_the_tool_with_the_kit_folder() {
+    // The server starts through sh, which looks for the tool next to an installed kit first.
     let server = &json(".mcp.json")["mcpServers"]["contr"];
-    assert_eq!(server["command"], TOOL);
+    assert_eq!(server["command"], "sh");
     assert_eq!(server["env"]["CONTR_KIT"], "${CLAUDE_PLUGIN_ROOT}");
-    let args: Vec<&str> = server["args"].as_array().unwrap().iter().map(|a| a.as_str().unwrap()).collect();
+    let args = tool_args(server["args"][1].as_str().unwrap());
+    assert_eq!(args, ["mcp"]);
     // No input: the server ends at once.
     let dir = tempfile::tempdir().unwrap();
     let (cfg, owner) = (dir.path().join("agents.json"), dir.path().join("owner.json"));

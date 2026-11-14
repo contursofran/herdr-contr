@@ -6,7 +6,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "[ -z \"$CONTR_COORDINATOR$HC_TERMINAL_ID\" ] || herdr-contr-orch hook stop || exit 1",
+            "command": "[ -z \"$CONTR_COORDINATOR$HC_TERMINAL_ID\" ] || PATH=\"${CLAUDE_PLUGIN_ROOT}/../bin:$PATH\" herdr-contr-orch hook stop || exit 1",
             "timeout": 15
           }
         ]
@@ -18,7 +18,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "[ -z \"$HC_TERMINAL_ID\" ] || herdr-contr-orch hook session-start || exit 1",
+            "command": "[ -z \"$HC_TERMINAL_ID\" ] || PATH=\"${CLAUDE_PLUGIN_ROOT}/../bin:$PATH\" herdr-contr-orch hook session-start || exit 1",
             "timeout": 15
           }
         ]
@@ -29,7 +29,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "[ -z \"$HC_TERMINAL_ID\" ] || herdr-contr-orch hook prompt || true",
+            "command": "[ -z \"$HC_TERMINAL_ID\" ] || PATH=\"${CLAUDE_PLUGIN_ROOT}/../bin:$PATH\" herdr-contr-orch hook prompt || true",
             "timeout": 10
           }
         ]

@@ -47,6 +47,18 @@ fn main() {
         src.push_str(&format!("    ({rel:?}, include_bytes!({:?})),\n", p.display().to_string()));
     }
     src.push_str("];\n");
+    // The kit (the Claude Code plugin of a coordinator and its workers), for <home>/herdr-contr/kit.
+    let kit_base = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../kit");
+    assert!(kit_base.join(".claude-plugin/plugin.json").is_file(), "kit/ must sit next to xplat/");
+    let mut kit = Vec::new();
+    walk(&kit_base, &kit_base, &mut kit);
+    kit.sort();
+    src.push_str("/// Every file of the kit, as (path relative to the kit folder, bytes), sorted by path.\npub static KIT: &[(&str, &[u8])] = &[\n");
+    for (rel, p) in &kit {
+        println!("cargo:rerun-if-changed={}", p.display());
+        src.push_str(&format!("    ({rel:?}, include_bytes!({:?})),\n", p.display().to_string()));
+    }
+    src.push_str("];\n");
     let keys = base.join("keys.json");
     println!("cargo:rerun-if-changed={}", keys.display());
     src.push_str(&format!("/// herdr-app/keys.json.\npub static KEYS: &[u8] = include_bytes!({:?});\n", keys.display().to_string()));
