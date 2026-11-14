@@ -39,10 +39,10 @@ fn injected_user_lines() {
     let inj = fixture_lines("injected.jsonl");
     assert_eq!(
         describe(&parse(&inj)),
-        ["user:Real question", "status", "status", "chips:Read a file", "user:[herdr-send from orchard-main-orch] please rebuild", "asst:On it."],
+        ["user:Real question", "user:/effort", "status", "status", "chips:Read a file", "user:[herdr-send from orchard-main-orch] please rebuild", "asst:On it."],
         "injected user lines"
     );
-    match &parse(&inj)[1].kind {
+    match &parse(&inj)[2].kind {
         ItemKind::Status(t) => assert_eq!(t, "Context compacted", "compaction status text"),
         _ => panic!("compaction is a status item"),
     }
