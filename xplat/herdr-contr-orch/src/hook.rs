@@ -12,7 +12,8 @@ use std::path::{Path, PathBuf};
 use serde::Deserialize;
 use serde_json::{json, Map, Value};
 
-use crate::cli::{flow_text, owner_store};
+use crate::cli::flow_text;
+use crate::home::owner_store;
 use crate::flowseen;
 use crate::spawn::ENV_COORDINATOR;
 use crate::turn::{context_and_model, last_turn, ran_command, Turn};
