@@ -587,6 +587,12 @@ fn installs_the_kit_and_the_orchestration_tool() {
     for rel in &files {
         assert_eq!(fs::read(kit.join(rel)).unwrap(), fs::read(Path::new(env!("CARGO_MANIFEST_DIR")).join("../../kit").join(rel)).unwrap(), "{rel}");
     }
+    // The marketplace file names the kit folder next to it, and is the repository's.
+    let market: Value = serde_json::from_str(&read(s.app.join("herdr-contr/.claude-plugin/marketplace.json"))).unwrap();
+    assert_eq!(market["plugins"][0]["source"], "./kit");
+    let plugin: Value = serde_json::from_str(&read(kit.join(".claude-plugin/plugin.json"))).unwrap();
+    assert_eq!(market["plugins"][0]["name"], plugin["name"]);
+    assert_eq!(read(s.app.join("herdr-contr/.claude-plugin/marketplace.json")), read(Path::new(env!("CARGO_MANIFEST_DIR")).join("../../.claude-plugin/marketplace.json")));
     let dest = s.app.join("herdr-contr/bin/herdr-contr-orch");
     assert_eq!(read(&dest), read(&orch));
     assert_eq!(fs::metadata(&dest).unwrap().permissions().mode() & 0o777, 0o755);

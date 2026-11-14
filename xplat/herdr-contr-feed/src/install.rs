@@ -14,6 +14,10 @@ mod embedded {
 }
 pub use embedded::{FILES, KEYS, KIT, KNOWN};
 
+/// The marketplace file of the kit: the repository's, which names the plugin at `./kit`. Claude Code registers
+/// the kit through it (`claude plugin marketplace add <home>/herdr-contr`).
+pub const MARKETPLACE: &[u8] = include_bytes!("../../../.claude-plugin/marketplace.json");
+
 /// The mods that install puts in <home>/mods: herdr-contr, and our copies of Herdr's spaces and tabs mods.
 pub const MODS: [&str; 3] = ["herdr-contr", "herdr-contr-spaces", "herdr-contr-tabs"];
 
@@ -57,6 +61,7 @@ Usage: herdr-contr-feed install [--home <herdr-app home>] [--helper <herdr-contr
    stays; with none there, it says where to get one.
  - The kit (the Claude Code plugin of a coordinator and its workers) goes to <home>/herdr-contr/kit/.
    That folder is this install's: a file there that this version does not have is removed.
+   <home>/herdr-contr/.claude-plugin/marketplace.json names it for `claude plugin marketplace add`.
  - --orch copies the orchestration tool herdr-contr-orch to <home>/herdr-contr/bin/, where the kit's
    hooks and MCP server look for it first.
  - --remote copies the helpers for other machines (<folder>/<target>/herdr-contr-feed, checked
@@ -423,6 +428,7 @@ pub fn run(args: &[String]) -> i32 {
         println!("  herdr-contr/bin/herdr-contr-feed (from {h})");
     }
     println!("  herdr-contr/kit/... ({} files)", KIT.len());
+    println!("  herdr-contr/.claude-plugin/marketplace.json");
     for p in &kit_old {
         println!("    {}: not in this version, removed", rel_of(p, &home));
     }
@@ -469,6 +475,7 @@ pub fn run(args: &[String]) -> i32 {
         for (rel, bytes) in KIT {
             put(&kit_dest.join(rel), bytes, false)?;
         }
+        put(&home.join("herdr-contr").join(".claude-plugin").join("marketplace.json"), MARKETPLACE, false)?;
         for p in &kit_old {
             fs::remove_file(p)?;
         }
