@@ -50,11 +50,16 @@ pub struct Run {
 }
 
 pub fn call(args: &[&str], vars: &[(&str, &str)], core: &dyn Core) -> Run {
+    call_with(args, vars, core, "")
+}
+
+/// A run with this text on stdin.
+pub fn call_with(args: &[&str], vars: &[(&str, &str)], core: &dyn Core, input: &str) -> Run {
     let vars: HashMap<String, String> = vars.iter().map(|(k, v)| (k.to_string(), v.to_string())).collect();
     let env = move |k: &str| vars.get(k).cloned().unwrap_or_default();
     let args: Vec<String> = args.iter().map(|s| s.to_string()).collect();
     let (mut out, mut err) = (Vec::new(), Vec::new());
-    let code = run(&args, &env, &mut out, &mut err, core);
+    let code = run(&args, &env, &mut input.as_bytes(), &mut out, &mut err, core);
     Run { code, out: String::from_utf8(out).unwrap(), err: String::from_utf8(err).unwrap() }
 }
 

@@ -1,7 +1,7 @@
 //! The command line: `agents flow | spawn | ls | send | interrupt | stop | rm | read | prompt`, and
 //! `owner ask | answer | done`. Ported from contr's `contr agents` and `contr owner`. `agents watch` is not
 //! ported: no part of the kit or of this repository calls it.
-use std::io::Write;
+use std::io::{BufRead, Write};
 use std::path::PathBuf;
 
 use crate::config::{Config, Flow};
@@ -11,6 +11,7 @@ use crate::workers::{self, Core, Manager, Worker};
 
 pub const USAGE: &str = "Usage:
   herdr-contr-orch agents <command> [args…] list and control the workers (herdr-contr-orch agents help)
+  herdr-contr-orch mcp                      serve the coordinator's tools over MCP on stdin and stdout
   herdr-contr-orch owner <command> [args…]  answer questions and mark to-dos done (herdr-contr-orch owner help)
   herdr-contr-orch --help, -h               print this text
 ";
@@ -124,7 +125,7 @@ pub fn owner_store(env: &dyn Fn(&str) -> String) -> Result<Store, String> {
 }
 
 /// CONTR_PROJECT, or the name of the folder the session runs in.
-fn project_name(env: &dyn Fn(&str) -> String) -> String {
+pub(crate) fn project_name(env: &dyn Fn(&str) -> String) -> String {
     let p = env("CONTR_PROJECT");
     if !p.is_empty() {
         return p;
@@ -146,8 +147,9 @@ fn is_help(a: &str) -> bool {
 
 /// Runs the command line (`args` without the program name). The exit code: 0 on success, 1 on an error, 2 on a
 /// usage error.
-pub fn run(args: &[String], env: &dyn Fn(&str) -> String, out: &mut dyn Write, err: &mut dyn Write, core: &dyn Core) -> i32 {
+pub fn run(args: &[String], env: &dyn Fn(&str) -> String, input: &mut dyn BufRead, out: &mut dyn Write, err: &mut dyn Write, core: &dyn Core) -> i32 {
     match args.first().map(String::as_str) {
+        Some("mcp") if args.len() == 1 => run_mcp(env, input, out, err, core),
         Some("agents") => run_agents(&args[1..], env, out, err, core),
         Some("owner") => run_owner(&args[1..], env, out, err, core),
         Some(a) if is_help(a) => {
@@ -163,6 +165,26 @@ pub fn run(args: &[String], env: &dyn Fn(&str) -> String, out: &mut dyn Write, e
             2
         }
     }
+}
+
+/// `mcp`: the worker tools and the owner tools over MCP, until stdin ends.
+fn run_mcp(env: &dyn Fn(&str) -> String, input: &mut dyn BufRead, out: &mut dyn Write, err: &mut dyn Write, core: &dyn Core) -> i32 {
+    // A broken profiles file or no place for the owner file stops the server at its start.
+    let store = match crate::tools::load_config(env).and_then(|_| owner_store(env)) {
+        Ok(s) => s,
+        Err(e) => {
+            let _ = writeln!(err, "herdr-contr-orch mcp: {e}");
+            return 1;
+        }
+    };
+    let (project, coordinator) = (project_name(env), env("HC_TERMINAL_ID"));
+    let mut tools = crate::tools::agent_tools(core, env);
+    tools.extend(crate::tools::owner_tools(&store, &project, &coordinator));
+    if let Err(e) = crate::mcp::serve("herdr-contr-orch", env!("CARGO_PKG_VERSION"), &tools, input, out) {
+        let _ = writeln!(err, "herdr-contr-orch mcp: {e}");
+        return 1;
+    }
+    0
 }
 
 fn run_agents(args: &[String], env: &dyn Fn(&str) -> String, out: &mut dyn Write, err: &mut dyn Write, core: &dyn Core) -> i32 {
@@ -354,7 +376,7 @@ const PROMPT_LINES: i64 = 40;
 
 /// The menu that a blocked worker waits on, or "no prompt" when the worker is not blocked or its screen has no
 /// menu that this tool can read.
-fn pending_prompt(m: &Manager, name: &str) -> Result<String, String> {
+pub(crate) fn pending_prompt(m: &Manager, name: &str) -> Result<String, String> {
     let w = m.get(name)?;
     if !w.live || w.status != "blocked" {
         return Ok("no prompt".into());
