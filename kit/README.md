@@ -21,6 +21,12 @@ with `--orch <file>`, the tool in `<Herdr home>/herdr-contr/bin`
 server look for `herdr-contr-orch` in `../bin` of the kit folder first, then
 on the PATH. Start `claude` with the kit: `claude --plugin-dir <kit>`.
 
+To have the kit in every `claude` session, register it once:
+`claude plugin marketplace add <Herdr home>/herdr-contr`, then
+`claude plugin install contr@contr`. The plugin reads the kit folder in
+place, so a later install needs no update step. The repository root has
+the same marketplace file, for a checkout.
+
 From a checkout, without an install: build the tool (`cargo build --release
 --manifest-path xplat/Cargo.toml -p herdr-contr-orch`), put it on the PATH,
 and give the repository's `kit` folder to `--plugin-dir`.
