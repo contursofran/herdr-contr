@@ -1,0 +1,9 @@
+{
+  "mcpServers": {
+    "contr": {
+      "command": "herdr-contr-orch",
+      "args": ["mcp"],
+      "env": { "CONTR_KIT": "${CLAUDE_PLUGIN_ROOT}" }
+    }
+  }
+}

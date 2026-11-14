@@ -1,0 +1,39 @@
+{
+  "description": "Workers: a turn that ends without hc send still reports to the coordinator. Coordinators: save the state before a compaction and get the playbook at startup and after a compaction. In any hc terminal: name the chat-writing skill at session start, and ask for the owner's requests in the todo list.",
+  "hooks": {
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "[ -z \"$CONTR_COORDINATOR$HC_TERMINAL_ID\" ] || herdr-contr-orch hook stop || exit 1",
+            "timeout": 15
+          }
+        ]
+      }
+    ],
+    "SessionStart": [
+      {
+        "matcher": "startup|resume|clear|compact",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "[ -z \"$HC_TERMINAL_ID\" ] || herdr-contr-orch hook session-start || exit 1",
+            "timeout": 15
+          }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "[ -z \"$HC_TERMINAL_ID\" ] || herdr-contr-orch hook prompt || true",
+            "timeout": 10
+          }
+        ]
+      }
+    ]
+  }
+}
