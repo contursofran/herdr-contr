@@ -229,6 +229,12 @@ drawn by Herdr's `frames`; every loader of the mod is this one); done is a check
     again). The port is config.json `phone_port` (8787), not in the dialog: for a port already taken.
     herdr-contr never changes Tailscale settings; it shows the Serve command. An install that replaces
     the helper restarts this service. While the dialog is open it asks the helper again every 10 s.
+  - **Shortcuts** (#165, read only): the keys that the three mods bind, in four groups (WINDOW, REPLY
+    BOX, CARDS, SETTINGS). A row is what the key does (13 px `foreground`) and its key caps on the right
+    (22 px high, 5 px corners, `chrome`, `border`, 12 px); "or" between two keys, "…" in a range
+    (⌃1 … ⌃9). The caps follow `window().platform`: ⌘ ⌥ ⇧ ⌃ on macOS, Ctrl / Alt / Shift elsewhere.
+    The table is `shortcuts.js`: the reply box binds its keys from it, and a test compares it with
+    `keys.json` and the key handlers, so a key that a mod binds and the table does not list fails `npm test`.
 - **Sidebar**: ⌘B or the sidebar button shows and hides it. With it hidden, the pointer at the
   window's left 4 px slides it out as a floating panel (260 px wide, 8 px from the edges, 14 px
   corners, a large shadow), which closes when the pointer leaves it, on Esc or a click beside it.

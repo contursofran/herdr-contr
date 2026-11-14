@@ -9,6 +9,7 @@ import * as sidecar from "./sidecar.js";
 import { setting } from "./config.js";
 import { appRel } from "./phone.js";
 import { modelName, hasModelMenu, menuPanel } from "./modelmenu.js";
+import { keystroke } from "./shortcuts.js";
 
 export { modelName };
 
@@ -171,7 +172,7 @@ let pasteBound = false;
 function bindPaste(cx) {
   if (pasteBound || typeof cx?.bind_keys !== "function") return;
   try {
-    cx.bind_keys([{ keystroke: "secondary-v", action: PASTE_ACTION, context: `${PASTE_CONTEXT} > Input` }]);
+    cx.bind_keys([{ keystroke: keystroke("paste"), action: PASTE_ACTION, context: `${PASTE_CONTEXT} > Input` }]);
     pasteBound = true;
   } catch { /* the box's own paste stays, and paste_other still attaches an image */ }
 }
@@ -192,9 +193,9 @@ let slashBound = false;
 function bindSlash(cx) {
   if (slashBound || typeof cx?.bind_keys !== "function") return;
   try {
-    cx.bind_keys([["up", SLASH.up], ["down", SLASH.down], ["tab", SLASH.complete], ["escape", SLASH.close]]
-      .map(([keystroke, action]) => ({ keystroke, action, context: `${SLASH_CONTEXT} > Input` }))
-      .concat([{ keystroke: "tab", action: SUGGEST_ACCEPT, context: `${SUGGEST_CONTEXT} > Input` }]));
+    cx.bind_keys([["slash-up", SLASH.up], ["slash-down", SLASH.down], ["slash-complete", SLASH.complete], ["slash-close", SLASH.close]]
+      .map(([id, action]) => ({ keystroke: keystroke(id), action, context: `${SLASH_CONTEXT} > Input` }))
+      .concat([{ keystroke: keystroke("suggest"), action: SUGGEST_ACCEPT, context: `${SUGGEST_CONTEXT} > Input` }]));
     slashBound = true;
   } catch { /* no keys for the list: a click on a row and Enter still complete */ }
 }
