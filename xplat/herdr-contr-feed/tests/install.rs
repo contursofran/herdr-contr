@@ -648,3 +648,40 @@ fn the_installed_kit_runs_the_tool_next_to_it() {
     assert_eq!(server["env"]["CONTR_KIT"], "${CLAUDE_PLUGIN_ROOT}");
     assert_eq!(run(server["args"][1].as_str().unwrap(), &[("CONTR_KIT", kit.to_str().unwrap())]), "orch mcp\n");
 }
+
+/// The contr app's folder in the sandbox's user config folder.
+fn old_contr(s: &Sandbox) -> PathBuf {
+    s.home.join(if cfg!(target_os = "macos") { "Library/Application Support/contr" } else { ".config/contr" })
+}
+
+#[test]
+fn copies_the_contr_apps_profiles_and_owner_files_once() {
+    let s = sandbox();
+    let old = old_contr(&s);
+    fs::create_dir_all(&old).unwrap();
+    fs::write(old.join("agents.json"), r#"{"flow": {"workers": 2}}"#).unwrap();
+    fs::write(old.join("owner.json"), r#"{"questions": []}"#).unwrap();
+    let dry = s.run(&["--home", s.app_s(), "--dry-run"]);
+    assert!(out(&dry).contains("herdr-contr/agents.json (a copy of ") && out(&dry).contains("herdr-contr/owner.json (a copy of "), "{}", out(&dry));
+    assert_eq!(fs::read_dir(&s.app).unwrap().count(), 0);
+    let r = s.run(&["--home", s.app_s()]);
+    assert_eq!(r.status.code(), Some(0), "{}", both(&r));
+    assert_eq!(read(s.app.join("herdr-contr/agents.json")), r#"{"flow": {"workers": 2}}"#);
+    assert_eq!(read(s.app.join("herdr-contr/owner.json")), r#"{"questions": []}"#);
+    assert!(old.join("agents.json").exists() && old.join("owner.json").exists(), "the old files stay");
+    // A file that is in the Herdr home is never replaced.
+    fs::write(s.app.join("herdr-contr/agents.json"), "{}").unwrap();
+    fs::write(old.join("agents.json"), r#"{"flow": {"workers": 3}}"#).unwrap();
+    let r = s.run(&["--home", s.app_s()]);
+    assert_eq!(r.status.code(), Some(0), "{}", both(&r));
+    assert!(!out(&r).contains("a copy of"), "{}", out(&r));
+    assert_eq!(read(s.app.join("herdr-contr/agents.json")), "{}");
+}
+
+#[test]
+fn with_no_contr_app_files_none_is_made() {
+    let s = sandbox();
+    let r = s.run(&["--home", s.app_s()]);
+    assert_eq!(r.status.code(), Some(0), "{}", both(&r));
+    assert!(!s.app.join("herdr-contr/agents.json").exists() && !s.app.join("herdr-contr/owner.json").exists());
+}

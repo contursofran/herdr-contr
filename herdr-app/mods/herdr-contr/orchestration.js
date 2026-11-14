@@ -1,11 +1,10 @@
-// The Orchestration section of the herdr-contr settings: it edits contr's agents.json, the file that
-// contr's coordinator reads (contr's internal/agents: Flow, DefaultConfig, LoadConfig). The path:
-// CONTR_AGENTS_CONFIG when set, else the user config folder's contr/agents.json (macOS:
-// ~/Library/Application Support; other systems: $XDG_CONFIG_HOME or ~/.config).
+// The Orchestration section of the herdr-contr settings: it edits agents.json, the file that the
+// orchestration tool reads (xplat/herdr-contr-orch: the flow and the profiles). The path:
+// CONTR_AGENTS_CONFIG when set, else agents.json in the Herdr home's herdr-contr folder (#160).
 // The choices are the ones of contr's Settings, Agents tab. A write reads the file, changes one field
 // and keeps all other keys. A file that is not a JSON object is never written. A missing file is
 // contr's defaults, and the first change creates it.
-import { home, window, exec, readTextFile, writeTextFile, shared, setShared } from "herdr";
+import { appHome, exec, readTextFile, writeTextFile, shared, setShared } from "herdr";
 
 export const KEY_AGENTS = "herdr-contr.agents";   // { path, file, bad, text, error }
 
@@ -40,14 +39,12 @@ let pathOnce = null;
 export const resetAgentsPath = () => { pathOnce = null; };
 export function agentsPath() {
   return (pathOnce ??= (async () => {
-    let over = "", xdg = "";
+    let over = "";
     try {
-      const r = await exec("sh", ["-c", 'printf "%s\\n%s" "$CONTR_AGENTS_CONFIG" "$XDG_CONFIG_HOME"']);
-      if (r?.code === 0) [over = "", xdg = ""] = String(r.stdout).split("\n");
-    } catch { /* the defaults below */ }
-    if (over) return over;
-    if ((window()?.platform ?? "macos") === "macos") return `${home()}/Library/Application Support/contr/agents.json`;
-    return `${xdg || `${home()}/.config`}/contr/agents.json`;
+      const r = await exec("sh", ["-c", 'printf "%s" "$CONTR_AGENTS_CONFIG"']);
+      if (r?.code === 0) over = String(r.stdout).split("\n")[0];
+    } catch { /* the default below */ }
+    return over || `${appHome()}/herdr-contr/agents.json`;
   })());
 }
 

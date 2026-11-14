@@ -62,6 +62,9 @@ Usage: herdr-contr-feed install [--home <herdr-app home>] [--helper <herdr-contr
  - The kit (the Claude Code plugin of a coordinator and its workers) goes to <home>/herdr-contr/kit/.
    That folder is this install's: a file there that this version does not have is removed.
    <home>/herdr-contr/.claude-plugin/marketplace.json names it for `claude plugin marketplace add`.
+ - The profiles file and the owner file of the orchestration tool (agents.json, owner.json) are in
+   <home>/herdr-contr/. When one is not there and the contr app's is (the user config folder,
+   contr/), it is copied once; the old file stays.
  - --orch copies the orchestration tool herdr-contr-orch to <home>/herdr-contr/bin/, where the kit's
    hooks and MCP server look for it first.
  - --remote copies the helpers for other machines (<folder>/<target>/herdr-contr-feed, checked
@@ -278,6 +281,19 @@ pub fn sort_files(home: &Path, files: &BTreeMap<&str, &[u8]>, mine: &BTreeMap<St
     s
 }
 
+/// The files of the orchestration tool that the contr app kept in the user config folder (macOS:
+/// ~/Library/Application Support/contr; else $XDG_CONFIG_HOME/contr or ~/.config/contr) and that have no copy
+/// in the Herdr home yet, as (name, the old file). The tool reads them in <home>/herdr-contr now (#160).
+fn old_orch_files(home: &Path, env: &dyn Fn(&str) -> Option<String>, macos: bool) -> Vec<(&'static str, PathBuf)> {
+    let old = if macos {
+        env("HOME").map(|h| Path::new(&h).join("Library/Application Support/contr"))
+    } else {
+        env("XDG_CONFIG_HOME").map(PathBuf::from).or_else(|| env("HOME").map(|h| Path::new(&h).join(".config"))).map(|d| d.join("contr"))
+    };
+    let Some(old) = old else { return Vec::new() };
+    ["agents.json", "owner.json"].into_iter().map(|n| (n, old.join(n))).filter(|(n, from)| from.is_file() && !home.join("herdr-contr").join(n).exists()).collect()
+}
+
 pub fn run(args: &[String]) -> i32 {
     let mut home: Option<String> = None;
     let mut helper: Option<String> = None;
@@ -408,6 +424,7 @@ pub fn run(args: &[String]) -> i32 {
     let mut kit_old = Vec::new();
     walk_files(&kit_dest, &mut kit_old);
     kit_old.retain(|p| !KIT.iter().any(|(rel, _)| kit_dest.join(rel) == *p));
+    let moved = old_orch_files(&home, &nonempty, cfg!(target_os = "macos"));
     let show = |v: &Value| v.as_str().map(String::from).unwrap_or_else(|| v.to_string());
     println!("{}{}", if dry { "Dry run: would install into " } else { "Installing into " }, home.display());
     for rel in files.keys().filter(|r| !r.starts_with("mods/")) {
@@ -429,6 +446,9 @@ pub fn run(args: &[String]) -> i32 {
     }
     println!("  herdr-contr/kit/... ({} files)", KIT.len());
     println!("  herdr-contr/.claude-plugin/marketplace.json");
+    for (name, from) in &moved {
+        println!("  herdr-contr/{name} (a copy of {}; the old file stays)", from.display());
+    }
     for p in &kit_old {
         println!("    {}: not in this version, removed", rel_of(p, &home));
     }
@@ -476,6 +496,9 @@ pub fn run(args: &[String]) -> i32 {
             put(&kit_dest.join(rel), bytes, false)?;
         }
         put(&home.join("herdr-contr").join(".claude-plugin").join("marketplace.json"), MARKETPLACE, false)?;
+        for (name, from) in &moved {
+            put(&home.join("herdr-contr").join(name), &fs::read(from)?, false)?;
+        }
         for p in &kit_old {
             fs::remove_file(p)?;
         }

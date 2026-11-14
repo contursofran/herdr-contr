@@ -35,7 +35,10 @@ beforeEach(() => {
   fake.readText = (p) => (existsSync(p) ? readFileSync(p, "utf8") : null);
   fake.exec = (cmd, args) => {
     if (cmd === "sh") return { code: 0, stdout: env.join("\n"), stderr: "" };
-    if (cmd === "contr") {
+    if (cmd === "env") {
+      // env HERDR_APP_HOME=<home> <the installed tool> owner answer <id> <answer>
+      assert.deepEqual(args.slice(0, 2), ["HERDR_APP_HOME=/home/test/.config/herdr-app", "/home/test/.config/herdr-app/herdr-contr/bin/herdr-contr-orch"]);
+      args = args.slice(2);
       contrRuns.push(args);
       if (contrResult) return contrResult;
       // contr owner answer <id> <answer>: the file changes first, then the coordinator gets the text.
@@ -52,14 +55,12 @@ afterEach(() => rmSync(dir, { recursive: true, force: true }));
 
 const click = async (el, cx) => { el._h.on_click({}, cx); await cx.settle(); };
 
-test("the path: CONTR_OWNER_FILE, else the user config folder (macOS, XDG, ~/.config)", async () => {
+test("the path: CONTR_OWNER_FILE, else the Herdr home's herdr-contr folder", async () => {
   assert.equal(await ownerPath(), file);
   resetOwnerPath(); env = ["", ""];
-  assert.equal(await ownerPath(), "/home/test/Library/Application Support/contr/owner.json");
-  resetOwnerPath(); fake.window = { platform: "linux" };
-  assert.equal(await ownerPath(), "/home/test/.config/contr/owner.json");
-  resetOwnerPath(); env = ["", "/x/cfg"];
-  assert.equal(await ownerPath(), "/x/cfg/contr/owner.json");
+  assert.equal(await ownerPath(), "/home/test/.config/herdr-app/herdr-contr/owner.json");
+  resetOwnerPath(); fake.exec = () => { throw new Error("no shell"); };
+  assert.equal(await ownerPath(), "/home/test/.config/herdr-app/herdr-contr/owner.json");
 });
 
 test("cardOf: the recommended option first, each with its impact; title, from and refs kept", () => {
@@ -165,7 +166,7 @@ test("a failed answer keeps the card with contr's message; a saved answer that d
   contrResult = null;
   const run = fake.exec; fake.exec = (cmd, args) => {
     const r = run(cmd, args);
-    return cmd === "contr" ? { code: 1, stdout: "", stderr: "contr owner answer: saved; coordinator not reached: no terminal t1" } : r;
+    return cmd === "env" ? { code: 1, stdout: "", stderr: "contr owner answer: saved; coordinator not reached: no terminal t1" } : r;
   };
   await c.answer(cx, "t1");
   el = c.view("t1", T);
@@ -176,7 +177,7 @@ test("a failed answer keeps the card with contr's message; a saved answer that d
 test("answerOwner: contr that cannot start is an error, not a throw", async () => {
   fake.exec = () => { throw new Error("ENOENT"); };
   const r = await answerOwner("D1", "x");
-  assert.match(r.error.message, /contr could not start.*ENOENT/);
+  assert.match(r.error.message, /herdr-contr-orch could not start.*ENOENT/);
 });
 
 test("the chat draws the coordinator's question above Claude Code's own card and answers it on a press", async () => {
@@ -192,5 +193,5 @@ test("the chat draws the coordinator's question above Claude Code's own card and
   await click(byId(v.render(cx), "chat-owner-answer"), cx);
   assert.deepEqual(contrRuns, [["owner", "answer", "D1", "Wait"]]);
   assert.equal(byId(v.render(cx), "chat-owner"), null);
-  assert.equal(log.exec.filter(([c]) => c === "contr").length, 1, "one run, on the press");
+  assert.equal(log.exec.filter(([c]) => c === "env").length, 1, "one run, on the press");
 });
