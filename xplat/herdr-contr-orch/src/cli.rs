@@ -11,7 +11,7 @@ use crate::workers::{self, Core, Manager, Worker};
 
 pub const USAGE: &str = "Usage:
   herdr-contr-orch agents <command> [args…] list and control the workers (herdr-contr-orch agents help)
-  herdr-contr-orch hook stop                the kit's Stop hook: a worker's turn with no report gets one
+  herdr-contr-orch hook <name>              the kit's hooks: stop and session-start (see hook help)
   herdr-contr-orch mcp                      serve the coordinator's tools over MCP on stdin and stdout
   herdr-contr-orch owner <command> [args…]  answer questions and mark to-dos done (herdr-contr-orch owner help)
   herdr-contr-orch --help, -h               print this text

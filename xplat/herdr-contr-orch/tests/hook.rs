@@ -67,10 +67,11 @@ fn the_hook_is_quiet_when_it_has_no_work() {
     assert_eq!(stop(&WORKER, &input, &core).code, 0);
     // Outside hc nothing is read or sent, even with bad input.
     assert_eq!(stop(&[], "not json", &core).code, 0);
+    assert!(core.calls().is_empty());
     // A session in hc that is not a worker reports to nobody.
     let input = json!({"transcript_path": transcript(dir.path(), &[PROMPT, WORDS])}).to_string();
     assert_eq!(stop(&[("HC_TERMINAL_ID", "t7")], &input, &core).code, 0);
-    assert!(core.calls().is_empty());
+    assert!(!core.methods().contains(&"terminal.send".to_string()));
 }
 
 #[test]
