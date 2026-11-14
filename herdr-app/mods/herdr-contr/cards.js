@@ -47,6 +47,9 @@ export function digit(e) {
 // The head of an owner question (ownerq.js): its id, and how many more wait after it.
 const ownerHead = (c) => `${c.request} · The coordinator asks${c.more > 0 ? ` · ${c.more} more after this` : ""}`;
 
+// How long after a press in the own-answer row the card leaves the keyboard with the text box.
+const OWN_MS = 300;
+
 export class Cards {
   // The "other answer" boxes are made here, once: a view may not make input state while it draws.
   // `cx`: for the card's own focus, so 1-9 and Enter reach it and not the reply box.
@@ -55,6 +58,8 @@ export class Cards {
     this.canFocus = () => true;   // the chat says no while you type a reply
     this.byAgent = new Map();
     this.address = null;   // whose card the boxes belong to now
+    this.typing = null;    // the own-answer box that has the keyboard
+    this.ownAt = 0;        // when the own-answer row was last pressed
     this.others = Array.from({ length: MAX_QUESTIONS }, (_v, qi) => {
       const input = TextareaState.new({ placeholder: "Or type your own answer", rows: 1 });
       input.on("change", (_e, cx) => {
@@ -63,6 +68,9 @@ export class Cards {
         e.others.set(qi, input.value());
         if (was !== Boolean(input.value().trim())) cx.notify();
       });
+      // While you type your own answer, the card reads no key as a pick (#177).
+      input.on("focus", () => { this.typing = input; });
+      input.on("blur", () => { if (this.typing === input) this.typing = null; });
       return input;
     });
   }
@@ -145,7 +153,7 @@ export class Cards {
       if (answersFor(c.question, en.picks, en.others)) { cx.spawn((cx) => this.answer(cx, address)); return true; }
       return false;
     }
-    if (n === null) return false;
+    if (n === null || this.typing) return false;
     const qi = Math.min(en.step ?? 0, qs.length - 1);
     // The number after the options moves the keyboard into the own-answer box (none: a preview picker).
     if (n - 1 === (qs[qi]?.options ?? []).length && this.others[qi] && !qs[qi]?.noOther) { this.others[qi].focus?.(); return true; }
@@ -206,7 +214,8 @@ export class Cards {
       .child(label);
     const box = v_flex().id(id).w_full().min_w(0).max_w(width).p(14).gap(10).rounded(14).bg(t.raised);
     if (this.focus) box.track_focus(this.focus)
-      .on_mouse_down("left", () => this.focus.focus())
+      // A press in the own-answer row is the text box's: the card does not take the keyboard from it (#177).
+      .on_mouse_down("left", () => { if (Date.now() - this.ownAt > OWN_MS) this.focus.focus(); })
       .on_key_down((ev, cx) => { if (this.key_down(ev, cx, address)) cx.stop_propagation(); });
     const hint = (n) => div().size(18).flex_none().rounded(5).border(1).border_color(t.border).flex().items_center().justify_center()
       .text_size(10.5).text_color(t.muted).child(String(n));
@@ -263,9 +272,12 @@ export class Cards {
       // take the focus on a press and read 1-9 and Enter as picks.
       const own = Boolean((e.others.get(qi) ?? "").trim());
       const keep = (_ev, cx) => cx.stop_propagation();
+      // A press anywhere in the row puts the keyboard in the box, whichever of the row's and the card's handlers
+      // runs first: the card skips its own focus for OWN_MS after it.
+      const type = (ev, cx) => { this.ownAt = Date.now(); input.focus?.(); keep(ev, cx); };
       if (input) sec.child(h_flex().id(`${id}-q${qi}-other`).px(10).py(7).gap(10).items_center().rounded(8)
         .bg(own ? t.selected : t.background).border(1).border_color(own ? t.accent : t.border)
-        .on_mouse_down("left", keep).on_key_down(keep)
+        .on_mouse_down("left", type).on_key_down(keep)
         .child(div().size(14).flex_none().rounded(qq.multi ? 3 : 7).border(1).border_color(own ? t.accent : t.muted).bg(own ? t.accent : t.background))
         .child(div().flex_1().min_w(0).child(Textarea.new(input).w_full().text_size(13)))
         .when((qq.options ?? []).length < 9, (el) => el.child(hint((qq.options ?? []).length + 1))));

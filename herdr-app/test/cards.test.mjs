@@ -202,6 +202,24 @@ test("own answer: a row like the options; clicks and keys in it stay in the text
   assert.equal(c.byAgent.get("t1").picks.size, 0);
 });
 
+test("own answer: a press in the row gives the keyboard to the text box and the card does not take it back (#177)", async () => {
+  cardNow = question;
+  const cx = fakeCx(); const c = new Cards(cx); await c.poll(cx, "t1", true);
+  let box = 0, card = 0; c.others[0].focus = () => { box++; }; c.focus = { focus() { card++; } };
+  const view = c.view("t1", T);
+  const ecx = { ...cx, stop_propagation() {} };
+  // The row's handler first, then the card's; and the other order.
+  byId(view, "card-q0-other")._h.on_mouse_down({}, ecx); view._h.on_mouse_down({}, ecx);
+  assert.equal(box, 1); assert.equal(card, 0, "the card leaves the keyboard with the box");
+  // While the box has the keyboard, a digit is text, not a pick.
+  c.typing = c.others[0];
+  assert.equal(c.key_down({ key: "1", modifiers: {} }, cx, "t1"), false);
+  assert.equal(c.byAgent.get("t1").picks.size, 0);
+  // A press elsewhere in the card, later, gives the card the keyboard.
+  c.ownAt = 0; view._h.on_mouse_down({}, ecx);
+  assert.equal(card, 1);
+});
+
 test("the number after the options moves the keyboard into the own-answer box", async () => {
   cardNow = question;
   const cx = fakeCx(); const c = new Cards(cx); await c.poll(cx, "t1", true);
