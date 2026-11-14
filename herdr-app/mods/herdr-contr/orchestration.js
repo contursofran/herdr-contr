@@ -1,24 +1,17 @@
-// The Orchestration section of the herdr-contr settings: it edits agents.json, the file that the
-// orchestration tool reads (xplat/herdr-contr-orch: the flow and the profiles). The path:
-// CONTR_AGENTS_CONFIG when set, else agents.json in the Herdr home's herdr-contr folder (#160).
-// The choices are the ones of contr's Settings, Agents tab. A write reads the file, changes one field
-// and keeps all other keys. A file that is not a JSON object is never written. A missing file is
-// contr's defaults, and the first change creates it.
-import { appHome, exec, readTextFile, writeTextFile, shared, setShared } from "herdr";
+// The Orchestration section of the herdr-contr settings: the flow and the profiles of the orchestration
+// tool (xplat/herdr-contr-orch). The tool is the one reader and writer of its agents.json (#186): the
+// section reads it with `agents config --json` and changes it with `agents set`. The defaults and the
+// valid values come from the tool; the mod keeps only the labels and the lists that it shows.
+import { shared, setShared } from "herdr";
+import { runOrch, orchJson } from "./orch.js";
 
-export const KEY_AGENTS = "herdr-contr.agents";   // { path, file, bad, text, error }
+export const KEY_AGENTS = "herdr-contr.agents";   // { path, bad, flow, fields, roles, error, missing }
 
-export const DEFAULT_FLOW = { plan: "when-needed", review: "code", debugger_after: 2, workers: 4, merge: "ask" };
-const claude = (model, effort) => ["claude", "--model", model, "--effort", effort, "--permission-mode", "auto"];
-export const DEFAULT_PROFILES = {
-  orchestrator: claude("opus", "medium"), builder: claude("sonnet", "medium"), planner: claude("opus", "low"),
-  reviewer: claude("opus", "low"), debugger: claude("opus", "xhigh"),
-};
-// [value, label, slug], as the settings' choices.
-export const FLOW_CHOICES = {
-  plan: [["never", "Never", "never"], ["when-needed", "When needed", "when-needed"], ["always", "Always", "always"]],
-  review: [["none", "None", "none"], ["code", "Code PRs", "code"], ["every", "Every PR", "every"]],
-  merge: [["ask", "Ask me", "ask"], ["auto", "When CI and review pass", "auto"]],
+// The label that the UI shows for each flow value. The valid values come from the tool's `fields`.
+export const FLOW_LABELS = {
+  plan: { never: "Never", "when-needed": "When needed", always: "Always" },
+  review: { none: "None", code: "Code PRs", every: "Every PR" },
+  merge: { ask: "Ask me", auto: "When CI and review pass" },
 };
 export const STEP_MAX = 99;
 export const MODELS = [["opus", "Opus 5.5", "opus"], ["sonnet", "Sonnet 5.5", "sonnet"], ["haiku", "Haiku 5.5", "haiku"], ["claude-fable-5-2", "Fable 5.2", "fable"]];
@@ -34,155 +27,65 @@ export const ROLES = [
   ["debugger", "Debugger", "After failed fixes."],
 ];
 
-// The file's path, asked of the user's shell once (the mod has no environment of its own).
-let pathOnce = null;
-export const resetAgentsPath = () => { pathOnce = null; };
-export function agentsPath() {
-  return (pathOnce ??= (async () => {
-    let over = "";
-    try {
-      const r = await exec("sh", ["-c", 'printf "%s" "$CONTR_AGENTS_CONFIG"']);
-      if (r?.code === 0) over = String(r.stdout).split("\n")[0];
-    } catch { /* the default below */ }
-    return over || `${appHome()}/herdr-contr/agents.json`;
-  })());
-}
-
-export function parseAgents(text) {
-  if (text == null) return { file: {}, bad: false, text: null };
-  try {
-    const v = JSON.parse(text);
-    if (v && typeof v === "object" && !Array.isArray(v)) return { file: v, bad: false, text };
-  } catch { /* not JSON */ }
-  return { file: {}, bad: true, text };
-}
-
+// Reads the settings with `herdr-contr-orch agents config --json`. A tool that is missing or fails gives
+// `missing` and its message; the section then shows the message and its switches are off.
 export async function loadAgents() {
-  const path = await agentsPath();
-  let text = null;
-  try { text = await readTextFile(path); } catch { text = null; }
-  const c = { path, ...parseAgents(text), error: null };
-  const was = shared(KEY_AGENTS);
-  if (!was || was.text !== c.text || was.path !== c.path) setShared(KEY_AGENTS, c);
+  const r = await orchJson(["agents", "config", "--json"]);
+  const v = r.value;
+  const c = v && typeof v === "object" && !Array.isArray(v)
+    ? { path: v.path ?? null, bad: v.bad === true, flow: v.flow ?? {}, fields: v.fields ?? {}, roles: Array.isArray(v.roles) ? v.roles : [], error: null, missing: false }
+    : { path: null, bad: false, flow: {}, fields: {}, roles: [], error: `The settings could not be read: ${r.error ?? "no JSON object"}`, missing: true };
+  if (JSON.stringify(c) !== JSON.stringify(shared(KEY_AGENTS))) setShared(KEY_AGENTS, c);
   return c;
 }
 
-const agents = () => shared(KEY_AGENTS) ?? { path: null, file: {}, bad: false, text: null };
+const agents = () => shared(KEY_AGENTS) ?? { path: null, bad: false, flow: {}, fields: {}, roles: [], error: null, missing: true };
 export const agentsBad = () => agents().bad === true;
 export const agentsError = () => agents().error ?? null;
 
-// A flow value: the file's, when contr accepts it, else contr's default.
-export function flowValue(key) {
-  const v = agents().file?.flow?.[key];
-  if (FLOW_CHOICES[key]) return FLOW_CHOICES[key].some(([x]) => x === v) ? v : DEFAULT_FLOW[key];
-  return Number.isInteger(v) && v >= 1 ? v : DEFAULT_FLOW[key];
-}
+export const flowValue = (key) => agents().flow?.[key];
+// The choices of a flow key, as [value, label, slug]: the tool's values with the UI's labels.
+export const flowChoices = (key) => (agents().fields?.[key]?.values ?? []).map((v) => [v, FLOW_LABELS[key]?.[v] ?? v, v]);
+const flowMin = (key) => agents().fields?.[key]?.min ?? 1;
 
-const flagOf = (argv, flag) => {
-  for (let i = 0; i < argv.length; i++) {
-    if (argv[i] === flag && i + 1 < argv.length) return argv[i + 1];
-    if (typeof argv[i] === "string" && argv[i].startsWith(flag + "=")) return argv[i].slice(flag.length + 1);
-  }
-  return "";
-};
-const argvOf = (name) => {
-  const p = agents().file?.profiles?.[name];
-  return Array.isArray(p?.argv) && p.argv.length ? p.argv : DEFAULT_PROFILES[name];
-};
-// Where claude is in a command: the first argument whose base name is "claude", at the start or after
-// "env" and its NAME=value arguments (#80). -1 when the command is not claude.
-export function claudeAt(argv) {
-  let i = 0;
-  if (argv[0] === "env") { i = 1; while (i < argv.length && /^[A-Za-z_][A-Za-z0-9_]*=/.test(String(argv[i]))) i++; }
-  return String(argv[i] ?? "").split("/").pop() === "claude" ? i : -1;
-}
-export const roleIsClaude = (name) => claudeAt(argvOf(name)) >= 0;
-// The model or effort that a role starts with; "" when it is not one of the choices (a custom command).
+const roleOf = (name) => agents().roles.find((r) => r?.name === name);
+export const roleIsClaude = (name) => roleOf(name)?.claude === true;
+// The model or effort that a role starts with; "" when it is not one of the choices (or a custom command).
 export function roleValue(name, what) {
-  const argv = argvOf(name);
-  if (claudeAt(argv) < 0) return "";
-  const v = flagOf(argv, what === "model" ? "--model" : "--effort");
+  const r = roleOf(name);
+  if (r?.claude !== true) return "";
+  const v = r[what];
   return (what === "model" ? MODELS : EFFORTS).some(([x]) => x === v) ? v : "";
 }
 
-// Sets --flag to v and keeps the other arguments; a missing --effort goes after --model (as contr does).
-export function setFlag(argv, flag, v) {
-  const out = [...argv];
-  for (let i = 0; i < out.length; i++) {
-    if (out[i] === flag && i + 1 < out.length) { out[i + 1] = v; return out; }
-    if (typeof out[i] === "string" && out[i].startsWith(flag + "=")) { out[i] = `${flag}=${v}`; return out; }
+// Runs `herdr-contr-orch agents set` with the pairs, then reads the settings again. False when the tool
+// refuses or fails; `error` then has its message.
+async function set(pairs) {
+  const r = await runOrch(["agents", "set", ...pairs.flat().map(String)]);
+  if (!r.ok) {
+    await loadAgents();
+    setShared(KEY_AGENTS, { ...agents(), error: r.error });
+    return false;
   }
-  let at = claudeAt(out) + 1 || 1;
-  if (flag === "--effort") out.forEach((a, i) => { if (a === "--model" && i + 1 < out.length) at = i + 2; else if (String(a).startsWith("--model=")) at = i + 1; });
-  out.splice(Math.min(at, out.length), 0, flag, v);
-  return out;
+  await loadAgents();
+  return true;
 }
 
-// Reads the file, applies `change(file)` to a copy, and writes it against the text just read.
-// False when the file is not JSON (left alone) or the write failed; `error` says why.
-async function update(change) {
-  for (let i = 0; i < 2; i++) {
-    const c = await loadAgents();
-    if (c.bad) return false;
-    const file = JSON.parse(JSON.stringify(c.file));   // Herdr's runtime has no structuredClone (#80)
-    change(file);
-    const text = JSON.stringify(file, null, 2) + "\n";
-    if (c.text == null) {
-      const dir = c.path.slice(0, c.path.lastIndexOf("/"));
-      try { await exec("mkdir", ["-p", dir]); } catch { /* the write says it */ }
-    }
-    try { await writeTextFile(c.path, text, c.text); }
-    catch (e) { if (i === 1) setShared(KEY_AGENTS, { ...c, error: `agents.json could not be written: ${e?.message ?? e}` }); continue; }
-    setShared(KEY_AGENTS, { path: c.path, file, bad: false, text, error: null });
-    return true;
-  }
-  return false;
-}
+export const setFlow = (key, value) => set([[`flow.${key}`, value]]);
+// One role's model or effort. The tool changes only that flag, and never a command that is not claude.
+export const setRole = (name, what, value) => set([[`profile.${name}.${what}`, value]]);
 
-// One flow key. The flow is written whole (as contr's Save does), the flow's other keys kept.
-export function setFlow(key, value) {
-  return update((f) => {
-    const was = f.flow && typeof f.flow === "object" && !Array.isArray(f.flow) ? f.flow : {};
-    f.flow = { ...DEFAULT_FLOW, ...was, [key]: value };
-  });
-}
-
-// One role's model or effort: only that flag changes in the command as it is; the profile's other keys
-// stay. A command that is not claude is never replaced (#80): no change.
-export function setRole(name, what, value) {
-  return update((f) => {
-    if (!f.profiles || typeof f.profiles !== "object" || Array.isArray(f.profiles)) f.profiles = {};
-    const p = f.profiles[name] && typeof f.profiles[name] === "object" ? f.profiles[name] : {};
-    let argv = Array.isArray(p.argv) && p.argv.length ? p.argv : DEFAULT_PROFILES[name];
-    if (claudeAt(argv) < 0) return;
-    argv = setFlag(argv, what === "model" ? "--model" : "--effort", value);
-    f.profiles[name] = { ...p, argv };
-  });
-}
-
-// True when each role is claude and has the recommended model and effort. A role that is not claude
-// keeps the setup from being complete.
+// True when each role is claude and has the recommended model and effort.
 export const recommendedInUse = () => Object.entries(RECOMMENDED)
   .every(([name, [m, e]]) => roleValue(name, "model") === m && roleValue(name, "effort") === e);
 
-// Sets the model and effort of each role to RECOMMENDED in one write. Roles that are not claude, the
-// other arguments, the other profile keys and the flow stay.
-export function useRecommended() {
-  return update((f) => {
-    if (!f.profiles || typeof f.profiles !== "object" || Array.isArray(f.profiles)) f.profiles = {};
-    for (const [name, [m, e]] of Object.entries(RECOMMENDED)) {
-      const p = f.profiles[name] && typeof f.profiles[name] === "object" ? f.profiles[name] : {};
-      let argv = Array.isArray(p.argv) && p.argv.length ? p.argv : DEFAULT_PROFILES[name];
-      if (claudeAt(argv) < 0) continue;
-      argv = setFlag(setFlag(argv, "--model", m), "--effort", e);
-      f.profiles[name] = { ...p, argv };
-    }
-  });
-}
+// Sets the model and effort of each role to RECOMMENDED in one `agents set` call.
+export const useRecommended = () => set(Object.entries(RECOMMENDED)
+  .flatMap(([name, [m, e]]) => [[`profile.${name}.model`, m], [`profile.${name}.effort`, e]]));
 
 // The section's body. `ui`: { seg, small, heading, about, t } from settings.js.
 export function orchestrationBody({ t, seg, small, heading, about, div, h_flex, v_flex }, view) {
-  const bad = agentsBad();
+  const bad = agentsBad() || agents().missing === true;
   // A change that throws shows its error; it is not dropped (#80).
   const run = (p, cx) => cx.spawn(async (cx) => {
     try { await p(); } catch (e) { setShared(KEY_AGENTS, { ...agents(), error: `The change failed: ${e?.message ?? e}` }); }
@@ -190,17 +93,17 @@ export function orchestrationBody({ t, seg, small, heading, about, div, h_flex, 
   });
   const body = v_flex().w_full();
   const st = agents();
-  if (bad) body.child(div().id("set-agents-bad").mt(12).p(10).rounded(8).bg(t.raised).border(1).border_color(t.blocked)
+  if (agentsBad()) body.child(div().id("set-agents-bad").mt(12).p(10).rounded(8).bg(t.raised).border(1).border_color(t.blocked)
     .text_size(12.5).text_color(t.foreground)
     .child("agents.json could not be read (it is not valid JSON), so contr's defaults show. Fix the file to change these here."));
   if (st.error) body.child(div().id("set-agents-error").mt(12).p(10).rounded(8).bg(t.raised).border(1).border_color(t.blocked)
     .text_size(12.5).text_color(t.foreground).child(st.error));
   const line = (id, title, text, control) => h_flex().id(id).w_full().py(14).gap(24).items_center().border_b(1).border_color(t.border)
     .child(about(title, text)).child(control);
-  const pick = (key) => seg(`flow-${key}`, FLOW_CHOICES[key], (v, cx) => run(() => setFlow(key, v), cx), flowValue(key), bad);
+  const pick = (key) => seg(`flow-${key}`, flowChoices(key), (v, cx) => run(() => setFlow(key, v), cx), flowValue(key) ?? "", bad);
   const step = (key, unit) => {
-    const n = flowValue(key);
-    const go = (d) => (cx) => { if (!bad && n + d >= 1 && n + d <= STEP_MAX) run(() => setFlow(key, n + d), cx); };
+    const n = Number(flowValue(key)) || flowMin(key);
+    const go = (d) => (cx) => { if (!bad && n + d >= flowMin(key) && n + d <= STEP_MAX) run(() => setFlow(key, n + d), cx); };
     return h_flex().flex_none().gap(8).items_center()
       .child(small(`set-flow-${key}-less`, "−", go(-1)))
       .child(div().id(`set-flow-${key}-value`).min_w(64).text_size(12.5).text_color(t.foreground).child(`${n} ${unit}`))
@@ -222,13 +125,13 @@ export function orchestrationBody({ t, seg, small, heading, about, div, h_flex, 
     .child(inUse ? div().id("set-recommended-note").text_size(12).text_color(t.dim).child("Recommended setup in use") : div()));
   for (const [name, title, does] of ROLES) {
     // A command that is not claude: its text shows and the switches are off; it is never replaced (#80).
-    const custom = !roleIsClaude(name);
+    const custom = !bad && !roleIsClaude(name);
     body.child(v_flex().id(`set-role-${name}`).w_full().py(14).gap(10).border_b(1).border_color(t.border)
-      .child(about(title, custom ? `${does} Custom: ${argvOf(name).join(" ")}` : does))
+      .child(about(title, custom ? `${does} Custom: ${(roleOf(name)?.argv ?? []).join(" ")}` : does))
       .child(h_flex().w_full().flex_wrap().gap(12).items_center()
         .child(seg(`role-${name}-model`, MODELS, (v, cx) => run(() => setRole(name, "model", v), cx), roleValue(name, "model"), bad || custom))
         .child(seg(`role-${name}-effort`, EFFORTS, (v, cx) => run(() => setRole(name, "effort", v), cx), roleValue(name, "effort"), bad || custom))));
   }
-  body.child(div().pt(12).text_size(11).text_color(t.dim).child(`Saved in ${st.path ?? "contr's agents.json"}. contr's coordinator reads it.`));
+  body.child(div().pt(12).text_size(11).text_color(t.dim).child(`Saved in ${st.path ?? "the tool's agents.json"} by herdr-contr-orch. The coordinator reads it.`));
   return body;
 }

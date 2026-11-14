@@ -16,7 +16,8 @@ next. The Herdr app gives the window, the sidebar, the tabs and the terminal.
   (#160): `xplat/herdr-contr-orch` and `kit/`. The helper's `install` puts both in
   the Herdr home (`herdr-contr/kit`, `herdr-contr/bin`). The tool's files
   (`agents.json`, `owner.json`, `state/`) are in the Herdr home's
-  `herdr-contr` folder, and the mod reads them there.
+  `herdr-contr` folder. The mod reads and changes them only through the tool
+  (#186).
 
 ## Goal: one thing at a time (owner, 2026-11-11)
 

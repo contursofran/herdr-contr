@@ -1,5 +1,7 @@
 # 27: Orchestration settings edit contr's agents.json
 
+The "read, change one field, write" part is replaced: see `186-mod-through-tool.md` (the file name takes the PR number).
+
 ## Decision
 
 The herdr-contr settings dialog has an Orchestration section. It edits contr's

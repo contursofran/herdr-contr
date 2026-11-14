@@ -3,33 +3,18 @@
 // question shows in the chat of the coordinator that asked it (the item's `coordinator`: its hc
 // terminal) as the question card of cards.js, one at a time, oldest first. A press answers it with
 // `herdr-contr-orch owner answer <id> <answer>`: the tool writes the file under its lock and sends the coordinator
-// "Owner answered <id>: <answer>". The mod only reads the file. An answered or decided item leaves.
-// The path: CONTR_OWNER_FILE when set, else owner.json in the Herdr home's herdr-contr folder, where
-// the tool keeps it (#160).
+// "Owner answered <id>: <answer>". The mod reads the open questions with `herdr-contr-orch owner open
+// --json` every OWNER_MS (#186); it never reads the file. An answered or decided item leaves.
 import { div } from "gpui-kit";
-import { appHome, exec, readTextFile } from "herdr";
+import { runOrch } from "./orch.js";
 import { Cards, answersFor } from "./cards.js";
 import { machineOf } from "./state.js";
 
-export const OWNER_MS = 3000;     // the file is read at most this often
+export const OWNER_MS = 3000;     // the open questions are read at most this often
 export const NOTE_MS = 15000;     // a note without a card stays this long
 
-// The file's path, asked of the user's shell once (the mod has no environment of its own).
-let pathOnce = null;
-export const resetOwnerPath = () => { pathOnce = null; };
-export function ownerPath() {
-  return (pathOnce ??= (async () => {
-    let over = "";
-    try {
-      const r = await exec("sh", ["-c", 'printf "%s" "$CONTR_OWNER_FILE"']);
-      if (r?.code === 0) over = String(r.stdout).split("\n")[0];
-    } catch { /* the default below */ }
-    return over || `${appHome()}/herdr-contr/owner.json`;
-  })());
-}
-
 const str = (v) => (typeof v === "string" ? v : "");
-// "hc:t2" → "t2": the key that the file's `coordinator` and an agent's address share.
+// "hc:t2" → "t2": the key that a question's `coordinator` and an agent's address share.
 const local = (address) => String(address ?? "").replace(/^hc:/, "");
 
 // One open question as a card of cards.js. The recommended option goes first; its impact is its detail.
@@ -48,12 +33,11 @@ export function cardOf(q) {
   };
 }
 
-// The open questions of the file's text, by coordinator, oldest first. A file that is not JSON, an
-// answered question and one that no coordinator asked give nothing.
-export function openByCoordinator(text) {
+// The open questions that `owner open --json` gives, by coordinator, oldest first. A question that no
+// coordinator asked, or one with no id or text, gives nothing.
+export function openByCoordinator(list) {
   const out = new Map();
-  let st; try { st = JSON.parse(text ?? "null"); } catch { return out; }
-  for (const q of Array.isArray(st?.questions) ? st.questions : []) {
+  for (const q of Array.isArray(list) ? list : []) {
     const who = local(q?.coordinator);
     if (!who || !str(q.id) || !str(q.question) || str(q.answer)) continue;
     if (!out.has(who)) out.set(who, []);
@@ -62,40 +46,38 @@ export function openByCoordinator(text) {
   return out;
 }
 
-// The orchestration tool that the helper's install puts in the Herdr home.
-export const orchPath = () => `${appHome()}/herdr-contr/bin/herdr-contr-orch`;
-
-// Runs `herdr-contr-orch owner answer` with this Herdr home, so the tool uses the files that the mod reads.
+// Runs `herdr-contr-orch owner answer`.
 // The answer has the sidecar's shape, for Cards.act.
 export async function answerOwner(id, text) {
-  let r;
-  try { r = await exec("env", [`HERDR_APP_HOME=${appHome()}`, orchPath(), "owner", "answer", id, text], { timeout: 30000 }); }
-  catch (e) { return { lines: [], error: { message: `herdr-contr-orch could not start (${e?.message ?? e}).` } }; }
-  if (r?.code === 0) return { lines: [{ type: "done", result: "sent" }], error: null };
-  const why = String(r?.stderr ?? "").trim();
-  if (/coordinator not reached/.test(why)) {
+  const r = await runOrch(["owner", "answer", id, text]);
+  if (r.ok) return { lines: [{ type: "done", result: "sent" }], error: null };
+  const why = r.error;
+  if (r.code != null && /coordinator not reached/.test(why)) {
     return { lines: [{ type: "done", result: "saved", message: `The answer is saved, but the coordinator did not get it: ${why}` }], error: null };
   }
-  return { lines: [], error: { message: why || `herdr-contr-orch owner answer failed (exit ${r?.code ?? "?"}).` } };
+  return { lines: [], error: { message: why } };
 }
 
 export class OwnerCards extends Cards {
   constructor(cx) {
     super(cx);
-    this.text = undefined;   // the file's text at the last read
+    this.text = undefined;   // the tool's output at the last read
     this.open = new Map();   // coordinator → cards
     this.readAt = 0; this.reading = false;
   }
 
-  // Reads the file at most every OWNER_MS unless `force`. True when its text changed.
+  // Runs `owner open --json` at most every OWNER_MS unless `force`. True when its output changed. A tool
+  // that is missing or fails gives no cards.
   async refresh(force = false) {
     if (this.reading || (!force && Date.now() - this.readAt < OWNER_MS)) return false;
     this.reading = true; this.readAt = Date.now();
     try {
-      let text;
-      try { text = await readTextFile(await ownerPath()); } catch { return false; }   // keep what was read
+      const r = await runOrch(["owner", "open", "--json"]);
+      let list = null;
+      if (r.ok) { try { list = JSON.parse(r.stdout); } catch { list = null; } }
+      const text = Array.isArray(list) ? r.stdout : null;
       if (text === this.text) return false;
-      this.text = text; this.open = openByCoordinator(text);
+      this.text = text; this.open = openByCoordinator(list);
       return true;
     } finally { this.reading = false; }
   }

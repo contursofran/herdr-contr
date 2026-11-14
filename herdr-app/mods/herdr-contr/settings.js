@@ -2,8 +2,8 @@
 // over the window as Herdr's own Settings, and laid out like it: sections in a sidebar on the left,
 // UPPERCASE headings on the right, a row's title and line on the left and its control on the right.
 // Esc, a click beside it or its close button closes it. Three settings of two or three choices, saved in
-// <appHome>/herdr-contr/config.json (config.js), the Orchestration section (contr's agents.json,
-// orchestration.js), the Phone page (phone.js) and the Shortcuts (shortcuts.js, read only). Tab moves through the
+// <appHome>/herdr-contr/config.json (config.js), the Orchestration section (the orchestration tool's
+// settings, orchestration.js), the Phone page (phone.js) and the Shortcuts (shortcuts.js, read only). Tab moves through the
 // sections, then the choices; Enter or Space picks one.
 import { div, svg } from "gpui-kit";
 import { v_flex, h_flex, Input, InputState } from "gpui-base";

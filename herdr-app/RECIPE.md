@@ -182,8 +182,9 @@ drawn by Herdr's `frames`; every loader of the mod is this one); done is a check
   sends N, on the row the pointer marks ("❯ …") Enter. hc gives no text styles: a selected row
   shows only when the panel marks it with a character. The card leaves when the panel closes.
 - **Owner question card** (#131): the questions that a coordinator asked with contr's `ask_owner`
-  (also the ones its workers raised through it). The mod reads the owner file, read only, at
-  most every 3 s: `CONTR_OWNER_FILE` when set, else `herdr-contr/owner.json` in the Herdr home (#160). An
+  (also the ones its workers raised through it). The mod runs the installed tool as `owner open
+  --json` at most every 3 s and shows its list (#186); it does not read the owner file. A tool that is
+  missing or fails gives no cards. An
   open question shows only in the chat of the agent whose hc terminal is the item's `coordinator`
   (local agents only), above the question card, one at a time, oldest first. Head: "D7 · The
   coordinator asks", with "· N more after this" when others wait. Then the title and "from …",
@@ -194,18 +195,17 @@ drawn by Herdr's `frames`; every loader of the mod is this one); done is a check
   <answer>". The item then leaves, and the next one shows. An item answered or decided elsewhere
   leaves at the next read. A failed run keeps the card with the tool's message; "saved, coordinator
   not reached" shows that note alone for 15 s.
-- **Orchestration settings**: agents.json, the file the orchestration tool reads. The path is
-  `CONTR_AGENTS_CONFIG` when set (read through `sh`, as the mod has no environment), else
-  `herdr-contr/agents.json` in the Herdr home (#160). The values and defaults are the tool's
-  (`xplat/herdr-contr-orch`, config.rs): flow `when-needed`, `code`, 2, 4, `ask`; orchestrator opus medium, builder sonnet
-  medium, planner and reviewer opus low, debugger opus xhigh. A change reads the file, sets one field
-  and writes it against the text just read: all other keys stay; the flow is written whole; a
-  role sets `--model` or `--effort` in its `argv` (a missing `--effort` goes after `--model`), and the
-  rest of the command stays. claude is the first argument whose base name is `claude`, after an
-  optional `env` with `NAME=value` arguments; a command that is not claude is never replaced and its
-  switches are off. A missing file shows the defaults;
-  the first change creates it (and its folder). A file that is not JSON shows an error and is never
-  written.
+- **Orchestration settings**: the flow and the profiles of the orchestration tool. The tool is the one
+  reader and writer of its agents.json (#186). The section runs the installed tool (as for the owner
+  question card) as `agents config --json`, and shows its `flow`, the choices of each flow key from
+  `fields` (`values`, or `min` for the two numbers, with − and + up to 99) and each role's `model` and
+  `effort`. The mod keeps only the labels of the flow values, the model and effort lists and the
+  recommended setup; a model or effort that is not in the lists shows as none. A pick runs `agents set
+  <key> <value>` (`flow.<key>`, `profile.<role>.model`, `profile.<role>.effort`), then reads the
+  settings again; "Use recommended setup" is one `agents set` with all pairs. A role whose command is
+  not claude shows its command and its switches are off. When the tool says `bad` (the file is not
+  JSON), a note shows and the switches are off. When the tool refuses a change, its stderr shows. When
+  the tool is missing or fails, the section shows its message and the switches are off.
 - **herdr-contr settings** (the sidebar's Settings menu, a right-click on Settings, or ⌘⇧,): saved in `<herdr-app home>/herdr-contr/config.json`
   as `{"status_row": "show", "remote_helper": "ask"}`. The install never
   creates the file; a missing file or key is the default, and so is a value that is not one of the

@@ -1,5 +1,5 @@
-// The owner's questions in the coordinator's chat (#131): contr's owner file in a temporary folder,
-// and a fake `contr owner answer` that changes it as contr does.
+// The owner's questions in the coordinator's chat (#131): an owner file in a temporary folder, and a fake
+// herdr-contr-orch: `owner open --json` gives its open questions, `owner answer` changes it (#186).
 import { test, beforeEach, afterEach } from "node:test";
 import assert from "node:assert/strict";
 import { mkdtempSync, writeFileSync, readFileSync, existsSync, rmSync } from "node:fs";
@@ -9,7 +9,7 @@ import { fake, log, reset } from "./stub/herdr.mjs";
 import { textOf, byId } from "./stub/ui.mjs";
 import { fakeCx } from "./fake-cx.mjs";
 import { agent, space } from "./fixtures.mjs";
-import { OwnerCards, cardOf, openByCoordinator, ownerPath, resetOwnerPath, answerOwner, OWNER_MS } from "../mods/herdr-contr/ownerq.js";
+import { OwnerCards, cardOf, openByCoordinator, answerOwner, OWNER_MS } from "../mods/herdr-contr/ownerq.js";
 import { ChatView } from "../mods/herdr-contr/chat.js";
 
 const T = new Proxy({}, { get: (_t, k) => `#${k}` });
@@ -21,24 +21,29 @@ const q = (id, coordinator, extra = {}) => ({ id, project: "herdr-contr", coordi
 const D1 = q("D1", "t1", { title: "Merge order", from: "builder #96", options: ["Merge #96 first", "Merge #97 first", "Wait"],
   recommended: 1, impacts: ["#97 needs a merge of main", "#96 needs a merge of main", "Both wait"], refs: ["PR 96", "#97"] });
 
-let dir, file, env, contrRuns, contrResult;
+let dir, file, contrRuns, contrResult, opens, openResult;
 const write = (questions) => writeFileSync(file, JSON.stringify({ questions, todos: [], next_question: 9, next_todo: 1 }, null, 2));
 const state = () => JSON.parse(readFileSync(file, "utf8"));
 
 beforeEach(() => {
-  reset(); resetOwnerPath(); contrRuns = []; contrResult = null;
+  reset(); contrRuns = []; contrResult = null; opens = 0; openResult = null;
   dir = mkdtempSync(join(tmpdir(), "herdr-contr-owner-"));
-  file = join(dir, "owner.json"); env = [file, ""];
+  file = join(dir, "owner.json");
   fake.window = { platform: "macos" };
   fake.spaces = [space()];
   fake.agents = [agent("t1", "idle")];
-  fake.readText = (p) => (existsSync(p) ? readFileSync(p, "utf8") : null);
   fake.exec = (cmd, args) => {
-    if (cmd === "sh") return { code: 0, stdout: env.join("\n"), stderr: "" };
     if (cmd === "env") {
-      // env HERDR_APP_HOME=<home> <the installed tool> owner answer <id> <answer>
+      // env HERDR_APP_HOME=<home> <the installed tool> owner open --json | owner answer <id> <answer>
       assert.deepEqual(args.slice(0, 2), ["HERDR_APP_HOME=/home/test/.config/herdr-app", "/home/test/.config/herdr-app/herdr-contr/bin/herdr-contr-orch"]);
       args = args.slice(2);
+      if (args.join(" ") === "owner open --json") {
+        opens++;
+        if (openResult) return openResult;
+        // As settings.rs open_questions: the questions with no answer, oldest first.
+        const qs = existsSync(file) ? state().questions.filter((x) => !x.answer) : [];
+        return { code: 0, stdout: JSON.stringify(qs), stderr: "" };
+      }
       contrRuns.push(args);
       if (contrResult) return contrResult;
       // contr owner answer <id> <answer>: the file changes first, then the coordinator gets the text.
@@ -55,14 +60,6 @@ afterEach(() => rmSync(dir, { recursive: true, force: true }));
 
 const click = async (el, cx) => { el._h.on_click({}, cx); await cx.settle(); };
 
-test("the path: CONTR_OWNER_FILE, else the Herdr home's herdr-contr folder", async () => {
-  assert.equal(await ownerPath(), file);
-  resetOwnerPath(); env = ["", ""];
-  assert.equal(await ownerPath(), "/home/test/.config/herdr-app/herdr-contr/owner.json");
-  resetOwnerPath(); fake.exec = () => { throw new Error("no shell"); };
-  assert.equal(await ownerPath(), "/home/test/.config/herdr-app/herdr-contr/owner.json");
-});
-
 test("cardOf: the recommended option first, each with its impact; title, from and refs kept", () => {
   const c = cardOf(D1);
   assert.equal(c.request, "D1");
@@ -77,14 +74,12 @@ test("cardOf: the recommended option first, each with its impact; title, from an
   assert.deepEqual(cardOf(q("D2", "t1")).question.questions[0].options, [], "no options: only the own answer");
 });
 
-test("openByCoordinator: open questions only, by coordinator, oldest first; bad text gives nothing", () => {
-  const text = JSON.stringify({ questions: [D1, q("D2", "t2"), q("D3", "hc:t1"), q("D4", "t1", { answer: "x", answered_by: "coordinator" }), q("D5", "")] });
-  const m = openByCoordinator(text);
+test("openByCoordinator: by coordinator, oldest first; no coordinator or no list gives nothing", () => {
+  const m = openByCoordinator([D1, q("D2", "t2"), q("D3", "hc:t1"), q("D5", ""), q("D6", null), { id: "D7", coordinator: "t1" }]);
   assert.deepEqual([...m.keys()], ["t1", "t2"]);
   assert.deepEqual(m.get("t1").map((c) => c.request), ["D1", "D3"]);
-  assert.equal(openByCoordinator("not json").size, 0);
   assert.equal(openByCoordinator(null).size, 0);
-  assert.equal(openByCoordinator(JSON.stringify({ questions: "x" })).size, 0);
+  assert.equal(openByCoordinator({ questions: [D1] }).size, 0);
 });
 
 test("a question shows only in the chat of the coordinator that asked it, with a count of the others", async () => {
@@ -142,15 +137,31 @@ test("an item answered or decided elsewhere leaves the card at the next read", a
   assert.equal(contrRuns.length, 0, "nothing is sent without a press");
 });
 
-test("the file is read at most every OWNER_MS, and not parsed again when its text is the same", async () => {
+test("owner open --json runs at most every OWNER_MS, and its output is not parsed again when it is the same", async () => {
   write([D1]);
   const cx = fakeCx(); const c = new OwnerCards(cx);
-  let reads = 0; const read = fake.readText; fake.readText = (p) => { reads++; return read(p); };
   await c.poll(cx, "t1"); await c.poll(cx, "t1"); await c.poll(cx, "t2");
-  assert.equal(reads, 1);
+  assert.equal(opens, 1);
   const open = c.open; c.readAt = 0;
   await c.poll(cx, "t1");
-  assert.equal(reads, 2); assert.equal(c.open, open, "same text: the same map");
+  assert.equal(opens, 2); assert.equal(c.open, open, "same output: the same map");
+});
+
+test("a tool that is missing, fails or gives text that is not a list: no cards, no throw", async () => {
+  write([D1]);
+  const cx = fakeCx(); const c = new OwnerCards(cx);
+  await c.poll(cx, "t1");
+  assert.ok(c.view("t1", T));
+  for (const r of [{ code: 1, stdout: "", stderr: "owner: lock: busy" }, { code: 0, stdout: "nope", stderr: "" }, { code: 0, stdout: "{}", stderr: "" }]) {
+    openResult = r; c.readAt = 0;
+    await c.poll(cx, "t1");
+    assert.equal(c.view("t1", T), null, JSON.stringify(r));
+    openResult = null; c.readAt = 0; await c.poll(cx, "t1"); assert.ok(c.view("t1", T));
+  }
+  const run = fake.exec; fake.exec = () => { throw new Error("ENOENT"); };
+  c.readAt = 0; await c.poll(cx, "t1");
+  assert.equal(c.view("t1", T), null);
+  fake.exec = run;
 });
 
 test("a failed answer keeps the card with contr's message; a saved answer that did not reach the coordinator says so", async () => {
@@ -193,5 +204,5 @@ test("the chat draws the coordinator's question above Claude Code's own card and
   await click(byId(v.render(cx), "chat-owner-answer"), cx);
   assert.deepEqual(contrRuns, [["owner", "answer", "D1", "Wait"]]);
   assert.equal(byId(v.render(cx), "chat-owner"), null);
-  assert.equal(log.exec.filter(([c]) => c === "env").length, 1, "one run, on the press");
+  assert.equal(contrRuns.length, 1, "one answer, on the press");
 });
