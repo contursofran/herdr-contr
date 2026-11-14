@@ -3,13 +3,14 @@
 // UPPERCASE headings on the right, a row's title and line on the left and its control on the right.
 // Esc, a click beside it or its close button closes it. Three settings of two or three choices, saved in
 // <appHome>/herdr-contr/config.json (config.js), the Orchestration section (contr's agents.json,
-// orchestration.js) and the Phone page (phone.js). Tab moves through the
+// orchestration.js), the Phone page (phone.js) and the Shortcuts (shortcuts.js, read only). Tab moves through the
 // sections, then the choices; Enter or Space picks one.
 import { div, svg } from "gpui-kit";
 import { v_flex, h_flex, Input, InputState } from "gpui-base";
-import { theme, props, closeOverlay } from "herdr";
+import { theme, props, closeOverlay, window } from "herdr";
 import { setting, setSetting, loadConfig, configBad, configPath } from "./config.js";
 import { icon, settingsClosed } from "./state.js";
+import { SHORTCUTS, SHORTCUT_GROUPS, keyCaps } from "./shortcuts.js";
 import { loadAgents, orchestrationBody } from "./orchestration.js";
 import { pollPhone, phoneTick, PHONE_TICK_MS, phoneOn, phoneBlocked, phoneChoose, phoneUser, phoneBody, setPhoneOption } from "./phone.js";
 
@@ -31,6 +32,7 @@ export const SECTIONS = [
   { id: "general", label: "General", icon: "sliders", parts: [["CHAT", ["text_size", "status_row", "inline_icons"]], ["OTHER MACHINES", ["remote_helper"]]] },
   { id: "orchestration", label: "Orchestration", icon: "grid" },
   { id: "phone", label: "Phone page", icon: "phone" },
+  { id: "shortcuts", label: "Shortcuts", icon: "keyboard" },
 ];
 
 const picks = (e) => e?.key === "enter" || e?.key === "space" || e?.key === " ";
@@ -141,7 +143,29 @@ export class SettingsView {
             .child(seg("phone", [[false, "Off", "off"], [true, "On", "on"]], (v, cx) => phoneChoose(v, cx), phoneOn(), phoneBlocked())))
           .child(phoneBody(t, this, { seg, small: smallButton(t), heading })));
     }
+    if (sec.id === "shortcuts") shortcutsBody(t, body, heading);
     // flex_none: the body keeps its height in the scroll column, so it scrolls and does not shrink (#149).
     return v_flex().id("settings-root").size_full().overflow_y_scrollbar().px(32).pb(24).child(body.flex_none());
   }
+}
+
+// The Shortcuts section: a row a key, under its group's heading; the key caps as on this platform
+// (⌘ on macOS, Ctrl elsewhere). Read only.
+function shortcutsBody(t, body, heading) {
+  const platform = window()?.platform ?? "macos";
+  const cap = (text) => div().h(22).min_w(22).px(6).flex().flex_none().items_center().justify_center().rounded(5)
+    .bg(t.chrome).border(1).border_color(t.border).text_size(12).text_color(t.foreground).child(text);
+  const chord = (c) => typeof c === "string"
+    ? div().flex_none().text_size(12).text_color(t.muted).child(c)
+    : h_flex().flex_none().gap(3).children(c.map(cap));
+  SHORTCUT_GROUPS.forEach((g) => {
+    body.child(heading(g.toUpperCase()));
+    SHORTCUTS.filter((s) => s.group === g).forEach((s, i) => {
+      const chords = s.keys.flatMap((k, j) => (j ? ["or"] : []).concat(keyCaps(k, platform)));
+      body.child(h_flex().id(`set-key-${g.toLowerCase().replace(/ /g, "-")}-${i}`).w_full().py(10).gap(24).items_center()
+        .border_b(1).border_color(t.border)
+        .child(div().flex_1().min_w(0).text_size(13).text_color(t.foreground).child(s.what))
+        .child(h_flex().flex_none().gap(6).flex_wrap().justify_end().children(chords.map(chord))));
+    });
+  });
 }
