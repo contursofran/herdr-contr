@@ -4,10 +4,12 @@
 //! The files and their places are the same as contr's, so both tools read the same state during the port.
 pub mod cli;
 pub mod config;
+pub mod hook;
 pub mod jsonfile;
 pub mod mcp;
 pub mod owner;
 pub mod prompt;
 pub mod spawn;
 pub mod tools;
+pub mod turn;
 pub mod workers;
