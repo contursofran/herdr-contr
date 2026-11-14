@@ -390,3 +390,13 @@ fn pending_request_counts_the_open_calls() {
     assert_eq!(open(&[one]), 1);
     assert_eq!(open(&[two]), 2, "parallel calls");
 }
+
+#[test]
+fn a_slash_command_shows_as_typed() {
+    let logged = "<command-message>contr:orchestrate</command-message>\n<command-name>/contr:orchestrate</command-name>\n<command-args>ok lets continue</command-args>";
+    assert_eq!(user_visible(logged).as_deref(), Some("/contr:orchestrate ok lets continue"));
+    assert_eq!(user_visible("<command-name>/clear</command-name>\n<command-message>clear</command-message>\n<command-args></command-args>").as_deref(), Some("/clear"));
+    // The output of a local command and a tag with no command name stay hidden.
+    assert!(user_visible("<local-command-stdout>Set model to opus</local-command-stdout>").is_none());
+    assert!(user_visible("<command-message>no name</command-message>").is_none());
+}

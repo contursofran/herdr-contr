@@ -796,9 +796,34 @@ pub fn hc_note(t: &str) -> Option<(String, String)> {
     Some((from.to_string(), text::trim(body).to_string()))
 }
 
+fn command_name_re() -> &'static Regex {
+    static R: OnceLock<Regex> = OnceLock::new();
+    R.get_or_init(|| Regex::new(r"<command-name>\s*(/[^<\s]+)\s*</command-name>").unwrap())
+}
+
+fn command_args_re() -> &'static Regex {
+    static R: OnceLock<Regex> = OnceLock::new();
+    R.get_or_init(|| Regex::new(r"(?s)<command-args>(.*?)</command-args>").unwrap())
+}
+
+/// A slash command the user sent, as typed ("/model opus"). Claude Code logs it as
+/// `<command-message>…</command-message><command-name>/model</command-name><command-args>opus</command-args>`,
+/// the tags in any order. None for any other text.
+pub fn slash_command(t: &str) -> Option<String> {
+    if !text::has_prefix(t, "<command-name>") && !text::has_prefix(t, "<command-message>") {
+        return None;
+    }
+    let name = command_name_re().captures(t)?.get(1)?.as_str();
+    let args = command_args_re().captures(t).and_then(|m| m.get(1)).map_or("", |a| text::trim(a.as_str()));
+    Some(if args.is_empty() { name.to_string() } else { format!("{name} {args}") })
+}
+
 /// The text to show for a user message, or nil when it is injected context. Pasted blocks lose their wrapper
 /// tags; typed text and pasted blocks keep their order, separated by a blank line.
 pub fn user_visible(t: &str) -> Option<String> {
+    if let Some(command) = slash_command(t) {
+        return Some(command);
+    }
     if text::has_prefix(t, "<") {
         let m = tag_re().captures(t)?;
         if !VISIBLE_TAGS.contains(&&m[1]) {
