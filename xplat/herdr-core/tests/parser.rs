@@ -121,6 +121,7 @@ fn injected() {
         describe(&parse(&inj))
             == [
                 "user:Real question",
+                "user:/effort",
                 "status",
                 "status",
                 "chips:Read a file",
@@ -130,7 +131,7 @@ fn injected() {
         "injected user lines {:?}",
         describe(&parse(&inj))
     );
-    match &parse(&inj)[1].kind {
+    match &parse(&inj)[2].kind {
         ItemKind::Status(t) => check!(t == "Context compacted", "compaction status text"),
         _ => check!(false, "compaction is a status item"),
     }
