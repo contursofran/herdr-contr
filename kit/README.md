@@ -11,14 +11,21 @@ orchestration tool of this repository, `xplat/herdr-contr-orch`):
   before a compaction) and the SessionStart hook: in an hc terminal one line that names `contr:chat-writing`; at startup of an orchestrator and after a compaction, the playbook.
 - `.mcp.json`: starts `herdr-contr-orch mcp`, which gives the session the agent tools (spawn, message,
   interrupt, stop, read, list, clear_ended). `stop` removes the
-  worker's terminal unless `keep` is set. `herdr-contr-orch` must be on the PATH.
+  worker's terminal unless `keep` is set. See Install for where `herdr-contr-orch` is found.
 
 ## Install
 
-Build the tool (`cargo build --release --manifest-path xplat/Cargo.toml -p
-herdr-contr-orch`) and put it on the PATH. Then start `claude` with the kit:
-`claude --plugin-dir <kit>`. The plugin reads this folder in place, so a
-change to the kit needs no update step.
+The helper's `install` puts the kit in `<Herdr home>/herdr-contr/kit` and,
+with `--orch <file>`, the tool in `<Herdr home>/herdr-contr/bin`
+(`scripts/land.sh` does both for merged `main`). The hooks and the MCP
+server look for `herdr-contr-orch` in `../bin` of the kit folder first, then
+on the PATH. Start `claude` with the kit: `claude --plugin-dir <kit>`.
+
+From a checkout, without an install: build the tool (`cargo build --release
+--manifest-path xplat/Cargo.toml -p herdr-contr-orch`), put it on the PATH,
+and give the repository's `kit` folder to `--plugin-dir`.
+
+For shell use (`herdr-contr-orch agents …`), put the tool on the PATH.
 
 ## Use
 

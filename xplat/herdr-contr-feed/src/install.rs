@@ -12,7 +12,7 @@ use std::path::{Path, PathBuf};
 mod embedded {
     include!(concat!(env!("OUT_DIR"), "/embedded.rs"));
 }
-pub use embedded::{FILES, KEYS, KNOWN};
+pub use embedded::{FILES, KEYS, KIT, KNOWN};
 
 /// The mods that install puts in <home>/mods: herdr-contr, and our copies of Herdr's spaces and tabs mods.
 pub const MODS: [&str; 3] = ["herdr-contr", "herdr-contr-spaces", "herdr-contr-tabs"];
@@ -46,7 +46,8 @@ fn remove_retired(home: &Path) -> std::io::Result<()> {
 
 const HELP: &str = "\
 Installs the herdr-contr layout, mod, themes, keys and helper into a herdr-app home.
-Usage: herdr-contr-feed install [--home <herdr-app home>] [--helper <herdr-contr-feed>] [--remote <folder>] [--dry-run]
+Usage: herdr-contr-feed install [--home <herdr-app home>] [--helper <herdr-contr-feed>] [--orch <herdr-contr-orch>]
+                                [--remote <folder>] [--dry-run]
  - The home is --home, else $HERDR_APP_HOME, else ~/.config/herdr-app. With no HOME, give --home.
  - A keys.json, layout or theme that is a symlink stays one; the file it points to is written.
  - It never overwrites what you have: if a layout, mod or theme with the same name is there and
@@ -54,6 +55,10 @@ Usage: herdr-contr-feed install [--home <herdr-app home>] [--helper <herdr-contr
  - keys.json is merged: your sections and keys stay; a key you already use keeps your command.
  - --helper copies herdr-contr-feed to <home>/herdr-contr/bin/. Without it, a helper already there
    stays; with none there, it says where to get one.
+ - The kit (the Claude Code plugin of a coordinator and its workers) goes to <home>/herdr-contr/kit/.
+   That folder is this install's: a file there that this version does not have is removed.
+ - --orch copies the orchestration tool herdr-contr-orch to <home>/herdr-contr/bin/, where the kit's
+   hooks and MCP server look for it first.
  - --remote copies the helpers for other machines (<folder>/<target>/herdr-contr-feed, checked
    against <folder>/SHA256SUMS) to <home>/herdr-contr/remote/.
  - After copying it runs `herdr-app check` on the mod. --dry-run prints the plan and writes nothing.
@@ -271,6 +276,7 @@ pub fn sort_files(home: &Path, files: &BTreeMap<&str, &[u8]>, mine: &BTreeMap<St
 pub fn run(args: &[String]) -> i32 {
     let mut home: Option<String> = None;
     let mut helper: Option<String> = None;
+    let mut orch: Option<String> = None;
     let mut remote: Option<String> = None;
     let mut dry = false;
     let mut i = 0;
@@ -289,6 +295,10 @@ pub fn run(args: &[String]) -> i32 {
             },
             "--helper" => match value("a file") {
                 Ok(v) => helper = Some(v),
+                Err(c) => return c,
+            },
+            "--orch" => match value("a file") {
+                Ok(v) => orch = Some(v),
                 Err(c) => return c,
             },
             "--remote" => match value("a folder") {
@@ -322,6 +332,11 @@ pub fn run(args: &[String]) -> i32 {
     if let Some(h) = &helper {
         if !Path::new(h).is_file() {
             return stop(&[format!("STOP: no helper at {h}")]);
+        }
+    }
+    if let Some(o) = &orch {
+        if !Path::new(o).is_file() {
+            return stop(&[format!("STOP: no orchestration tool at {o}")]);
         }
     }
     let marker_path = home.join("herdr-contr").join("install.json");
@@ -382,6 +397,12 @@ pub fn run(args: &[String]) -> i32 {
     };
 
     let bin_dest = home.join("herdr-contr").join("bin").join(if cfg!(windows) { "herdr-contr-feed.exe" } else { "herdr-contr-feed" });
+    let orch_dest = home.join("herdr-contr").join("bin").join(if cfg!(windows) { "herdr-contr-orch.exe" } else { "herdr-contr-orch" });
+    let kit_dest = home.join("herdr-contr").join("kit");
+    // The kit folder is ours: what is there and not in this version goes.
+    let mut kit_old = Vec::new();
+    walk_files(&kit_dest, &mut kit_old);
+    kit_old.retain(|p| !KIT.iter().any(|(rel, _)| kit_dest.join(rel) == *p));
     let show = |v: &Value| v.as_str().map(String::from).unwrap_or_else(|| v.to_string());
     println!("{}{}", if dry { "Dry run: would install into " } else { "Installing into " }, home.display());
     for rel in files.keys().filter(|r| !r.starts_with("mods/")) {
@@ -400,6 +421,13 @@ pub fn run(args: &[String]) -> i32 {
     }
     if let Some(h) = &helper {
         println!("  herdr-contr/bin/herdr-contr-feed (from {h})");
+    }
+    println!("  herdr-contr/kit/... ({} files)", KIT.len());
+    for p in &kit_old {
+        println!("    {}: not in this version, removed", rel_of(p, &home));
+    }
+    if let Some(o) = &orch {
+        println!("  herdr-contr/bin/herdr-contr-orch (from {o})");
     }
     if let Some((list, _)) = &remote {
         for r in list {
@@ -437,6 +465,15 @@ pub fn run(args: &[String]) -> i32 {
         }
         if let Some(h) = &helper {
             put(&bin_dest, &fs::read(h)?, true)?;
+        }
+        for (rel, bytes) in KIT {
+            put(&kit_dest.join(rel), bytes, false)?;
+        }
+        for p in &kit_old {
+            fs::remove_file(p)?;
+        }
+        if let Some(o) = &orch {
+            put(&orch_dest, &fs::read(o)?, true)?;
         }
         if let Some((list, sums)) = &remote {
             let dir = home.join("herdr-contr").join("remote");

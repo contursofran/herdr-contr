@@ -43,10 +43,11 @@ gh pr merge "$N" --squash --match-head-commit "$SHA" || fail "the merge of $N fa
 echo "land: merged $N at $SHA"
 
 git switch -q main && git pull -q --ff-only || fail "cannot update main"
-(cd xplat && cargo build -q --release -p herdr-contr-feed) || fail "the helper did not build"
+(cd xplat && cargo build -q --release -p herdr-contr-feed -p herdr-contr-orch) || fail "the helper and the orchestration tool did not build"
 H=$PWD/xplat/target/release/herdr-contr-feed
-"$H" install --dry-run --helper "$H" >/dev/null || fail "the install dry run failed"
-"$H" install --helper "$H" || fail "the install failed"
+O=$PWD/xplat/target/release/herdr-contr-orch
+"$H" install --dry-run --helper "$H" --orch "$O" >/dev/null || fail "the install dry run failed"
+"$H" install --helper "$H" --orch "$O" || fail "the install failed"
 echo "land: installed main after $N"
 
 if [ -n "$SHOT" ]; then

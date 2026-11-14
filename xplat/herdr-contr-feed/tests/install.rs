@@ -554,3 +554,91 @@ fn an_install_restarts_the_phone_page_that_runs_this_helper() {
     assert!(s.calls().iter().any(|c| c == "systemctl --user try-restart herdr-contr-serve"), "{:?}", s.calls());
     assert!(out(&r).contains("the phone page (herdr-contr settings): restarted"), "{}", out(&r));
 }
+
+/// Every file of the repository's kit, as paths relative to it.
+fn kit_files() -> Vec<String> {
+    fn walk(dir: &Path, base: &Path, out: &mut Vec<String>) {
+        for e in fs::read_dir(dir).unwrap() {
+            let p = e.unwrap().path();
+            if p.is_dir() {
+                walk(&p, base, out);
+            } else if p.file_name().unwrap() != ".DS_Store" {
+                out.push(p.strip_prefix(base).unwrap().to_str().unwrap().to_string());
+            }
+        }
+    }
+    let base = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../kit");
+    let mut out = Vec::new();
+    walk(&base, &base, &mut out);
+    out.sort();
+    out
+}
+
+#[test]
+fn installs_the_kit_and_the_orchestration_tool() {
+    let s = sandbox();
+    let orch = s.root.join("herdr-contr-orch");
+    write_exe(&orch, "#!/bin/sh\necho orch\n");
+    let r = s.run(&["--home", s.app_s(), "--orch", orch.to_str().unwrap()]);
+    assert_eq!(r.status.code(), Some(0), "{}", both(&r));
+    let kit = s.app.join("herdr-contr/kit");
+    let files = kit_files();
+    assert!(files.contains(&"hooks/hooks.json".to_string()) && files.contains(&".claude-plugin/plugin.json".to_string()));
+    for rel in &files {
+        assert_eq!(fs::read(kit.join(rel)).unwrap(), fs::read(Path::new(env!("CARGO_MANIFEST_DIR")).join("../../kit").join(rel)).unwrap(), "{rel}");
+    }
+    let dest = s.app.join("herdr-contr/bin/herdr-contr-orch");
+    assert_eq!(read(&dest), read(&orch));
+    assert_eq!(fs::metadata(&dest).unwrap().permissions().mode() & 0o777, 0o755);
+    assert!(out(&r).contains(&format!("herdr-contr/kit/... ({} files)", files.len())), "{}", out(&r));
+    assert!(out(&r).contains("herdr-contr/bin/herdr-contr-orch (from "), "{}", out(&r));
+}
+
+#[test]
+fn a_second_install_removes_a_kit_file_that_this_version_does_not_have() {
+    let s = sandbox();
+    assert_eq!(s.run(&["--home", s.app_s()]).status.code(), Some(0));
+    let old = s.app.join("herdr-contr/kit/agents/explorer.md");
+    fs::write(&old, "old").unwrap();
+    let dry = s.run(&["--home", s.app_s(), "--dry-run"]);
+    assert!(out(&dry).contains("herdr-contr/kit/agents/explorer.md: not in this version, removed"), "{}", out(&dry));
+    assert!(old.exists(), "a dry run removes nothing");
+    let r = s.run(&["--home", s.app_s()]);
+    assert_eq!(r.status.code(), Some(0), "{}", both(&r));
+    assert!(!old.exists());
+    assert!(s.app.join("herdr-contr/kit/agents/builder.md").exists());
+    // Without --orch, no tool is copied.
+    assert!(!s.app.join("herdr-contr/bin/herdr-contr-orch").exists());
+}
+
+#[test]
+fn stops_when_the_orchestration_tool_is_not_a_file() {
+    let s = sandbox();
+    let r = s.run(&["--home", s.app_s(), "--orch", s.root.join("none").to_str().unwrap()]);
+    assert_eq!(r.status.code(), Some(1), "{}", both(&r));
+    assert!(both(&r).contains("STOP: no orchestration tool at "), "{}", both(&r));
+    assert_eq!(fs::read_dir(&s.app).unwrap().count(), 0);
+}
+
+/// The kit's hooks find the tool that install put next to the kit, with no tool on the PATH.
+#[test]
+fn the_installed_kit_runs_the_tool_next_to_it() {
+    let s = sandbox();
+    let orch = s.root.join("herdr-contr-orch");
+    write_exe(&orch, "#!/bin/sh\necho \"orch $*\"\n");
+    assert_eq!(s.run(&["--home", s.app_s(), "--orch", orch.to_str().unwrap()]).status.code(), Some(0));
+    let kit = s.app.join("herdr-contr/kit");
+    let run = |command: &str, vars: &[(&str, &str)]| {
+        let o = Command::new("sh").arg("-c").arg(command).env_clear().env("PATH", "/usr/bin:/bin").envs(vars.iter().copied()).output().unwrap();
+        out(&o)
+    };
+    let hooks: Value = serde_json::from_str(&read(kit.join("hooks/hooks.json"))).unwrap();
+    // Claude Code puts the plugin folder in place of ${CLAUDE_PLUGIN_ROOT}.
+    let stop = hooks["hooks"]["Stop"][0]["hooks"][0]["command"].as_str().unwrap().replace("${CLAUDE_PLUGIN_ROOT}", kit.to_str().unwrap());
+    assert_eq!(run(&stop, &[("HC_TERMINAL_ID", "t1")]), "orch hook stop\n");
+    let mcp: Value = serde_json::from_str(&read(kit.join(".mcp.json"))).unwrap();
+    let server = &mcp["mcpServers"]["contr"];
+    assert_eq!((server["command"].as_str(), server["args"][0].as_str()), (Some("sh"), Some("-c")));
+    assert_eq!(server["env"]["CONTR_KIT"], "${CLAUDE_PLUGIN_ROOT}");
+    assert_eq!(run(server["args"][1].as_str().unwrap(), &[("CONTR_KIT", kit.to_str().unwrap())]), "orch mcp\n");
+}
