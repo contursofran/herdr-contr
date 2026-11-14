@@ -9,6 +9,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
 
 use crate::jsonfile;
+use crate::workers::flag_value;
 
 /// How to start one kind of agent: the program and its arguments. The task, when there is one, goes after them.
 #[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
@@ -79,20 +80,28 @@ impl Default for Flow {
     }
 }
 
+/// The valid values of each text key of the flow.
+pub const FLOW_CHOICES: [(&str, &[&str]); 3] =
+    [("plan", &["never", "when-needed", "always"]), ("review", &["none", "code", "every"]), ("merge", &["ask", "auto"])];
+/// The number keys of the flow and their smallest value; they have no largest value.
+pub const FLOW_NUMBERS: [&str; 2] = ["debugger_after", "workers"];
+pub const FLOW_MIN: i64 = 1;
+
 impl Flow {
     /// An error for a value out of range.
     pub fn validate(&self) -> Result<(), String> {
-        let check = |key: &str, v: &str, ok: &[&str]| {
+        let check = |key: &str, v: &str| {
+            let ok = FLOW_CHOICES.iter().find(|(k, _)| *k == key).map(|(_, c)| *c).unwrap_or_default();
             if ok.contains(&v) { Ok(()) } else { Err(format!("flow {key}: {v:?} is not one of {}", ok.join(", "))) }
         };
-        check("plan", &self.plan, &["never", "when-needed", "always"])?;
-        check("review", &self.review, &["none", "code", "every"])?;
-        check("merge", &self.merge, &["ask", "auto"])?;
-        if self.debugger_after < 1 {
-            return Err(format!("flow debugger_after: {} is less than 1", self.debugger_after));
+        check("plan", &self.plan)?;
+        check("review", &self.review)?;
+        check("merge", &self.merge)?;
+        if self.debugger_after < FLOW_MIN {
+            return Err(format!("flow debugger_after: {} is less than {FLOW_MIN}", self.debugger_after));
         }
-        if self.workers < 1 {
-            return Err(format!("flow workers: {} is less than 1", self.workers));
+        if self.workers < FLOW_MIN {
+            return Err(format!("flow workers: {} is less than {FLOW_MIN}", self.workers));
         }
         Ok(())
     }
@@ -183,19 +192,6 @@ impl Default for Config {
             notice: String::new(),
         }
     }
-}
-
-/// The value after `flag` (or `flag=`) in argv, or "".
-fn flag_value(argv: &[String], flag: &str) -> String {
-    for (i, a) in argv.iter().enumerate() {
-        if a == flag && i + 1 < argv.len() {
-            return argv[i + 1].clone();
-        }
-        if let Some(v) = a.strip_prefix(&format!("{flag}=")) {
-            return v.to_string();
-        }
-    }
-    String::new()
 }
 
 impl Config {

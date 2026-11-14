@@ -1,5 +1,5 @@
-//! The command line: `agents flow | spawn | ls | send | interrupt | stop | rm | read | prompt`, and
-//! `owner ask | answer | done`. Ported from contr's `contr agents` and `contr owner`. `agents watch` is not
+//! The command line: `agents flow | config | set | spawn | ls | send | interrupt | stop | rm | read | prompt`, and
+//! `owner ask | answer | done | open`. Ported from contr's `contr agents` and `contr owner`. `agents watch` is not
 //! ported: no part of the kit or of this repository calls it.
 use std::io::{BufRead, Write};
 
@@ -43,6 +43,14 @@ pub const AGENTS_USAGE: &str = "Usage:
                                                    and the numbered choices; \"no prompt\"
                                                    when it waits on none
   herdr-contr-orch agents flow                     print the flow: how the coordinator takes an issue to a merge
+  herdr-contr-orch agents config --json            print the profiles file as JSON: path, bad, flow
+                                                   (values in effect), fields (default and valid
+                                                   values), roles (argv, claude, model, effort)
+  herdr-contr-orch agents set <key> <value> [<key> <value>…]
+                                                   change fields of the profiles file under its
+                                                   lock; keys: flow.<key>, profile.<role>.model,
+                                                   profile.<role>.effort; a role that is not claude
+                                                   stays as it is
 
 Flags can come before or after the other arguments. After --, every word is
 an argument.
@@ -70,6 +78,7 @@ pub const OWNER_USAGE: &str = "Usage:
   herdr-contr-orch owner ask [flags] <question…> ask a question; prints its id (D1, …)
   herdr-contr-orch owner answer <id> <answer…>   answer a question (D1, …) and tell its coordinator
   herdr-contr-orch owner done <id>               mark a to-do (T1, …) done and tell its coordinator
+  herdr-contr-orch owner open --json             print the questions with no answer as JSON, oldest first
 
 Flags of ask (each of option, impact and ref can repeat):
   --title T         a 2-4 word name
@@ -170,6 +179,9 @@ fn run_agents(args: &[String], env: &dyn Fn(&str) -> String, out: &mut dyn Write
     }
     if ["ls", "spawn", "send", "interrupt", "stop", "rm", "read", "prompt"].contains(&sub.as_str()) {
         return run_worker_command(sub, &args[1..], env, out, err, core);
+    }
+    if sub == "config" || sub == "set" {
+        return run_settings(sub, &args[1..], env, out, err);
     }
     if sub != "flow" {
         let _ = write!(err, "herdr-contr-orch agents: unknown command {sub}\n{AGENTS_USAGE}");
@@ -370,6 +382,34 @@ fn spawn_worker(flags: &Flags, pos: &[String], cfg: &Config, env: &dyn Fn(&str) 
     spawn(core, cfg, env, spec)
 }
 
+/// `agents config --json` and `agents set <key> <value>…`.
+fn run_settings(sub: &str, rest: &[String], env: &dyn Fn(&str) -> String, out: &mut dyn Write, err: &mut dyn Write) -> i32 {
+    let path = config_path(env);
+    let done = if sub == "config" {
+        if rest != ["--json"] {
+            let _ = write!(err, "herdr-contr-orch agents config: give --json\n{AGENTS_USAGE}");
+            return 2;
+        }
+        crate::settings::config_json(&path).map(|v| {
+            let _ = writeln!(out, "{v}");
+        })
+    } else {
+        if rest.is_empty() || rest.len() % 2 != 0 {
+            let _ = write!(err, "herdr-contr-orch agents set: give pairs of key and value\n{AGENTS_USAGE}");
+            return 2;
+        }
+        let pairs: Vec<(String, String)> = rest.chunks(2).map(|p| (p[0].clone(), p[1].clone())).collect();
+        crate::settings::set(&path, &pairs)
+    };
+    match done {
+        Ok(()) => 0,
+        Err(e) => {
+            let _ = writeln!(err, "herdr-contr-orch agents {sub}: {e}");
+            1
+        }
+    }
+}
+
 fn run_owner(args: &[String], env: &dyn Fn(&str) -> String, out: &mut dyn Write, err: &mut dyn Write, core: &dyn Core) -> i32 {
     let Some(sub) = args.first().map(String::as_str) else {
         let _ = err.write_all(OWNER_USAGE.as_bytes());
@@ -382,6 +422,22 @@ fn run_owner(args: &[String], env: &dyn Fn(&str) -> String, out: &mut dyn Write,
     let rest = &args[1..];
     if sub == "ask" {
         return run_owner_ask(rest, env, out, err);
+    }
+    if sub == "open" {
+        if rest != ["--json"] {
+            let _ = write!(err, "herdr-contr-orch owner open: give --json\n{OWNER_USAGE}");
+            return 2;
+        }
+        return match owner_store(env).and_then(|s| crate::settings::open_questions(&s)) {
+            Ok(v) => {
+                let _ = writeln!(out, "{v}");
+                0
+            }
+            Err(e) => {
+                let _ = writeln!(err, "herdr-contr-orch owner open: {e}");
+                1
+            }
+        };
     }
     let answer = rest.get(1..).unwrap_or_default().join(" ");
     match sub {

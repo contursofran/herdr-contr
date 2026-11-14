@@ -262,10 +262,10 @@ fn make_private_dir(dir: &Path) -> io::Result<()> {
 }
 
 /// An exclusive lock on a file; it ends when the value drops (the file closes).
-struct Lock(#[allow(dead_code)] fs::File);
+pub(crate) struct Lock(#[allow(dead_code)] fs::File);
 
 impl Lock {
-    fn take(path: &Path) -> io::Result<Lock> {
+    pub(crate) fn take(path: &Path) -> io::Result<Lock> {
         let mut opts = OpenOptions::new();
         opts.read(true).write(true).create(true).truncate(false);
         #[cfg(unix)]
