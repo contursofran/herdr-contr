@@ -39,10 +39,10 @@ fn injected_user_lines() {
     let inj = fixture_lines("injected.jsonl");
     assert_eq!(
         describe(&parse(&inj)),
-        ["user:Real question", "status", "status", "chips:Read a file", "user:[herdr-send from orchard-main-orch] please rebuild", "asst:On it."],
+        ["user:Real question", "user:/effort", "status", "status", "chips:Read a file", "user:[herdr-send from orchard-main-orch] please rebuild", "asst:On it."],
         "injected user lines"
     );
-    match &parse(&inj)[1].kind {
+    match &parse(&inj)[2].kind {
         ItemKind::Status(t) => assert_eq!(t, "Context compacted", "compaction status text"),
         _ => panic!("compaction is a status item"),
     }
@@ -389,4 +389,14 @@ fn pending_request_counts_the_open_calls() {
     let two = r#"{"type":"assistant","uuid":"o2","message":{"content":[{"type":"tool_use","id":"oa","name":"Bash","input":{"command":"ls"}},{"type":"tool_use","id":"ob","name":"Bash","input":{"command":"pwd"}}]}}"#;
     assert_eq!(open(&[one]), 1);
     assert_eq!(open(&[two]), 2, "parallel calls");
+}
+
+#[test]
+fn a_slash_command_shows_as_typed() {
+    let logged = "<command-message>contr:orchestrate</command-message>\n<command-name>/contr:orchestrate</command-name>\n<command-args>ok lets continue</command-args>";
+    assert_eq!(user_visible(logged).as_deref(), Some("/contr:orchestrate ok lets continue"));
+    assert_eq!(user_visible("<command-name>/clear</command-name>\n<command-message>clear</command-message>\n<command-args></command-args>").as_deref(), Some("/clear"));
+    // The output of a local command and a tag with no command name stay hidden.
+    assert!(user_visible("<local-command-stdout>Set model to opus</local-command-stdout>").is_none());
+    assert!(user_visible("<command-message>no name</command-message>").is_none());
 }
