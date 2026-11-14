@@ -100,3 +100,12 @@ test("the chat draws the switch only under Herdr's tab bar", async () => {
   fake.layout = read("layouts/herdr-contr-own.json");
   assert.equal(byId(v.render(cx), "view-switch"), null);
 });
+
+test("the block over the terminal runs the key commands, so the key goes back to the chat (#171)", async () => {
+  setView("tab");
+  assert.equal(screen(), "tab");
+  const cx = fakeCx();
+  new SwitchView(cx);
+  assert.ok(cx.tasks.length > 0, "a task waits for the key commands");
+  assert.ok(cx.timers.length > 0, "the screen sync runs");
+});
