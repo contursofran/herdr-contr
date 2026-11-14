@@ -8,7 +8,7 @@ import { agent, space } from "./fixtures.mjs";
 import { SettingsView } from "../mods/herdr-contr/settings.js";
 import { loadAgents, agentsPath, resetAgentsPath, flowValue, roleValue, setFlow, setRole, setFlag, DEFAULT_FLOW, useRecommended, recommendedInUse } from "../mods/herdr-contr/orchestration.js";
 
-const MAC = "/home/test/Library/Application Support/contr/agents.json";
+const MAC = "/home/test/.config/herdr-app/herdr-contr/agents.json";
 let file, env, path;
 beforeEach(() => {
   reset(); resetAgentsPath(); file = null; env = ["", ""]; path = MAC;
@@ -33,13 +33,9 @@ const open = async () => {
 const click = async (el) => { const cx = fakeCx(); el._h.on_click({}, cx); await cx.settle(); };
 // The stub elements answer any method, `then` too, so open() wraps the tree in { el }.
 
-test("the path: macOS user config folder, XDG on Linux, and CONTR_AGENTS_CONFIG over both", async () => {
+test("the path: the Herdr home's herdr-contr folder, and CONTR_AGENTS_CONFIG over it", async () => {
   assert.equal(await agentsPath(), MAC);
-  resetAgentsPath(); fake.window = { platform: "linux" };
-  assert.equal(await agentsPath(), "/home/test/.config/contr/agents.json");
-  resetAgentsPath(); env = ["", "/x/cfg"];
-  assert.equal(await agentsPath(), "/x/cfg/contr/agents.json");
-  resetAgentsPath(); env = ["/y/agents.json", "/x/cfg"];
+  resetAgentsPath(); env = ["/y/agents.json", ""];
   assert.equal(await agentsPath(), "/y/agents.json");
 });
 
@@ -52,7 +48,7 @@ test("no file: contr's defaults show, nothing is written; the first change creat
   assert.equal(roleValue("debugger", "effort"), "xhigh");
   assert.match(textOf(byId(el, "set-flow-workers-value")), /4 workers/);
   await click(byId(el, "set-flow-merge-auto"));
-  assert.ok(log.exec.some(([c, a]) => c === "mkdir" && a[1] === "/home/test/Library/Application Support/contr"));
+  assert.ok(log.exec.some(([c, a]) => c === "mkdir" && a[1] === "/home/test/.config/herdr-app/herdr-contr"));
   assert.deepEqual(JSON.parse(file), { flow: { ...DEFAULT_FLOW, merge: "auto" } });
 });
 

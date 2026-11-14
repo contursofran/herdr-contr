@@ -14,8 +14,9 @@ next. The Herdr app gives the window, the sidebar, the tabs and the terminal.
 - The orchestration (worker profiles, spawn, the owner's questions and
   to-dos, the MCP tools, the kit) moves here from the contr repository
   (#160): `xplat/herdr-contr-orch` and `kit/`. The helper's `install` puts both in
-  the Herdr home (`herdr-contr/kit`, `herdr-contr/bin`). The owner's
-  coordinators run the `contr` command until the owner switches them.
+  the Herdr home (`herdr-contr/kit`, `herdr-contr/bin`). The tool's files
+  (`agents.json`, `owner.json`, `state/`) are in the Herdr home's
+  `herdr-contr` folder, and the mod reads them there.
 
 ## Goal: one thing at a time (owner, 2026-11-11)
 
@@ -73,13 +74,13 @@ and `gpui-kit.d.ts`. Read them there. Do not copy them into this repository.
   Herdr and the mod have nothing for it, and write why in the PR.
 - **Data comes from hooks, session logs and APIs, not from the screen.** A
   new feature takes its data from a Claude Code hook, the session log, hc's
-  API or the `contr` command. Terminal text is only for the guard that
+  API or the orchestration tool. Terminal text is only for the guard that
   checks the prompt before a key goes out.
 - **One inbox.** All that needs the owner is in one list, with one policy
   for each kind of action (`auto` or `ask`). Do not add a second channel for
   the same thing. An answer in any place closes the item.
-- **State comes from the source.** Show what GitHub, hc and the `contr`
-  command say now. Do not keep a state file that someone writes by hand.
+- **State comes from the source.** Show what GitHub, hc and the
+  orchestration tool say now. Do not keep a state file that someone writes by hand.
 - **No file that each PR appends to.** A decision is one file:
   `docs/decisions/<PR number>-<slug>.md`. Do not keep a table that each PR
   edits. Register each test fixture in a file of its own.

@@ -12,17 +12,14 @@ use crate::workers::{Core, Manager, ROLE_ORCHESTRATOR};
 /// The first line of the context of a changed flow.
 pub const CHANGED_LEAD: &str = "contr: the owner changed the flow and models in agents.json; follow these from now on.\n";
 
-/// The state folder: CONTR_STATE_DIR; else on macOS ~/Library/Application Support/contr; else
-/// $XDG_STATE_HOME/contr, or ~/.local/state/contr. None when no folder can be found.
+/// The state folder: CONTR_STATE_DIR; else `state` in this tool's folder of the Herdr home. None when no
+/// folder can be found.
 pub fn state_dir(env: &dyn Fn(&str) -> String) -> Option<PathBuf> {
-    let set = |name: &str| Some(env(name)).filter(|v| !v.is_empty()).map(PathBuf::from);
-    if let Some(dir) = set("CONTR_STATE_DIR") {
-        return Some(dir);
+    let set = env("CONTR_STATE_DIR");
+    if !set.is_empty() {
+        return Some(PathBuf::from(set));
     }
-    if cfg!(target_os = "macos") {
-        return set("HOME").map(|h| h.join("Library/Application Support/contr"));
-    }
-    set("XDG_STATE_HOME").map(|s| s.join("contr")).or_else(|| set("HOME").map(|h| h.join(".local/state/contr")))
+    crate::cli::data_dir(env).ok().map(|d| d.join("state"))
 }
 
 /// The flow text, and one line for each profile with its model and effort, in name order.
