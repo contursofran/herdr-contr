@@ -9,6 +9,8 @@ use std::fs;
 use std::io::Write;
 use std::path::{Path, PathBuf};
 
+use herdr_core::places::{self, Places};
+
 mod embedded {
     include!(concat!(env!("OUT_DIR"), "/embedded.rs"));
 }
@@ -283,15 +285,21 @@ pub fn sort_files(home: &Path, files: &BTreeMap<&str, &[u8]>, mine: &BTreeMap<St
 
 /// The files of the orchestration tool that the contr app kept in the user config folder (macOS:
 /// ~/Library/Application Support/contr; else $XDG_CONFIG_HOME/contr or ~/.config/contr) and that have no copy
-/// in the Herdr home yet, as (name, the old file). The tool reads them in <home>/herdr-contr now (#160).
-fn old_orch_files(home: &Path, env: &dyn Fn(&str) -> Option<String>, macos: bool) -> Vec<(&'static str, PathBuf)> {
+/// in the Herdr home yet, as (the new place, the old file). The tool reads them in <home>/herdr-contr now (#160).
+fn old_orch_files(home: &Path, env: &dyn Fn(&str) -> Option<String>, macos: bool) -> Vec<(PathBuf, PathBuf)> {
     let old = if macos {
         env("HOME").map(|h| Path::new(&h).join("Library/Application Support/contr"))
     } else {
         env("XDG_CONFIG_HOME").map(PathBuf::from).or_else(|| env("HOME").map(|h| Path::new(&h).join(".config"))).map(|d| d.join("contr"))
     };
     let Some(old) = old else { return Vec::new() };
-    ["agents.json", "owner.json"].into_iter().map(|n| (n, old.join(n))).filter(|(n, from)| from.is_file() && !home.join("herdr-contr").join(n).exists()).collect()
+    let places = Places::new(home);
+    [places.agents(), places.owner()]
+        .into_iter()
+        .filter_map(|to| Some((old.join(to.file_name()?), to)))
+        .filter(|(from, to)| from.is_file() && !to.exists())
+        .map(|(from, to)| (to, from))
+        .collect()
 }
 
 pub fn run(args: &[String]) -> i32 {
@@ -343,13 +351,11 @@ pub fn run(args: &[String]) -> i32 {
         i += 2;
     }
     let nonempty = |k: &str| std::env::var(k).ok().filter(|v| !v.is_empty());
-    let home = match home.or_else(|| nonempty("HERDR_APP_HOME")) {
-        Some(h) => PathBuf::from(h),
-        None => match nonempty("HOME").or_else(|| nonempty("USERPROFILE")) {
-            Some(h) => Path::new(&h).join(".config").join("herdr-app"),
-            None => return stop(&["STOP: HOME is not set, so there is no ~/.config/herdr-app. Name the folder with --home <herdr-app home>. Nothing was written.".into()]),
-        },
+    let env = |k: &str| std::env::var(k).unwrap_or_default();
+    let Some(home) = places::home(home.as_deref(), None, &env) else {
+        return stop(&["STOP: HOME is not set, so there is no ~/.config/herdr-app. Name the folder with --home <herdr-app home>. Nothing was written.".into()]);
     };
+    let places = Places::new(&home);
     if let Some(h) = &helper {
         if !Path::new(h).is_file() {
             return stop(&[format!("STOP: no helper at {h}")]);
@@ -360,7 +366,7 @@ pub fn run(args: &[String]) -> i32 {
             return stop(&[format!("STOP: no orchestration tool at {o}")]);
         }
     }
-    let marker_path = home.join("herdr-contr").join("install.json");
+    let marker_path = places.install_record();
     let files: BTreeMap<&str, &[u8]> = FILES.iter().copied().collect();
 
     let mine: BTreeMap<String, String> = fs::read(&marker_path)
@@ -417,9 +423,9 @@ pub fn run(args: &[String]) -> i32 {
         },
     };
 
-    let bin_dest = home.join("herdr-contr").join("bin").join(if cfg!(windows) { "herdr-contr-feed.exe" } else { "herdr-contr-feed" });
-    let orch_dest = home.join("herdr-contr").join("bin").join(if cfg!(windows) { "herdr-contr-orch.exe" } else { "herdr-contr-orch" });
-    let kit_dest = home.join("herdr-contr").join("kit");
+    let bin_dest = places.feed();
+    let orch_dest = places.orch();
+    let kit_dest = places.kit();
     // The kit folder is ours: what is there and not in this version goes.
     let mut kit_old = Vec::new();
     walk_files(&kit_dest, &mut kit_old);
@@ -446,8 +452,8 @@ pub fn run(args: &[String]) -> i32 {
     }
     println!("  herdr-contr/kit/... ({} files)", KIT.len());
     println!("  herdr-contr/.claude-plugin/marketplace.json");
-    for (name, from) in &moved {
-        println!("  herdr-contr/{name} (a copy of {}; the old file stays)", from.display());
+    for (to, from) in &moved {
+        println!("  {} (a copy of {}; the old file stays)", rel_of(to, &home), from.display());
     }
     for p in &kit_old {
         println!("    {}: not in this version, removed", rel_of(p, &home));
@@ -495,9 +501,9 @@ pub fn run(args: &[String]) -> i32 {
         for (rel, bytes) in KIT {
             put(&kit_dest.join(rel), bytes, false)?;
         }
-        put(&home.join("herdr-contr").join(".claude-plugin").join("marketplace.json"), MARKETPLACE, false)?;
-        for (name, from) in &moved {
-            put(&home.join("herdr-contr").join(name), &fs::read(from)?, false)?;
+        put(&places.marketplace(), MARKETPLACE, false)?;
+        for (to, from) in &moved {
+            put(to, &fs::read(from)?, false)?;
         }
         for p in &kit_old {
             fs::remove_file(p)?;
@@ -506,7 +512,7 @@ pub fn run(args: &[String]) -> i32 {
             put(&orch_dest, &fs::read(o)?, true)?;
         }
         if let Some((list, sums)) = &remote {
-            let dir = home.join("herdr-contr").join("remote");
+            let dir = places.folder().join("remote");
             for r in list {
                 put(&dir.join(&r.target).join("herdr-contr-feed"), &r.bytes, true)?;
             }

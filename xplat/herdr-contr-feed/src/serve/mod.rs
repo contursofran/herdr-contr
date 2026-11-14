@@ -87,16 +87,6 @@ fn default_cache() -> Option<String> {
     (!home.is_empty()).then(|| format!("{home}/.herdr-contr/serve/cache.json"))
 }
 
-/// The herdr-app home whose settings serve follows: `--home`, else `$HERDR_APP_HOME`, else the home this helper is
-/// installed in (`<home>/herdr-contr/bin`), else `~/.config/herdr-app` (as the install picks it). None: no home known.
-pub fn app_home(flag: Option<&str>, env: Option<&str>, installed: Option<&std::path::Path>, user_home: Option<&str>) -> Option<String> {
-    let given = |v: Option<&str>| v.filter(|h| !h.is_empty()).map(String::from);
-    given(flag)
-        .or_else(|| given(env))
-        .or_else(|| installed.and_then(|fb| fb.parent()).map(|h| h.to_string_lossy().into_owned()))
-        .or_else(|| given(user_home).map(|h| format!("{h}/.config/herdr-app")))
-}
-
 fn args_of(o: &Options) -> Vec<String> {
     let mut a = vec!["serve".to_string(), "--user".into(), o.user.clone(), "--port".into(), o.port.to_string()];
     if let Some(c) = &o.cache {
@@ -163,8 +153,10 @@ pub fn main(args: &[String]) -> i32 {
         print!("{}", service(&kind, &program, &home, &o));
         return 0;
     }
-    let user_home = herdr_core::hc::session::home_dir(&herdr_core::hc::session::process_env());
-    o.home = app_home(o.home.as_deref(), std::env::var("HERDR_APP_HOME").ok().as_deref(), crate::config::dir(None).as_deref(), Some(&user_home));
+    // The home whose settings serve follows: `--home`, else the rule of herdr_core::places.
+    let installed = std::env::current_exe().ok().and_then(|e| herdr_core::places::installed_home(&e));
+    let env = |k: &str| std::env::var(k).unwrap_or_default();
+    o.home = herdr_core::places::home(o.home.as_deref(), installed.as_deref(), &env).map(|h| h.to_string_lossy().into_owned());
     if o.cache.is_none() {
         o.cache = default_cache();
     }
@@ -237,12 +229,6 @@ mod tests {
 
     #[test]
     fn the_herdr_app_home() {
-        let fb = std::path::Path::new("/opt/h/herdr-contr");
-        assert_eq!(app_home(Some("/given"), Some("/env"), Some(fb), Some("/home/you")).as_deref(), Some("/given"));
-        assert_eq!(app_home(None, Some("/env"), Some(fb), Some("/home/you")).as_deref(), Some("/env"));
-        assert_eq!(app_home(Some(""), Some(""), Some(fb), Some("/home/you")).as_deref(), Some("/opt/h"), "the home the helper is installed in");
-        assert_eq!(app_home(None, None, None, Some("/home/you")).as_deref(), Some("/home/you/.config/herdr-app"));
-        assert_eq!(app_home(None, None, None, Some("")), None);
         assert_eq!(parse(&a(&["--user", "me@x", "--home", "/h"])).unwrap().home.as_deref(), Some("/h"));
         assert!(args_of(&parse(&a(&["--user", "me@x", "--home", "/h"])).unwrap()).ends_with(&a(&["--home", "/h"])));
     }

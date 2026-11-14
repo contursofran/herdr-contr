@@ -2,9 +2,9 @@
 //! `owner ask | answer | done | open`. Ported from contr's `contr agents` and `contr owner`. `agents watch` is not
 //! ported: no part of the kit or of this repository calls it.
 use std::io::{BufRead, Write};
-use std::path::PathBuf;
 
 use crate::config::{Config, Flow};
+use crate::home::{config_path, owner_store};
 use crate::owner::{Question, Store};
 use crate::spawn::{review_worktree, spawn, spawn_task, Spec};
 use crate::workers::{self, Core, Manager, Worker};
@@ -98,35 +98,6 @@ Environment:
   CONTR_OWNER_FILE   the owner file (default: owner.json in the Herdr home's herdr-contr folder;
                      the Herdr home is HERDR_APP_HOME, else ~/.config/herdr-app)
 ";
-
-/// This tool's folder in the Herdr home: herdr-contr in HERDR_APP_HOME, else in ~/.config/herdr-app. The
-/// helper's install and the mod use the same folder.
-pub fn data_dir(env: &dyn Fn(&str) -> String) -> Result<PathBuf, String> {
-    let home = env("HERDR_APP_HOME");
-    if !home.is_empty() {
-        return Ok(PathBuf::from(home).join("herdr-contr"));
-    }
-    let user = Some(env("HOME")).filter(|h| !h.is_empty()).or_else(|| Some(env("USERPROFILE")).filter(|h| !h.is_empty()));
-    user.map(|h| PathBuf::from(h).join(".config/herdr-app/herdr-contr")).ok_or_else(|| "neither $HERDR_APP_HOME nor $HOME are defined".to_string())
-}
-
-/// The profiles file: CONTR_AGENTS_CONFIG, or agents.json in this tool's folder of the Herdr home.
-pub fn config_path(env: &dyn Fn(&str) -> String) -> PathBuf {
-    let p = env("CONTR_AGENTS_CONFIG");
-    if !p.is_empty() {
-        return PathBuf::from(p);
-    }
-    data_dir(env).map(|d| d.join("agents.json")).unwrap_or_default()
-}
-
-/// The owner file: CONTR_OWNER_FILE, or owner.json in this tool's folder of the Herdr home.
-pub fn owner_store(env: &dyn Fn(&str) -> String) -> Result<Store, String> {
-    let p = env("CONTR_OWNER_FILE");
-    if !p.is_empty() {
-        return Ok(Store::new(p));
-    }
-    Ok(Store::new(data_dir(env)?.join("owner.json")))
-}
 
 /// CONTR_PROJECT, or the name of the folder the session runs in.
 pub(crate) fn project_name(env: &dyn Fn(&str) -> String) -> String {

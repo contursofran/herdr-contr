@@ -3,7 +3,8 @@
 use serde::Deserialize;
 use serde_json::{json, Map, Value};
 
-use crate::cli::{config_path, pending_prompt};
+use crate::cli::pending_prompt;
+use crate::home::config_path;
 use crate::config::Config;
 use crate::mcp::{Run, Tool};
 use crate::owner::{Question, Store, Todo};

@@ -5,6 +5,7 @@
 pub mod cli;
 pub mod config;
 pub mod flowseen;
+pub mod home;
 pub mod hook;
 pub mod jsonfile;
 pub mod mcp;
