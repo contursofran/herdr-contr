@@ -66,6 +66,7 @@ impl Sources {
 
 /// contr's state folder: CONTR_STATE_DIR; else macOS `~/Library/Application Support/contr`; else
 /// `$XDG_STATE_HOME/contr` or `~/.local/state/contr`.
+// The usage file stays in the old contr folder, not in herdr_core::places: the status line writes it there.
 pub fn state_dir(env: &dyn Fn(&str) -> Option<String>, home: Option<&Path>, macos: bool) -> Option<PathBuf> {
     if let Some(d) = env("CONTR_STATE_DIR") {
         return Some(d.into());

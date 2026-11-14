@@ -11,6 +11,7 @@ pub mod hc;
 pub mod keygate;
 pub mod log_image;
 pub mod model;
+pub mod places;
 pub mod question;
 pub mod screen;
 pub mod session;

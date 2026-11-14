@@ -5,7 +5,7 @@ use std::fs;
 use std::io;
 use std::path::{Path, PathBuf};
 
-use crate::cli::config_path;
+use crate::home::config_path;
 use crate::config::Config;
 use crate::workers::{Core, Manager, ROLE_ORCHESTRATOR};
 
@@ -19,7 +19,7 @@ pub fn state_dir(env: &dyn Fn(&str) -> String) -> Option<PathBuf> {
     if !set.is_empty() {
         return Some(PathBuf::from(set));
     }
-    crate::cli::data_dir(env).ok().map(|d| d.join("state"))
+    crate::home::places(env).ok().map(|p| p.state())
 }
 
 /// The flow text, and one line for each profile with its model and effort, in name order.

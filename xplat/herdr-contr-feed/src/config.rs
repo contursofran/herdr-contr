@@ -6,6 +6,8 @@
 use serde_json::Value;
 use std::path::{Path, PathBuf};
 
+use herdr_core::places::Places;
+
 #[derive(Debug, Clone, PartialEq)]
 pub struct Config {
     /// `remote_helper: "never"`: no helper on other machines, and nothing runs there.
@@ -28,12 +30,9 @@ impl Default for Config {
 /// when it is `<home>/herdr-contr/bin/herdr-contr-feed`. None: no settings, the defaults apply.
 pub fn dir(home: Option<&str>) -> Option<PathBuf> {
     if let Some(h) = home.filter(|h| !h.is_empty()) {
-        return Some(Path::new(h).join("herdr-contr"));
+        return Some(Places::new(h).folder());
     }
-    let exe = std::env::current_exe().ok()?;
-    let bin = exe.parent()?;
-    let fb = bin.parent()?;
-    (bin.file_name()? == "bin" && fb.file_name()? == "herdr-contr").then(|| fb.to_path_buf())
+    herdr_core::places::installed_home(&std::env::current_exe().ok()?).map(|h| Places::new(h).folder())
 }
 
 pub fn parse(text: &str) -> Config {
