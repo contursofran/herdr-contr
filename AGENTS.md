@@ -48,7 +48,7 @@ stay ours. The top bar is our copy of Herdr's `tabs` mod.
 | `herdr-app/install.sh`, `herdr-app/install-isolated.sh` | the install into a Herdr home, and into a test home |
 | `xplat/herdr-contr-feed` | the helper (Rust): reads the agents' session logs and talks to hc |
 | `xplat/herdr-core` | the helper's hc client |
-| `xplat/herdr-contr-orch` | the orchestration tool (Rust), ported from contr slice by slice (#160): the profiles and the flow, the owner file, the worker commands on hc (`spawn`, `ls`, `send`, `interrupt`, `stop`, `rm`, `read`, `prompt`) |
+| `xplat/herdr-contr-orch` | the orchestration tool (Rust), ported from contr slice by slice (#160): the profiles and the flow, the owner file, the worker commands on hc (`spawn`, `ls`, `send`, `interrupt`, `stop`, `rm`, `read`, `prompt`), the MCP server with the coordinator's tools (`mcp`) |
 | `xplat/fixtures` | the session logs and hub answers that the helper's tests read |
 | `xplat/herdr-contr-feed/web` | the phone page that the helper embeds (built output; do not edit) |
 | `web`, `scripts/web-build.mjs`, `scripts/sw-test.mjs` | the phone page's source, its build into `xplat/herdr-contr-feed/web`, and its service worker test |

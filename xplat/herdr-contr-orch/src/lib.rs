@@ -5,7 +5,9 @@
 pub mod cli;
 pub mod config;
 pub mod jsonfile;
+pub mod mcp;
 pub mod owner;
 pub mod prompt;
 pub mod spawn;
+pub mod tools;
 pub mod workers;
