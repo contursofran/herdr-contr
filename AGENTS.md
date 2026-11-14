@@ -12,9 +12,9 @@ next. The Herdr app gives the window, the sidebar, the tabs and the terminal.
   2026-11-11). Change, move or delete any file.
 - Keep `LICENSE` and the copyright lines.
 - The orchestration (worker profiles, spawn, the owner's questions and
-  to-dos, the MCP tools) lives in the contr repository: `kit/`,
-  `contr agents`, `contr mcp`. This repository reads that data through the
-  `contr` command. It does not copy that code.
+  to-dos, the MCP tools, the kit) moves here from the contr repository
+  (#160): `xplat/herdr-contr-orch` and `kit/`. Until the install part of
+  #160 lands, the owner's coordinators run the `contr` command.
 
 ## Goal: one thing at a time (owner, 2026-11-11)
 
@@ -49,6 +49,7 @@ stay ours. The top bar is our copy of Herdr's `tabs` mod.
 | `xplat/herdr-contr-feed` | the helper (Rust): reads the agents' session logs and talks to hc |
 | `xplat/herdr-core` | the helper's hc client |
 | `xplat/herdr-contr-orch` | the orchestration tool (Rust), ported from contr slice by slice (#160): the profiles and the flow, the owner file, the worker commands on hc (`spawn`, `ls`, `send`, `interrupt`, `stop`, `rm`, `read`, `prompt`), the MCP server with the coordinator's tools (`mcp`), the hooks of a worker and of a coordinator (`hook stop`, `hook session-start`, `hook prompt`) |
+| `kit` | the Claude Code plugin of a coordinator and its workers: the agent definitions, the playbook (`commands/orchestrate.md`), the chat-writing skill, the hooks and the MCP server, which run `herdr-contr-orch` |
 | `xplat/fixtures` | the session logs and hub answers that the helper's tests read |
 | `xplat/herdr-contr-feed/web` | the phone page that the helper embeds (built output; do not edit) |
 | `web`, `scripts/web-build.mjs`, `scripts/sw-test.mjs` | the phone page's source, its build into `xplat/herdr-contr-feed/web`, and its service worker test |
