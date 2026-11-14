@@ -151,6 +151,7 @@ export class SettingsView {
 
 // The Shortcuts section: a row a key, under its group's heading; the key caps as on this platform
 // (⌘ on macOS, Ctrl elsewhere). Read only.
+export const KEYS_W = 300;
 function shortcutsBody(t, body, heading) {
   const platform = window()?.platform ?? "macos";
   const cap = (text) => div().h(22).min_w(22).px(6).flex().flex_none().items_center().justify_center().rounded(5)
@@ -165,7 +166,8 @@ function shortcutsBody(t, body, heading) {
       body.child(h_flex().id(`set-key-${g.toLowerCase().replace(/ /g, "-")}-${i}`).w_full().py(10).gap(24).items_center()
         .border_b(1).border_color(t.border)
         .child(div().flex_1().min_w(0).text_size(13).text_color(t.foreground).child(s.what))
-        .child(h_flex().flex_none().gap(6).flex_wrap().justify_end().children(chords.map(chord))));
+        // The keys wrap in at most KEYS_W px, so a row with many keys keeps room for its text (#172).
+        .child(h_flex().flex_none().max_w(KEYS_W).gap(6).flex_wrap().justify_end().children(chords.map(chord))));
     });
   });
 }

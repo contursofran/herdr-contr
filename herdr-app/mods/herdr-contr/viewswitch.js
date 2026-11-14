@@ -4,6 +4,7 @@ import { div } from "gpui-kit";
 import { h_flex } from "gpui-base";
 import { theme } from "herdr";
 import { setView, shownScreen, activeTab, tabAgents } from "./state.js";
+import { startTop } from "./top.js";
 
 export const SWITCH_H = 36;
 export const KEY_HINT = "⌘J";
@@ -29,8 +30,10 @@ export const switchStrip = (t, shown) => h_flex().w_full().h(SWITCH_H).flex_none
   .child(viewSwitch(t, shown));
 
 // The "view-switch" block over the tab's terminal. Empty for a tab without an agent (the sync hides the block).
+// It is the only herdr-contr view on that screen, so it runs the key commands and the screen sync (#171):
+// without them, the key did not go back from the terminal to the chat.
 export class SwitchView {
-  constructor(_cx) {}
+  constructor(cx) { this.top = {}; startTop(cx, this.top); }
   render(_cx) {
     const t = theme(), tab = activeTab();
     if (!tab || !tabAgents(tab.id).length) return div().size_full().bg(t.background);
