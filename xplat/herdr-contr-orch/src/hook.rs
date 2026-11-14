@@ -13,6 +13,7 @@ use serde::Deserialize;
 use serde_json::{json, Map, Value};
 
 use crate::cli::{flow_text, owner_store};
+use crate::flowseen;
 use crate::spawn::ENV_COORDINATOR;
 use crate::turn::{context_and_model, last_turn, ran_command, Turn};
 use crate::workers::{Core, Manager, LABEL_CONTEXT, LABEL_CONTEXT_LIMIT, LABEL_EFFORT, LABEL_MODEL, LABEL_ORCHESTRATING, ROLE_ORCHESTRATOR};
@@ -20,6 +21,7 @@ use crate::workers::{Core, Manager, LABEL_CONTEXT, LABEL_CONTEXT_LIMIT, LABEL_EF
 pub const USAGE: &str = "Usage:
   herdr-contr-orch hook stop            the kit's Stop hook
   herdr-contr-orch hook session-start   the kit's SessionStart hook (startup, resume, clear, compact)
+  herdr-contr-orch hook prompt          the kit's UserPromptSubmit hook
 
 Claude Code runs them and gives them the hook input on stdin.
 
@@ -44,7 +46,16 @@ coordinator started, its open owner items and the flow. Claude Code adds
 them to the new context. After resume and clear it prints nothing more.
 In an hc terminal it first prints one line that names the skill
 contr:chat-writing.
+
+prompt runs only in an hc terminal (HC_TERMINAL_ID), and not in a worker.
+It asks Claude to add each request of the owner to its todos with
+\"[you] \". A prompt that starts with \"<hc from=\" is skipped. When the
+owner changed the flow or the models of the profiles after the session
+saw them last, a coordinator gets them again. It always exits 0.
 ";
+
+/// What the prompt hook adds to a prompt of the owner.
+pub const YOU_CONTEXT: &str = "contr: before you start, add each new request in this prompt to your todo list (TodoWrite or TaskCreate). Start the text of each such item with \"[you] \".";
 
 /// The context size, in tokens, from which a coordinator is asked to save its state: below the owner's
 /// compaction window.
@@ -89,6 +100,12 @@ struct Effort {
 /// `hook`. The exit code is 0 when the hook is done or has nothing to do, and 1 on an error, usage errors
 /// included. It is never 2: for a Stop hook, 2 blocks the turn and sends stderr to the model.
 pub fn run(args: &[String], env: &dyn Fn(&str) -> String, input: &mut dyn BufRead, out: &mut dyn Write, err: &mut dyn Write, core: &dyn Core) -> i32 {
+    if args.len() == 1 && args[0] == "prompt" {
+        if let Err(e) = prompt(env, input, out, err, core) {
+            let _ = writeln!(err, "herdr-contr-orch hook prompt: {e}");
+        }
+        return 0;
+    }
     if args.len() != 1 || (args[0] != "stop" && args[0] != "session-start") {
         let _ = err.write_all(USAGE.as_bytes());
         return 1;
@@ -110,6 +127,10 @@ pub fn run(args: &[String], env: &dyn Fn(&str) -> String, input: &mut dyn BufRea
         if !env("HC_TERMINAL_ID").is_empty() {
             let _ = out.write_all(CHAT_SKILL_LINE.as_bytes());
         }
+        // The session starts with the flow that it has now.
+        if let Err(e) = flowseen::record(env, &env("HC_TERMINAL_ID")) {
+            let _ = writeln!(err, "herdr-contr-orch hook: record flow: {e}");
+        }
         h.session_start(out)
     } else if !env(ENV_COORDINATOR).is_empty() {
         worker_stop(&h.input, env, core)
@@ -123,6 +144,35 @@ pub fn run(args: &[String], env: &dyn Fn(&str) -> String, input: &mut dyn BufRea
             1
         }
     }
+}
+
+/// The UserPromptSubmit hook: the todo line for a prompt of the owner, and the flow when it changed. A
+/// worker's prompts come from the coordinator, and a worker is never a coordinator: it gets no context.
+fn prompt(env: &dyn Fn(&str) -> String, input: &mut dyn BufRead, out: &mut dyn Write, err: &mut dyn Write, core: &dyn Core) -> Result<(), String> {
+    let id = env("HC_TERMINAL_ID");
+    if id.is_empty() || !env(ENV_COORDINATOR).is_empty() {
+        return Ok(());
+    }
+    let flow = flowseen::change(env, core, &id).unwrap_or_else(|e| {
+        let _ = writeln!(err, "herdr-contr-orch hook prompt: flow: {e}");
+        String::new()
+    });
+    let mut raw = String::new();
+    input.read_to_string(&mut raw).map_err(|e| format!("bad hook input: {e}"))?;
+    let hook_input: Value = serde_json::from_str(&raw).map_err(|e| format!("bad hook input: {e}"))?;
+    let asked = hook_input["prompt"].as_str().unwrap_or_default().trim();
+    let mut parts = Vec::new();
+    if !asked.is_empty() && !asked.starts_with("<hc from=") {
+        parts.push(YOU_CONTEXT);
+    }
+    if !flow.is_empty() {
+        parts.push(&flow);
+    }
+    if parts.is_empty() {
+        return Ok(());
+    }
+    let context = json!({"hookSpecificOutput": {"hookEventName": "UserPromptSubmit", "additionalContext": parts.join("\n\n")}});
+    writeln!(out, "{context}").map_err(|e| e.to_string())
 }
 
 /// Sends the coordinator a report for a turn that sent none. With no transcript file (Claude Code saved
