@@ -2,12 +2,12 @@
 // the ones its workers raised through it) in one owner file (contr's internal/owner). Each open
 // question shows in the chat of the coordinator that asked it (the item's `coordinator`: its hc
 // terminal) as the question card of cards.js, one at a time, oldest first. A press answers it with
-// `contr owner answer <id> <answer>`: contr writes the file under its lock and sends the coordinator
+// `herdr-contr-orch owner answer <id> <answer>`: the tool writes the file under its lock and sends the coordinator
 // "Owner answered <id>: <answer>". The mod only reads the file. An answered or decided item leaves.
-// The path: CONTR_OWNER_FILE when set, else the user config folder's contr/owner.json (macOS:
-// ~/Library/Application Support; other systems: $XDG_CONFIG_HOME or ~/.config).
+// The path: CONTR_OWNER_FILE when set, else owner.json in the Herdr home's herdr-contr folder, where
+// the tool keeps it (#160).
 import { div } from "gpui-kit";
-import { home, window, exec, readTextFile } from "herdr";
+import { appHome, exec, readTextFile } from "herdr";
 import { Cards, answersFor } from "./cards.js";
 import { machineOf } from "./state.js";
 
@@ -19,14 +19,12 @@ let pathOnce = null;
 export const resetOwnerPath = () => { pathOnce = null; };
 export function ownerPath() {
   return (pathOnce ??= (async () => {
-    let over = "", xdg = "";
+    let over = "";
     try {
-      const r = await exec("sh", ["-c", 'printf "%s\\n%s" "$CONTR_OWNER_FILE" "$XDG_CONFIG_HOME"']);
-      if (r?.code === 0) [over = "", xdg = ""] = String(r.stdout).split("\n");
-    } catch { /* the defaults below */ }
-    if (over) return over;
-    if ((window()?.platform ?? "macos") === "macos") return `${home()}/Library/Application Support/contr/owner.json`;
-    return `${xdg || `${home()}/.config`}/contr/owner.json`;
+      const r = await exec("sh", ["-c", 'printf "%s" "$CONTR_OWNER_FILE"']);
+      if (r?.code === 0) over = String(r.stdout).split("\n")[0];
+    } catch { /* the default below */ }
+    return over || `${appHome()}/herdr-contr/owner.json`;
   })());
 }
 
@@ -64,17 +62,21 @@ export function openByCoordinator(text) {
   return out;
 }
 
-// Runs `contr owner answer`. The answer has the sidecar's shape, for Cards.act.
+// The orchestration tool that the helper's install puts in the Herdr home.
+export const orchPath = () => `${appHome()}/herdr-contr/bin/herdr-contr-orch`;
+
+// Runs `herdr-contr-orch owner answer` with this Herdr home, so the tool uses the files that the mod reads.
+// The answer has the sidecar's shape, for Cards.act.
 export async function answerOwner(id, text) {
   let r;
-  try { r = await exec("contr", ["owner", "answer", id, text], { timeout: 30000 }); }
-  catch (e) { return { lines: [], error: { message: `contr could not start (${e?.message ?? e}).` } }; }
+  try { r = await exec("env", [`HERDR_APP_HOME=${appHome()}`, orchPath(), "owner", "answer", id, text], { timeout: 30000 }); }
+  catch (e) { return { lines: [], error: { message: `herdr-contr-orch could not start (${e?.message ?? e}).` } }; }
   if (r?.code === 0) return { lines: [{ type: "done", result: "sent" }], error: null };
   const why = String(r?.stderr ?? "").trim();
   if (/coordinator not reached/.test(why)) {
     return { lines: [{ type: "done", result: "saved", message: `The answer is saved, but the coordinator did not get it: ${why}` }], error: null };
   }
-  return { lines: [], error: { message: why || `contr owner answer failed (exit ${r?.code ?? "?"}).` } };
+  return { lines: [], error: { message: why || `herdr-contr-orch owner answer failed (exit ${r?.code ?? "?"}).` } };
 }
 
 export class OwnerCards extends Cards {

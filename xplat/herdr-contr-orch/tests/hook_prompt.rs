@@ -145,11 +145,6 @@ fn the_state_folder_comes_from_the_environment() {
     let env = |vars: &'static [(&'static str, &'static str)]| move |k: &str| vars.iter().find(|(n, _)| *n == k).map(|(_, v)| v.to_string()).unwrap_or_default();
     assert_eq!(state_dir(&env(&[("CONTR_STATE_DIR", "/s"), ("HOME", "/h")])).unwrap(), Path::new("/s"));
     assert_eq!(state_dir(&env(&[])), None);
-    let home = state_dir(&env(&[("HOME", "/h"), ("XDG_STATE_HOME", "/x")])).unwrap();
-    if cfg!(target_os = "macos") {
-        assert_eq!(home, Path::new("/h/Library/Application Support/contr"));
-    } else {
-        assert_eq!(home, Path::new("/x/contr"));
-        assert_eq!(state_dir(&env(&[("HOME", "/h")])).unwrap(), Path::new("/h/.local/state/contr"));
-    }
+    assert_eq!(state_dir(&env(&[("HOME", "/h")])).unwrap(), Path::new("/h/.config/herdr-app/herdr-contr/state"));
+    assert_eq!(state_dir(&env(&[("HOME", "/h"), ("HERDR_APP_HOME", "/a")])).unwrap(), Path::new("/a/herdr-contr/state"));
 }

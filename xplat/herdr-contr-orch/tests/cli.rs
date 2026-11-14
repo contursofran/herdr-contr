@@ -177,14 +177,20 @@ fn owner_usage_errors() {
 }
 
 #[test]
-fn the_default_files_are_in_the_user_config_folder() {
+fn the_default_files_are_in_the_herdr_home() {
     let home = tempfile::tempdir().unwrap();
-    let vars = [("HOME", path(home.path())), ("XDG_CONFIG_HOME", ""), ("CONTR_PROJECT", "app")];
+    let vars = [("HOME", path(home.path())), ("CONTR_PROJECT", "app")];
     assert_eq!(call(&["owner", "ask", "Go?"], &vars, &Fake::default()).out, "D1\n");
-    let base = if cfg!(target_os = "macos") { "Library/Application Support" } else { ".config" };
-    assert!(home.path().join(base).join("contr/owner.json").exists());
+    assert!(home.path().join(".config/herdr-app/herdr-contr/owner.json").exists());
+    // The profiles file of that folder gives the flow.
+    fs::write(home.path().join(".config/herdr-app/herdr-contr/agents.json"), r#"{"flow": {"workers": 7}}"#).unwrap();
     let r = call(&["agents", "flow"], &vars, &Fake::default());
-    assert_eq!(r.code, 0);
+    assert!(r.code == 0 && r.out.contains("at most 7"), "{}", r.out);
+    // HERDR_APP_HOME names another Herdr home.
+    let app = tempfile::tempdir().unwrap();
+    let vars = [("HOME", path(home.path())), ("HERDR_APP_HOME", path(app.path())), ("CONTR_PROJECT", "app")];
+    assert_eq!(call(&["owner", "ask", "Go?"], &vars, &Fake::default()).out, "D1\n");
+    assert!(app.path().join("herdr-contr/owner.json").exists());
     let r = call(&["owner", "ask", "Go?"], &[("CONTR_PROJECT", "app")], &Fake::default());
     assert_eq!(r.code, 1);
     assert!(r.err.contains("HOME"), "{}", r.err);

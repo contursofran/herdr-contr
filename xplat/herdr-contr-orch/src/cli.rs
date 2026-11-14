@@ -53,7 +53,8 @@ Environment:
                         it the parent of the worker
   CONTR_KIT             the Claude Code plugin folder of the kit; it replaces \"kit\" of
                         the profiles file
-  CONTR_AGENTS_CONFIG   profiles file (default: the user config folder, contr/agents.json).
+  CONTR_AGENTS_CONFIG   profiles file (default: agents.json in the Herdr home's herdr-contr folder;
+                        the Herdr home is HERDR_APP_HOME, else ~/.config/herdr-app).
                         Built-in profiles: orchestrator (claude opus, medium effort), builder,
                         planner, reviewer, debugger, explorer. A profile in the file replaces the
                         built-in one of the same name. A file with \"presets\" and no
@@ -85,44 +86,37 @@ coordinator that asked gets \"Owner answered <id>: <answer>\" or
 stays saved and the command exits 1.
 
 Environment:
-  CONTR_OWNER_FILE   the owner file (default: the user config folder, contr/owner.json)
+  CONTR_OWNER_FILE   the owner file (default: owner.json in the Herdr home's herdr-contr folder;
+                     the Herdr home is HERDR_APP_HOME, else ~/.config/herdr-app)
 ";
 
-/// The user config folder: on macOS ~/Library/Application Support; else $XDG_CONFIG_HOME, or ~/.config.
-fn config_dir(env: &dyn Fn(&str) -> String) -> Result<PathBuf, String> {
-    let home = env("HOME");
-    if cfg!(target_os = "macos") {
-        if home.is_empty() {
-            return Err("$HOME is not defined".into());
-        }
-        return Ok(PathBuf::from(home).join("Library/Application Support"));
+/// This tool's folder in the Herdr home: herdr-contr in HERDR_APP_HOME, else in ~/.config/herdr-app. The
+/// helper's install and the mod use the same folder.
+pub fn data_dir(env: &dyn Fn(&str) -> String) -> Result<PathBuf, String> {
+    let home = env("HERDR_APP_HOME");
+    if !home.is_empty() {
+        return Ok(PathBuf::from(home).join("herdr-contr"));
     }
-    let xdg = env("XDG_CONFIG_HOME");
-    if !xdg.is_empty() {
-        return Ok(PathBuf::from(xdg));
-    }
-    if home.is_empty() {
-        return Err("neither $XDG_CONFIG_HOME nor $HOME are defined".into());
-    }
-    Ok(PathBuf::from(home).join(".config"))
+    let user = Some(env("HOME")).filter(|h| !h.is_empty()).or_else(|| Some(env("USERPROFILE")).filter(|h| !h.is_empty()));
+    user.map(|h| PathBuf::from(h).join(".config/herdr-app/herdr-contr")).ok_or_else(|| "neither $HERDR_APP_HOME nor $HOME are defined".to_string())
 }
 
-/// The profiles file: CONTR_AGENTS_CONFIG, or contr/agents.json in the user config folder.
+/// The profiles file: CONTR_AGENTS_CONFIG, or agents.json in this tool's folder of the Herdr home.
 pub fn config_path(env: &dyn Fn(&str) -> String) -> PathBuf {
     let p = env("CONTR_AGENTS_CONFIG");
     if !p.is_empty() {
         return PathBuf::from(p);
     }
-    config_dir(env).map(|d| d.join("contr/agents.json")).unwrap_or_default()
+    data_dir(env).map(|d| d.join("agents.json")).unwrap_or_default()
 }
 
-/// The owner file: CONTR_OWNER_FILE, or contr/owner.json in the user config folder.
+/// The owner file: CONTR_OWNER_FILE, or owner.json in this tool's folder of the Herdr home.
 pub fn owner_store(env: &dyn Fn(&str) -> String) -> Result<Store, String> {
     let p = env("CONTR_OWNER_FILE");
     if !p.is_empty() {
         return Ok(Store::new(p));
     }
-    Ok(Store::new(config_dir(env)?.join("contr/owner.json")))
+    Ok(Store::new(data_dir(env)?.join("owner.json")))
 }
 
 /// CONTR_PROJECT, or the name of the folder the session runs in.

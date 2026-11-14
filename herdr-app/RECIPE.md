@@ -182,22 +182,22 @@ drawn by Herdr's `frames`; every loader of the mod is this one); done is a check
   sends N, on the row the pointer marks ("❯ …") Enter. hc gives no text styles: a selected row
   shows only when the panel marks it with a character. The card leaves when the panel closes.
 - **Owner question card** (#131): the questions that a coordinator asked with contr's `ask_owner`
-  (also the ones its workers raised through it). The mod reads contr's owner file, read only, at
-  most every 3 s: `CONTR_OWNER_FILE` when set, else the user config folder's `contr/owner.json`. An
+  (also the ones its workers raised through it). The mod reads the owner file, read only, at
+  most every 3 s: `CONTR_OWNER_FILE` when set, else `herdr-contr/owner.json` in the Herdr home (#160). An
   open question shows only in the chat of the agent whose hc terminal is the item's `coordinator`
   (local agents only), above the question card, one at a time, oldest first. Head: "D7 · The
   coordinator asks", with "· N more after this" when others wait. Then the title and "from …",
   the question, the options with the recommended one first and each option's impact under it, and
-  "Refs: …". Keys and the own answer as on the question card. Send answer runs `contr owner answer
-  <id> <answer>`: contr saves the answer and sends the coordinator "Owner answered <id>:
+  "Refs: …". Keys and the own answer as on the question card. Send answer runs the installed tool (`herdr-contr/bin/herdr-contr-orch`
+  in the Herdr home, with `HERDR_APP_HOME` set to that home) as `owner answer
+  <id> <answer>`: the tool saves the answer and sends the coordinator "Owner answered <id>:
   <answer>". The item then leaves, and the next one shows. An item answered or decided elsewhere
-  leaves at the next read. A failed run keeps the card with contr's message; "saved, coordinator
+  leaves at the next read. A failed run keeps the card with the tool's message; "saved, coordinator
   not reached" shows that note alone for 15 s.
-- **Orchestration settings**: contr's agents.json, the file contr's coordinator reads. The path is
-  `CONTR_AGENTS_CONFIG` when set (read through `sh`, as the mod has no environment), else the user
-  config folder's `contr/agents.json` (macOS `~/Library/Application Support`, other systems
-  `$XDG_CONFIG_HOME` or `~/.config`). The values and defaults are contr's (`internal/agents`: Flow,
-  DefaultConfig): flow `when-needed`, `code`, 2, 4, `ask`; orchestrator opus medium, builder sonnet
+- **Orchestration settings**: agents.json, the file the orchestration tool reads. The path is
+  `CONTR_AGENTS_CONFIG` when set (read through `sh`, as the mod has no environment), else
+  `herdr-contr/agents.json` in the Herdr home (#160). The values and defaults are the tool's
+  (`xplat/herdr-contr-orch`, config.rs): flow `when-needed`, `code`, 2, 4, `ask`; orchestrator opus medium, builder sonnet
   medium, planner and reviewer opus low, debugger opus xhigh. A change reads the file, sets one field
   and writes it against the text just read: all other keys stay; the flow is written whole; a
   role sets `--model` or `--effort` in its `argv` (a missing `--effort` goes after `--model`), and the
