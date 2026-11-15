@@ -22,7 +22,7 @@ fn run(sock: &str, args: &[&str]) -> Vec<Value> {
 fn protocol_lines() {
     let v = run("/nonexistent.sock", &["version"]);
     assert_eq!(v[0], serde_json::json!({"type":"header","protocol":1,"sidecar":"0.1.0","cmd":"version"}));
-    assert_eq!(v[1]["commands"], serde_json::json!(["version", "feed", "status", "card", "approve", "answer", "send", "paste-image", "mermaid", "pictures", "helper", "queue", "phone", "commands", "working", "model", "usage", "favicon", "panel", "keys", "suggestion"]));
+    assert_eq!(v[1]["commands"], serde_json::json!(["version", "feed", "status", "card", "approve", "answer", "send", "paste-image", "mermaid", "pictures", "helper", "queue", "phone", "commands", "working", "model", "usage", "favicon", "panel", "keys", "suggestion", "agent-images"]));
     assert_eq!(v.last().unwrap()["type"], "end");
     assert_eq!(v.last().unwrap()["ok"], true);
 
@@ -190,5 +190,28 @@ fn favicon_copies_under_the_dir() {
     let usage = run("/nonexistent.sock", &["favicon", "--path", src.to_str().unwrap()]);
     assert_eq!(usage[1]["type"], "error");
     assert_eq!(usage[1]["code"], "usage");
+    let _ = std::fs::remove_dir_all(&d);
+}
+
+#[test]
+fn agent_images_copies_under_the_dir() {
+    let d = std::env::temp_dir().join(format!("hcf-cli-agentimg-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&d);
+    std::fs::create_dir_all(d.join("proj")).unwrap();
+    std::fs::write(d.join("proj/chart.svg"), r#"<svg width="120" height="60"></svg>"#).unwrap();
+    let log = d.join("s.jsonl");
+    std::fs::write(&log, format!("{}\n", serde_json::json!({"type": "user", "cwd": d.join("proj")}))).unwrap();
+    let cache = d.join("home/herdr-contr/images");
+    let (l, c) = (log.to_str().unwrap(), cache.to_str().unwrap());
+    let v = run("/nonexistent.sock", &["agent-images", "--log", l, "--dir", c, "--srcs", r#"["chart.svg","https://x.dev/a.png"]"#]);
+    let p = v[1]["path"].as_str().unwrap();
+    assert!(p.starts_with(c) && p.ends_with(".svg"));
+    assert_eq!((v[1]["width"].as_f64(), v[1]["height"].as_f64()), (Some(120.0), Some(60.0)));
+    assert_eq!(v[2], serde_json::json!({"type": "agent-image", "index": 1, "path": null}));
+    assert_eq!(v.last().unwrap()["ok"], true);
+    for bad in [vec!["agent-images", "--log", l, "--dir", c], vec!["agent-images", "--log", l, "--dir", c, "--srcs", "[1]"]] {
+        let e = run("/nonexistent.sock", &bad);
+        assert_eq!((e[1]["type"].as_str(), e[1]["code"].as_str()), (Some("error"), Some("usage")));
+    }
     let _ = std::fs::remove_dir_all(&d);
 }

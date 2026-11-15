@@ -23,12 +23,19 @@ pub fn name(src: &Path) -> Option<String> {
 /// is not a file `image()` draws.
 pub fn copy(src: &Path, dir: &Path) -> std::io::Result<Option<PathBuf>> {
     let Some(n) = name(src) else { return Ok(None) };
+    let dst = dir.join(n);
+    Ok(copy_to(src, &dst)?.then_some(dst))
+}
+
+/// Copies `src` to `dst` when `dst` is not there, or is older than `src` or of another size. false when `src` is not
+/// a file. Also for the agents' images (`agentimages`).
+pub fn copy_to(src: &Path, dst: &Path) -> std::io::Result<bool> {
     let meta = match std::fs::metadata(src) {
         Ok(m) if m.is_file() => m,
-        _ => return Ok(None),
+        _ => return Ok(false),
     };
-    let dst = dir.join(n);
-    let fresh = match std::fs::metadata(&dst) {
+    let Some(dir) = dst.parent() else { return Ok(false) };
+    let fresh = match std::fs::metadata(dst) {
         Ok(d) => match (d.modified(), meta.modified()) {
             (Ok(c), Ok(s)) => c >= s && d.len() == meta.len(),
             _ => false,
@@ -39,9 +46,9 @@ pub fn copy(src: &Path, dir: &Path) -> std::io::Result<Option<PathBuf>> {
         std::fs::create_dir_all(dir)?;
         let tmp = dir.join(format!(".{}.tmp", std::process::id()));
         std::fs::copy(src, &tmp)?;
-        std::fs::rename(&tmp, &dst)?;
+        std::fs::rename(&tmp, dst)?;
     }
-    Ok(Some(dst))
+    Ok(true)
 }
 
 #[cfg(test)]

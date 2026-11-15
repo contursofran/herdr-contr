@@ -12,6 +12,7 @@
 //!   herdr-contr-feed model  --terminal <addr> [--cache <file>]   (the agent's model and effort; read only)
 //!   herdr-contr-feed usage   (the Claude and Codex plan usage; read only)
 //!   herdr-contr-feed paste-image --dir <folder>   (copied files, else the clipboard's image as a PNG there; path null when none)
+//!   herdr-contr-feed agent-images --log <log> --dir <folder> --srcs <json>   (copies of the images an agent links)
 //!   herdr-contr-feed mermaid --dir <folder> [--dark] [--fg|--bg|--fill|--border|--line <#hex>]... --text <s>   (an SVG there)
 //!   herdr-contr-feed send   --terminal <addr> --text <s> [--file <path>]... [--expect-kind <k>] [--expect-path <log>]
 //!   herdr-contr-feed helper install --machine <m> --sha256 <hex>   (the helper on another machine; after the user's yes)
@@ -62,7 +63,7 @@ pub fn run(argv: &[String]) -> String {
     r.out.emit_value(json!({"type": "header", "protocol": PROTOCOL_VERSION, "sidecar": SIDECAR_VERSION, "cmd": cmd}));
     match cmd.as_str() {
         "version" => {
-            r.out.emit_value(json!({"type": "version", "commands": ["version", "feed", "status", "card", "approve", "answer", "send", "paste-image", "mermaid", "pictures", "helper", "queue", "phone", "commands", "working", "model", "usage", "favicon", "panel", "keys", "suggestion"], "release": update::release()}));
+            r.out.emit_value(json!({"type": "version", "commands": ["version", "feed", "status", "card", "approve", "answer", "send", "paste-image", "mermaid", "pictures", "helper", "queue", "phone", "commands", "working", "model", "usage", "favicon", "panel", "keys", "suggestion", "agent-images"], "release": update::release()}));
             r.finish(true)
         }
         "usage" => {
@@ -119,6 +120,24 @@ pub fn run(argv: &[String]) -> String {
                     r.finish(true)
                 }
                 Err(e) => r.fail("write", &format!("cannot write the pictures: {e}")),
+            }
+        }
+        "agent-images" => {
+            let (Some(log), Some(dir), Some(srcs)) = (opt("--log"), opt("--dir"), opt("--srcs")) else {
+                return r.fail("usage", "agent-images needs --log <log>, --dir <folder> and --srcs <json>");
+            };
+            let Some(srcs) = serde_json::from_str::<Vec<String>>(&srcs).ok().filter(|s| s.len() <= crate::agentimages::MAX) else {
+                return r.fail("usage", &format!("--srcs is a JSON list of at most {} strings", crate::agentimages::MAX));
+            };
+            let home = std::env::var_os("HOME").map(PathBuf::from);
+            match crate::agentimages::lines(Path::new(&log), &srcs, Path::new(&dir), home.as_deref(), SystemTime::now()) {
+                Ok(lines) => {
+                    for l in lines {
+                        r.out.emit_value(l);
+                    }
+                    r.finish(true)
+                }
+                Err(e) => r.fail("write", &format!("cannot copy the images: {e}")),
             }
         }
         "mermaid" => {
