@@ -28,9 +28,35 @@ cargo build --manifest-path xplat/Cargo.toml -p herdr-contr-feed
 (cd herdr-app && HERDR_CONTR_FEED="$PWD/../xplat/target/debug/herdr-contr-feed" npm test)
 ```
 
+## Install
+
+This installs merged `main` into your Herdr home (`~/.config/herdr-app`). Build the helper and the
+orchestration tool, look at the plan, then install:
+
+```sh
+cargo build --release --locked --manifest-path xplat/Cargo.toml -p herdr-contr-feed -p herdr-contr-orch
+H=xplat/target/release/herdr-contr-feed
+O=xplat/target/release/herdr-contr-orch
+"$H" install --dry-run --helper "$H" --orch "$O"
+"$H" install --helper "$H" --orch "$O"
+```
+
+Give `--orch` each time. Without `herdr-contr-orch`, the settings screen shows "The settings could not
+be read" and the kit's hooks do not run. The install never overwrites a layout, mod or theme that it
+did not put there, and it merges `keys.json`.
+
+Then pick a layout in the Herdr app:
+
+```sh
+herdr-app do layout.switch '{"name": "herdr-contr"}'
+```
+
+`herdr-contr` keeps Herdr's own sidebar. `herdr-contr-own` hides it. `ctrl-shift-l` switches back to
+your own layout. [herdr-app/README.md](herdr-app/README.md) has the details.
+
 ## Install into a test home
 
-Never install into your real Herdr home (`~/.config/herdr-app`) for development. Use a test home:
+Never install a branch that is not merged into your real Herdr home. For development, use a test home:
 
 ```sh
 cargo build --manifest-path xplat/Cargo.toml -p herdr-contr-feed
