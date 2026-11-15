@@ -8,7 +8,7 @@ use crate::home::config_path;
 use crate::config::Config;
 use crate::mcp::{Run, Tool};
 use crate::owner::{Question, Store, Todo};
-use crate::spawn::{review_worktree, spawn, spawn_task, Spec};
+use crate::spawn::{review_worktree, spawn, spawn_task, Spec, ENV_COORDINATOR};
 use crate::workers::{Core, Manager};
 
 type Env<'a> = &'a dyn Fn(&str) -> String;
@@ -64,6 +64,10 @@ struct AgentArgs {
     any_profile: bool,
 }
 
+/// The full name of the report tool in a session with the kit: Claude Code's prefix for the plugin's server.
+/// Spawn allows it, so auto mode does not block a worker's report.
+pub const REPORT_TOOL: &str = "mcp__plugin_contr_contr__report";
+
 /// The tools on the workers. The coordinator's hc terminal is HC_TERMINAL_ID; spawn makes it the parent of the
 /// worker.
 pub fn agent_tools<'a>(core: &'a dyn Core, env: Env<'a>) -> Vec<Tool<'a>> {
@@ -77,7 +81,7 @@ pub fn agent_tools<'a>(core: &'a dyn Core, env: Env<'a>) -> Vec<Tool<'a>> {
     vec![
         Tool {
             name: "spawn",
-            description: "Start a worker agent in a new hc terminal, in its worktree. It reports back with hc send when its turn ends.",
+            description: "Start a worker agent in a new hc terminal, in its worktree. It reports back with the report tool when its turn ends.",
             schema: schema(
                 &["name", "profile"],
                 &[
@@ -123,6 +127,18 @@ pub fn agent_tools<'a>(core: &'a dyn Core, env: Env<'a>) -> Vec<Tool<'a>> {
             description: "Type a message into a worker and press Enter. It keeps the worker's context.",
             schema: schema(&["name", "text"], &[name, ("text", "string", "The message.")]),
             run: run(core, env, |m, a| m.send(&a.name, &a.text).map(|_| "sent".into())),
+        },
+        Tool {
+            name: "report",
+            description: "A worker's report to its coordinator (CONTR_COORDINATOR): use it instead of hc send. When the coordinator's prompt is busy (such as with a dialog), contr keeps the report and gives it to the coordinator when its prompt is free. Returns sent or held.",
+            schema: schema(&["text"], &[("text", "string", "The report: <your name>: <status>, <one line>; RESULT.md in <worktree>.")]),
+            run: run(core, env, move |_, a| {
+                let to = env(ENV_COORDINATOR);
+                if to.is_empty() {
+                    return Err("no coordinator: CONTR_COORDINATOR is not set".into());
+                }
+                crate::held::report(core, env, &to, &a.text)
+            }),
         },
         Tool {
             name: "interrupt",

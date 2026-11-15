@@ -7,10 +7,10 @@ orchestration tool of this repository, `xplat/herdr-contr-orch`):
 - `commands/orchestrate.md`: the coordinator playbook, as `/contr:orchestrate <goal>`.
 - `skills/chat-writing/SKILL.md`: what contr's chat shows (remarks, tables, chips, status board,
   merge queue) and when to use each part, for any session in contr.
-- `hooks/hooks.json`: the Stop hook (a worker's turn that sent no report; a coordinator's state
-  before a compaction) and the SessionStart hook: in an hc terminal one line that names `contr:chat-writing`; at startup of an orchestrator and after a compaction, the playbook.
+- `hooks/hooks.json`: the Stop hook (a worker's turn that sent no report; the reports held for a busy
+  coordinator; a coordinator's state before a compaction) and the SessionStart hook: in an hc terminal one line that names `contr:chat-writing`; at startup of an orchestrator and after a compaction, the playbook.
 - `.mcp.json`: starts `herdr-contr-orch mcp`, which gives the session the agent tools (spawn, set_title, message,
-  interrupt, stop, read, list, clear_ended). `stop` removes the
+  report, interrupt, stop, read, list, clear_ended). A worker reports with `report`. `stop` removes the
   worker's terminal unless `keep` is set. See Install for where `herdr-contr-orch` is found.
 
 ## Install
@@ -57,12 +57,20 @@ For shell use (`herdr-contr-orch agents …`), put the tool on the PATH.
    `claude --plugin-dir <kit> --model opus --effort medium`, then
    `/contr:orchestrate <goal>`.
 3. Workers that the coordinator starts get its address in
-   `CONTR_COORDINATOR` and report with `hc send`. When a worker's turn ends
-   without one, the kit's Stop hook (`hooks/hooks.json`, `herdr-contr-orch hook stop`)
+   `CONTR_COORDINATOR` and report with the MCP server's `report` tool. Spawn
+   allows the tool (`--allowedTools mcp__plugin_contr_contr__report`), so
+   auto mode does not block it. When hc refuses the report because the
+   coordinator's prompt is busy (a dialog), the tool keeps it in
+   `held/<coordinator>` of the state folder. The coordinator's Stop hook
+   gives the held reports when its turn ends (it keeps the turn going one
+   time), and its prompt hook gives them with the next prompt. When a
+   worker's turn ends without a report, or its report call failed (hc
+   refused it, or auto mode blocked it), the kit's Stop hook (`hooks/hooks.json`, `herdr-contr-orch hook stop`)
    sends the coordinator "ended its turn without a report. Last words: …".
    When Claude Code saved no transcript, the hook cannot tell whether the
    turn sent a report, so it sends "ended its turn; it may have sent a report
-   already …" with the last words. Workers start without the
+   already …" with the last words. When hc refuses that note, it is held
+   in the same way. Workers start without the
    `CLAUDECODE` and `CLAUDE_CODE_*` variables of the hc core, so Claude Code
    saves their transcripts.
    The hook does nothing in sessions without `CONTR_COORDINATOR`.

@@ -9,6 +9,7 @@ use std::process::Command;
 use serde_json::{json, Map, Value};
 
 use crate::config::Config;
+use crate::tools::REPORT_TOOL;
 use crate::workers::{self, is_claude, Core, Worker, CLEAN_NAME, SETUP_NAME};
 
 /// Holds the main checkout of a worker's worktree while the setup command runs, so the command can copy files
@@ -134,16 +135,17 @@ fn has_flag(args: &[String], flag: &str) -> bool {
     args.iter().any(|a| a.strip_prefix(flag).is_some_and(|r| r.is_empty() || r.starts_with('=')))
 }
 
-/// The profile's command. With a kit, a claude command gets `--plugin-dir <kit>` after the program name, unless
-/// it has `--plugin-dir` already. When its agent has a definition in the kit, it also gets
-/// `--agent contr:<agent>`.
+/// The profile's command. With a kit, a claude command gets `--allowedTools <the report tool> --plugin-dir <kit>`
+/// after the program name, unless it has `--plugin-dir` already: the allow rule lets a worker report in auto
+/// mode. `--allowedTools` takes a list, so a flag comes after it. When its agent has a definition in the kit,
+/// it also gets `--agent contr:<agent>`.
 pub fn agent_argv(kit: &str, agent: &str, argv: &[String]) -> Vec<String> {
     if !is_claude(argv) || kit.is_empty() {
         return argv.to_vec();
     }
     let mut out = vec![argv[0].clone()];
     if !has_flag(&argv[1..], "--plugin-dir") {
-        out.extend(words(&["--plugin-dir", kit]));
+        out.extend(words(&["--allowedTools", REPORT_TOOL, "--plugin-dir", kit]));
     }
     if Path::new(kit).join("agents").join(format!("{agent}.md")).exists() {
         out.extend(words(&["--agent", &format!("contr:{agent}")]));

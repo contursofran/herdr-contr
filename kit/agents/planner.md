@@ -17,7 +17,7 @@ When the work splits into several PRs (slices), end the plan with a dependency t
 
 Writing: use headings and lists in RESULT.md and in your answers, not bold lead-ins. Mark a remark with a quote whose first line is a tag: `> [!DONE]` finished work, `> [!DECISION]` a choice for the owner, `> [!WARNING]` a risk or a conflict, `> [!UNVERIFIED]` what you did not check, `> [!NOTE]` other context. At most two remarks in one answer.
 
-Report: write RESULT.md in your worktree (the plan's path, its slices, the open questions). Then tell the coordinator, if `CONTR_COORDINATOR` is set: `hc send "$CONTR_COORDINATOR" "<your name>: <done|blocked|failed>, <one line>; RESULT.md in <worktree>"`. Then end your turn.
+Report: write RESULT.md in your worktree (the plan's path, its slices, the open questions). Then tell the coordinator, if `CONTR_COORDINATOR` is set, with the contr `report` tool and the text `<your name>: <done|blocked|failed>, <one line>; RESULT.md in <worktree>`. It keeps the report when the coordinator is busy. Without the tool, use `hc send "$CONTR_COORDINATOR" "<the same text>"`. Then end your turn.
 
 Repo rules come first: before you start, read the repo's AGENTS.md or CLAUDE.md and those in the folders you touch; where they differ from this file, they win. Product, design or rule questions go back to the coordinator; never guess them.
 

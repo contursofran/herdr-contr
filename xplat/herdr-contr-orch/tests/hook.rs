@@ -9,7 +9,8 @@ use orch::hook::{missed_report, SAID_MAX};
 use serde_json::json;
 
 const PROMPT: &str = r#"{"type":"user","message":{"role":"user","content":"do the task"}}"#;
-const SEND: &str = r#"{"type":"assistant","message":{"content":[{"type":"tool_use","name":"Bash","input":{"command":"hc send t1 \"b1: done\""}}]}}"#;
+const SEND: &str = r#"{"type":"assistant","message":{"content":[{"type":"tool_use","id":"s1","name":"Bash","input":{"command":"hc send t1 \"b1: done\""}}]}}"#;
+const SENT: &str = r#"{"type":"user","message":{"role":"user","content":[{"type":"tool_result","tool_use_id":"s1","content":"sent"}]}}"#;
 const WORDS: &str = r#"{"type":"assistant","message":{"content":[{"type":"text","text":"PR #5 is open.\nHead abc."}]}}"#;
 const WORKER: [(&str, &str); 2] = [("CONTR_COORDINATOR", "t1"), ("HC_TERMINAL_ID", "t7")];
 
@@ -63,7 +64,7 @@ fn the_hook_is_quiet_when_it_has_no_work() {
     let dir = tempfile::tempdir().unwrap();
     let core = Fake::default();
     // A turn that reported sends nothing.
-    let input = json!({"transcript_path": transcript(dir.path(), &[PROMPT, SEND, WORDS])}).to_string();
+    let input = json!({"transcript_path": transcript(dir.path(), &[PROMPT, SEND, SENT, WORDS])}).to_string();
     assert_eq!(stop(&WORKER, &input, &core).code, 0);
     // Outside hc nothing is read or sent, even with bad input.
     assert_eq!(stop(&[], "not json", &core).code, 0);

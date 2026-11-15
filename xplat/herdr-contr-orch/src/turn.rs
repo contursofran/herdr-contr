@@ -10,7 +10,8 @@ use serde_json::Value;
 /// The last turn of a transcript: the part after the last prompt.
 #[derive(Debug, Default, PartialEq)]
 pub struct Turn {
-    /// The turn sent a message to another terminal: a Bash call with `hc send`, or the kit's message tool.
+    /// The turn sent a message to another terminal: a Bash call with `hc send`, or the kit's report or message
+    /// tool, whose result is not an error. A call that auto mode blocked or that hc refused is no report.
     pub reported: bool,
     /// The last text of the assistant in the turn.
     pub said: String,
@@ -46,16 +47,29 @@ fn reports(block: &Value) -> bool {
     if name == "Bash" {
         return block["input"]["command"].as_str().unwrap_or_default().contains("hc send");
     }
-    name.ends_with("contr__message")
+    name.ends_with("contr__report") || name.ends_with("contr__message")
 }
 
 /// The last turn of the transcript in `r`.
 pub fn last_turn(r: impl Read) -> io::Result<Turn> {
     let mut t = Turn::default();
+    // The ids of the report calls of the turn that have no result yet.
+    let mut calls: Vec<String> = Vec::new();
     each_entry(r, |e| {
         let content = &e["message"]["content"];
         match e["type"].as_str() {
-            Some("user") if e["isMeta"] != true && is_prompt(content) => t = Turn::default(),
+            Some("user") if e["isMeta"] != true && is_prompt(content) => {
+                t = Turn::default();
+                calls.clear();
+            }
+            Some("user") => {
+                for b in content.as_array().into_iter().flatten() {
+                    let id = b["tool_use_id"].as_str().unwrap_or_default();
+                    if b["type"] == "tool_result" && b["is_error"] != true && calls.iter().any(|c| c == id) {
+                        t.reported = true;
+                    }
+                }
+            }
             Some("assistant") => {
                 for b in content.as_array().into_iter().flatten() {
                     match b["type"].as_str() {
@@ -65,7 +79,7 @@ pub fn last_turn(r: impl Read) -> io::Result<Turn> {
                                 t.said = s.to_string();
                             }
                         }
-                        Some("tool_use") if reports(b) => t.reported = true,
+                        Some("tool_use") if reports(b) => calls.extend(b["id"].as_str().map(str::to_string)),
                         _ => {}
                     }
                 }
@@ -131,9 +145,17 @@ mod tests {
     const PROMPT_LIST: &str = r#"{"type":"user","message":{"role":"user","content":[{"type":"text","text":"<hc from=\"t1 lead\">fix it</hc>"}]}}"#;
     const META_PROMPT: &str = r#"{"type":"user","isMeta":true,"message":{"role":"user","content":"caveat"}}"#;
     const RESULT: &str = r#"{"type":"user","message":{"role":"user","content":[{"type":"tool_result","tool_use_id":"x","content":"ok"}]}}"#;
-    const SEND_CALL: &str = r#"{"type":"assistant","message":{"content":[{"type":"tool_use","name":"Bash","input":{"command":"hc send \"$CONTR_COORDINATOR\" \"b1: done\""}}]}}"#;
-    const OTHER_CALL: &str = r#"{"type":"assistant","message":{"content":[{"type":"tool_use","name":"Bash","input":{"command":"cargo test"}}]}}"#;
-    const MCP_CALL: &str = r#"{"type":"assistant","message":{"content":[{"type":"tool_use","name":"mcp__plugin_contr_contr__message","input":{"name":"t1"}}]}}"#;
+    const SEND_CALL: &str = r#"{"type":"assistant","message":{"content":[{"type":"tool_use","id":"s1","name":"Bash","input":{"command":"hc send \"$CONTR_COORDINATOR\" \"b1: done\""}}]}}"#;
+    const SEND_OK: &str = r#"{"type":"user","message":{"role":"user","content":[{"type":"tool_result","tool_use_id":"s1","content":"sent"}]}}"#;
+    // hc refused the send (exit 1), or auto mode blocked the command: Claude Code marks the result as an error.
+    const SEND_REFUSED: &str = r#"{"type":"user","message":{"role":"user","content":[{"type":"tool_result","tool_use_id":"s1","is_error":true,"content":"Exit code 1\nhc: t1 did not take the text: blocked"}]}}"#;
+    const SEND_BLOCKED: &str = r#"{"type":"user","message":{"role":"user","content":[{"type":"tool_result","tool_use_id":"s1","is_error":true,"content":"Permission for this action has been denied. Reason: Unsanctioned Communication"}]}}"#;
+    const OTHER_CALL: &str = r#"{"type":"assistant","message":{"content":[{"type":"tool_use","id":"o1","name":"Bash","input":{"command":"cargo test"}}]}}"#;
+    const OTHER_OK: &str = r#"{"type":"user","message":{"role":"user","content":[{"type":"tool_result","tool_use_id":"o1","content":"ok"}]}}"#;
+    const MCP_CALL: &str = r#"{"type":"assistant","message":{"content":[{"type":"tool_use","id":"m1","name":"mcp__plugin_contr_contr__message","input":{"name":"t1"}}]}}"#;
+    const MCP_OK: &str = r#"{"type":"user","message":{"role":"user","content":[{"type":"tool_result","tool_use_id":"m1","content":[{"type":"text","text":"sent"}]}]}}"#;
+    const REPORT_CALL: &str = r#"{"type":"assistant","message":{"content":[{"type":"tool_use","id":"r1","name":"mcp__plugin_contr_contr__report","input":{"text":"b1: done"}}]}}"#;
+    const REPORT_HELD: &str = r#"{"type":"user","message":{"role":"user","content":[{"type":"tool_result","tool_use_id":"r1","content":[{"type":"text","text":"held: t1 did not take it now (blocked)"}]}]}}"#;
     const WORDS: &str = r#"{"type":"assistant","message":{"content":[{"type":"text","text":"  PR #5 is open.  "}]}}"#;
     const SUMMARY: &str = r#"{"type":"summary","summary":"x"}"#;
 
@@ -143,13 +165,17 @@ mod tests {
 
     #[test]
     fn last_turn_is_the_part_after_the_last_prompt() {
-        let cases: [(&str, &[&str], Turn); 7] = [
-            ("report in the turn", &[PROMPT, OTHER_CALL, RESULT, SEND_CALL, RESULT, WORDS], turn(true, "PR #5 is open.")),
-            ("no report", &[PROMPT, OTHER_CALL, RESULT, WORDS], turn(false, "PR #5 is open.")),
-            ("report only in an earlier turn", &[PROMPT, SEND_CALL, RESULT, WORDS, PROMPT_LIST, OTHER_CALL, RESULT], turn(false, "")),
-            ("tool results and meta lines keep the turn", &[PROMPT, SEND_CALL, RESULT, META_PROMPT, SUMMARY, WORDS], turn(true, "PR #5 is open.")),
-            ("the kit's message tool counts", &[PROMPT_LIST, MCP_CALL, RESULT], turn(true, "")),
-            ("bad lines are skipped", &[PROMPT, "not json", SEND_CALL], turn(true, "")),
+        let cases: [(&str, &[&str], Turn); 11] = [
+            ("report in the turn", &[PROMPT, OTHER_CALL, OTHER_OK, SEND_CALL, SEND_OK, WORDS], turn(true, "PR #5 is open.")),
+            ("no report", &[PROMPT, OTHER_CALL, OTHER_OK, WORDS], turn(false, "PR #5 is open.")),
+            ("report only in an earlier turn", &[PROMPT, SEND_CALL, SEND_OK, WORDS, PROMPT_LIST, OTHER_CALL, OTHER_OK], turn(false, "")),
+            ("tool results and meta lines keep the turn", &[PROMPT, SEND_CALL, SEND_OK, META_PROMPT, SUMMARY, WORDS], turn(true, "PR #5 is open.")),
+            ("the kit's message tool counts", &[PROMPT_LIST, MCP_CALL, MCP_OK], turn(true, "")),
+            ("the kit's report tool counts, also when it held the report", &[PROMPT, REPORT_CALL, REPORT_HELD], turn(true, "")),
+            ("a send that hc refused is no report", &[PROMPT, SEND_CALL, SEND_REFUSED, WORDS], turn(false, "PR #5 is open.")),
+            ("a send that auto mode blocked is no report", &[PROMPT, SEND_CALL, SEND_BLOCKED], turn(false, "")),
+            ("a call with no result is no report", &[PROMPT, SEND_CALL, RESULT], turn(false, "")),
+            ("bad lines are skipped", &[PROMPT, "not json", SEND_CALL, SEND_OK], turn(true, "")),
             ("empty", &[], turn(false, "")),
         ];
         for (name, lines, want) in cases {
