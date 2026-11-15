@@ -413,8 +413,9 @@ drawn by Herdr's `frames`; every loader of the mod is this one); done is a check
   - `herdr-contr-feed`, a helper program at `<herdr-app home>/herdr-contr/bin/herdr-contr-feed`
     (make it executable). The gallery copies only `layouts/` and `mods/`, so get the helper on its
     own: build it in this repository with
-    `(cd xplat && cargo build --release -p herdr-contr-feed)`, then run
-    `xplat/target/release/herdr-contr-feed install --helper xplat/target/release/herdr-contr-feed`. It reads each agent's session log
+    `(cd xplat && cargo build --release -p herdr-contr-feed -p herdr-contr-orch)`, then run
+    `xplat/target/release/herdr-contr-feed install --helper xplat/target/release/herdr-contr-feed --orch xplat/target/release/herdr-contr-orch`
+    (`--orch` adds the orchestration tool, which the settings screen runs). It reads each agent's session log
     (`~/.claude/projects/`, `~/.codex/sessions/`, `~/.grok/sessions/`, `~/.cursor/projects/`,
     `~/.pi/agent/sessions/`, `~/.gemini/antigravity-cli/`) and talks to herdr-core (`hc`) to read
     screens and send keys and text. Commands: `feed`, `status`, `card`, `approve`, `answer`,

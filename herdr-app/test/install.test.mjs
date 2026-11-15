@@ -27,6 +27,8 @@ test("without a helper it stops and says how to build one", () => {
   const r = run(join(modDir, "install.sh"), ["--home", s.app], { HOME: s.home });
   assert.equal(r.status, 1);
   assert.match(r.stderr, /cargo build --release -p herdr-contr-feed/);
+  assert.match(r.stderr, /-p herdr-contr-orch/);
+  assert.match(r.stderr, /--orch xplat\/target\/release\/herdr-contr-orch/);
   assert.deepEqual(readdirSync(s.app), []);
 });
 

@@ -40,8 +40,8 @@ else
 fi
 if [ -z "$exe" ] || [ ! -x "$exe" ]; then
   echo "STOP: no helper at $here/$rel." >&2
-  echo "In the repo, build one: (cd xplat && cargo build --release -p herdr-contr-feed)," >&2
-  echo "then run: xplat/target/release/herdr-contr-feed install --helper xplat/target/release/herdr-contr-feed" >&2
+  echo "In the repo, build one: (cd xplat && cargo build --release -p herdr-contr-feed -p herdr-contr-orch)," >&2
+  echo "then run: xplat/target/release/herdr-contr-feed install --helper xplat/target/release/herdr-contr-feed --orch xplat/target/release/herdr-contr-orch" >&2
   exit 1
 fi
 set -- --helper "$exe" "$@"
