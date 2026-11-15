@@ -6,6 +6,7 @@ import { fake, reset } from "./stub/herdr.mjs";
 import { fakeCx } from "./fake-cx.mjs";
 import { textOf, byId } from "./stub/ui.mjs";
 import { SHORTCUTS, SHORTCUT_GROUPS, expand, caps, keyCaps } from "../mods/herdr-contr/shortcuts.js";
+import { viewerKey } from "../mods/herdr-contr/viewer.js";
 import { ChatView, spaceKey } from "../mods/herdr-contr/chat.js";
 import { keyName } from "../mods/herdr-contr/panelcard.js";
 import { digit } from "../mods/herdr-contr/cards.js";
@@ -74,6 +75,7 @@ test("handlers: the panel card, the question and approval cards, the chat and th
   sub(takes((e) => digit(e) !== null && !e.modifiers.shift), cards, "cards");
   assert.ok(cards.has("enter"));
   sub(takes((e) => spaceKey(e) !== null), file("chat.js"), "chat");
+  assert.deepEqual([...takes((e) => viewerKey(e) !== null)].sort(), [...file("viewer.js")].sort(), "picture viewer");
   sub(takes((e) => e?.key === "enter" || e?.key === "space" || e?.key === " "), new Set([...file("settings.js"), ...[...file("settings.js")].flatMap((k) => MODS.map((m) => stroke(k, m)))]), "settings");
 });
 

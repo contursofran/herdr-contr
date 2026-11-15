@@ -4,7 +4,7 @@
 // A key is a Herdr keystroke ("cmd-shift-t"); "ctrl-1..9" is a range. `bound`: where the key is bound:
 // "keys.json" (with its `action`), "bind_keys" (composer.js, in `context`), "handler" (an on_key_down in `file`)
 // or "submit" (the box's own Enter, composer.js).
-export const SHORTCUT_GROUPS = ["Window", "Reply box", "Cards", "Settings"];
+export const SHORTCUT_GROUPS = ["Window", "Chat", "Reply box", "Cards", "Settings"];
 
 export const SHORTCUTS = [
   { group: "Window", what: "Switch Chat | Terminal", keys: ["cmd-j", "cmd-shift-t"], bound: "keys.json", action: "herdr-contr.view" },
@@ -27,6 +27,8 @@ export const SHORTCUTS = [
   { id: "slash-complete", group: "Reply box", what: "\"/\" list: complete the command (Enter also)", keys: ["tab"], bound: "bind_keys", context: "HerdrContrSlash" },
   { id: "slash-close", group: "Reply box", what: "\"/\" list: close", keys: ["escape"], bound: "bind_keys", context: "HerdrContrSlash" },
   { id: "suggest", group: "Reply box", what: "Put the suggested prompt in the box", keys: ["tab"], bound: "bind_keys", context: "HerdrContrSuggest" },
+  { group: "Chat", what: "Picture viewer: the previous or the next picture", keys: ["left", "right"], bound: "handler", file: "viewer.js" },
+  { group: "Chat", what: "Picture viewer: close", keys: ["escape"], bound: "handler", file: "viewer.js" },
   { group: "Reply box", what: "Send", keys: ["enter"], bound: "submit" },
   { group: "Reply box", what: "New line", keys: ["shift-enter"], bound: "submit" },
   { group: "Cards", what: "Panel card: send the key to the agent's prompt", keys: ["up", "down", "left", "right", "enter", "tab", "space", "escape", "0..9"], bound: "handler", file: "panelcard.js" },

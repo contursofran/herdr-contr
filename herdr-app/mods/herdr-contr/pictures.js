@@ -3,7 +3,8 @@
 // `pictures` writes them as files under <app home>/herdr-contr/pics. image() reads a path relative to the app
 // home (phone.js appRel). picturesTick (the chat's timer) asks for them, never the draw; the answers are kept
 // here by log and pictures. Until an answer is there, or when it has no picture to draw, the "N images" line shows.
-// The chat's list renderer refuses handlers and state (#70): the pictures are plain elements.
+// The chat's list renderer refuses handlers and state (#70): the pictures are plain elements. A click on the row
+// opens the viewer (chat.js click, viewer.js).
 import { div, image } from "gpui-kit";
 import { v_flex, h_flex } from "gpui-base";
 import { appHome } from "herdr";
@@ -121,6 +122,30 @@ export async function picturesTick(rows, path, now = Date.now()) {
     return list.length > 0;
   }));
   return got.some(Boolean);
+}
+
+// The chat's pictures for the viewer (viewer.js, #193), in chat order: each row's pictures from each source, in
+// the order the sources were added. A source is (row, path) => [{ rel, width?, height? }] (width and height in
+// px, when known). Another kind of picture (the agent's images, #192) joins with one addPictureSource call.
+const sources = [];
+export function addPictureSource(fn) { if (!sources.includes(fn)) sources.push(fn); }
+
+// The pictures of a user message: the log's when they are known, else the pasted ones (no size).
+export function userPictureList(row, path) {
+  if (row?.k !== "user" || row.from != null) return [];
+  const log = picturesOf(row, path);
+  if (log) return log.list;
+  return pastedOf(row.text).rels.map((rel) => ({ rel }));
+}
+addPictureSource(userPictureList);
+
+// [{ rel, width, height, row }]: `row` is the id of the row that has the picture.
+export function chatPictures(rows, path) {
+  const out = [];
+  for (const row of rows ?? []) for (const src of sources) for (const p of src(row, path) ?? []) {
+    if (p?.rel) out.push({ rel: p.rel, width: p.width ?? null, height: p.height ?? null, row: row.id });
+  }
+  return out;
 }
 
 export function forgetPictures() { answers.clear(); asking.clear(); pastes.clear(); }
