@@ -41,6 +41,10 @@ Write each item once. Do not write a row of blocks and then a table that names t
 +	return err
 ```
 
+## Images
+
+To show a local PNG, JPEG or SVG, write `![alt](absolute path)` alone on its line; the chat draws the image. A web URL stays a link.
+
 ## Remarks
 
 A quote whose first line is a tag shows as a remark with a colored bar and a word. At most two remarks in one answer.

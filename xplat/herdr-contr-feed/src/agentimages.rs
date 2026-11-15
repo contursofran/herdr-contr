@@ -246,7 +246,8 @@ mod tests {
         assert_eq!(size(b"not an image", "png"), None);
         let svg = |s: &str| size(s.as_bytes(), "svg");
         assert_eq!(svg(r#"<?xml version="1.0"?><svg xmlns="http://www.w3.org/2000/svg" width="200" height="100px">"#), Some((200.0, 100.0)));
-        assert_eq!(svg(r#"<svg viewBox="0 0 300 150" stroke-width="2">"#), Some((300.0, 150.0)), "stroke-width is not width");
+        assert_eq!(svg(r#"<svg stroke-width="2" width="300" height="150">"#), Some((300.0, 150.0)), "stroke-width is not width");
+        assert_eq!(svg(r#"<svg viewBox="0 0 300 150">"#), Some((300.0, 150.0)));
         assert_eq!(svg(r#"<svg width='100%' height='100%' viewBox='0,0,40,20'>"#), Some((40.0, 20.0)));
         assert_eq!(svg(r#"<svg xmlns="http://www.w3.org/2000/svg">"#), None);
         assert_eq!(svg("<html>"), None);
