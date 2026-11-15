@@ -152,3 +152,17 @@ fn the_report_tool_errors() {
     assert_eq!(got, [("report: hc: not_found".to_string(), true)]);
     assert_eq!(mcp(&[report(" ")], &worker, &Fake::default()), [("report: agents: no text to send".to_string(), true)]);
 }
+
+#[test]
+fn an_error_with_held_reports_does_not_stop_the_coordinators_hooks() {
+    let (dir, state) = (tempfile::tempdir().unwrap(), tempfile::tempdir().unwrap());
+    // A terminal name that is no file name: the held folder cannot be found.
+    let vars = [("HC_TERMINAL_ID", ".."), ("CONTR_STATE_DIR", path(state.path())), ("CONTR_AGENTS_CONFIG", "/none/agents.json")];
+    let core = Fake::default();
+    let input = json!({"transcript_path": transcript(dir.path(), &[PROMPT, WORDS])}).to_string();
+    let r = call_with(&["hook", "stop"], &vars, &core, &input);
+    assert!(r.code == 0 && r.err.contains("held: bad terminal name"), "{}", r.err);
+    assert!(core.methods().contains(&"terminal.label".to_string()), "the Stop still labels the terminal");
+    let r = call_with(&["hook", "prompt"], &vars, &core, r#"{"prompt":"fix it"}"#);
+    assert!(r.code == 0 && r.err.contains("held: bad terminal name") && r.out.contains("[you]"), "{} {}", r.out, r.err);
+}
