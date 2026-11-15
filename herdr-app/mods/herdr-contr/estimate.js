@@ -7,6 +7,7 @@
 // No percentage on top: on a long pasted message 8% of the height was many lines of empty space.
 import { splitBlocks, tableCells } from "./blocks.js";
 import { isMermaid, mermaidOf, mermaidSize } from "./mermaid.js";
+import { agentImageOf, agentImageSize, IMG_BOX } from "./agentimages.js";
 import { ROW_PAD_Y, BUBBLE_PAD_Y, bubbleTextWidth, BUBBLE_GAP, IMAGES_LINE_H, CHIP_ROW, CHIP_GAP, OPEN_INDENT, CALL_H, CALLS_PAD,
   SEP_H, FOOTER_H, STATUS_H, CARD_ROW_H, OTHER_H } from "./metrics.js";
 
@@ -128,8 +129,9 @@ export function lineHeight(size, zoom = 1) {
 // `k`: the chat's text size over the default 16 px (settings: text_size); `zoom`: Herdr's zoom. Text and its
 // line heights scale by k; padding and margins stay. Headings and list indents are counted at no less than
 // their default size, so a guess never comes out shorter than drawn.
-export function markdownHeight(text, width, spans = null, k = 1, zoom = 1) {
-  const v = measure(text, width, spans, k, zoom);
+// `log`: the image lines of that log's agent count as their images (agentimages.js), as mdblocks.js draws them.
+export function markdownHeight(text, width, spans = null, k = 1, zoom = 1, log = null) {
+  const v = measure(text, width, spans, k, zoom, log);
   return Math.ceil(v.h + v.p + (v.p > 0 ? END_PAD : 0));
 }
 // The height before rounding and the end pad: the part of a row that `text` takes. mdblocks.js cuts a
@@ -138,7 +140,7 @@ export function markdownRaw(text, width, k = 1, zoom = 1) {
   const v = measure(text, width, null, k, zoom);
   return v.h + v.p;
 }
-function measure(text, width, spans, k, zoom) {
+function measure(text, width, spans, k, zoom, log = null) {
   const CODE_LH = lineHeight(13 * k, zoom);    // TextView at 13 px (Menlo): its own line height
   const CELL_LH = lineHeight(13.5 * k, zoom);  // table text at 13.5 px (measured 11-10)
   const fs = FS * k, lh = lineHeight(fs, zoom), up = Math.max(1, k);
@@ -153,7 +155,14 @@ function measure(text, width, spans, k, zoom) {
   // "**" (bold) is markup, not drawn.
   const close = () => { if (para) p += proseLines(para.text.replace(/\*\*/g, ""), para.width, para.fs, k) * para.lh + para.extra; para = null; };
   // The blocks mdblocks.js draws (blocks.js): code boxes and tables on their own, the rest markdown.
-  for (const b of splitBlocks(text)) {
+  for (const b of splitBlocks(text, log ? (src) => agentImageOf(log, src) : null)) {
+    if (b.k === "img") {
+      // An image as mdblocks.js draws it: 6 px margin, a 1 px border, each side. No paragraph gap next to it.
+      close(); lastLevel = null; box();
+      h += IMG_BOX + agentImageSize(b.img, width).h;
+      prevBlank = true;
+      continue;
+    }
     if (b.k === "code") {
       // A code box as mdblocks.js draws it: 6 px margin, 10 px padding and a 1 px border, each side.
       close(); lastLevel = null; box();
@@ -269,15 +278,15 @@ export const columnWidth = (paneWidth) => Math.max(240, Math.min(READ_W, (paneWi
 // The height of a row. `open`: its tool chip shows the calls, or its note from another agent the whole text.
 // The sizes are the drawing's (metrics.js). `pics` (pictures.js userPictures), for a user row: `text`, its text
 // without pasted image paths, and `h`, the height of its pictures when there are some to draw, else its
-// "N images" line counts.
-export function rowHeight(row, width, open = false, k = 1, zoom = 1, pics = null) {
+// "N images" line counts. `log`: an assistant row's log on this machine, for its images (agentimages.js).
+export function rowHeight(row, width, open = false, k = 1, zoom = 1, pics = null, log = null) {
   switch (row.k) {
     case "user":
       if (row.from != null) return CHIP_ROW + (open ? markdownHeight(row.text || "", width - OPEN_INDENT, null, k, zoom) + CHIP_GAP : 0);
       return markdownHeight((pics ? pics.text : row.text) || "", bubbleTextWidth(width), null, k, zoom)
         + (row.images || pics?.h ? BUBBLE_GAP + (pics?.h || IMAGES_LINE_H) : 0)
         + 2 * BUBBLE_PAD_Y + 2 * ROW_PAD_Y;
-    case "assistant": return markdownHeight(row.text || "", width, null, k, zoom) + 2 * ROW_PAD_Y;
+    case "assistant": return markdownHeight(row.text || "", width, null, k, zoom, log) + 2 * ROW_PAD_Y;
     case "tools": {
       const calls = (row.chips || []).reduce((n, c) => n + (c.calls || []).length, 0);
       return CHIP_ROW + (open ? calls * CALL_H + CALLS_PAD : 0);

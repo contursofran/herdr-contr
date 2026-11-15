@@ -39,10 +39,16 @@ export function tableCells(line) {
   return out;
 }
 
+// A line that is only one image link (#192): "![alt](src)", "![alt](<src with spaces>)", with an optional title.
+export const IMAGE_LINE = /^ {0,3}!\[([^\]\n]*)\]\(\s*(<[^>\n]+>|[^\s()]+)(?:\s+(?:"[^"\n]*"|'[^'\n]*'))?\s*\)\s*$/;
+const imageSrc = (m) => m[2].replace(/^<(.*)>$/, "$1");
+
 // [{k:"md", text}, {k:"code", lang, text, lines}, {k:"table", head, align, rows}] in order. A code block's
 // `lines` are its source lines (none for an empty box; `text` cannot tell that from one empty line). An
 // unclosed fence runs to the end. A markdown block of blank lines only is left out.
-export function splitBlocks(text) {
+// `img(src)`: the drawn image of a src (agentimages.js), or null. An image line outside code and tables whose src
+// has one is a block of its own, {k:"img", alt, src, img}; else it stays markdown.
+export function splitBlocks(text, img = null) {
   const lines = String(text ?? "").split("\n");
   const out = []; let md = [];
   const flush = () => { if (md.length && md.join("\n").trim()) out.push({ k: "md", text: md.join("\n") }); md = []; };
@@ -65,9 +71,29 @@ export function splitBlocks(text) {
       out.push({ k: "table", head, align, rows });
       continue;
     }
+    const m = img ? IMAGE_LINE.exec(lines[i]) : null;
+    const drawn = m ? img(imageSrc(m)) : null;
+    if (drawn) {
+      flush();
+      out.push({ k: "img", alt: m[1], src: imageSrc(m), img: drawn });
+      continue;
+    }
     md.push(lines[i]);
   }
   flush();
+  return out;
+}
+
+// The image lines of a text outside code and tables, in order: [{alt, src}].
+export function imageLines(text) {
+  const out = [];
+  for (const b of splitBlocks(text)) {
+    if (b.k !== "md") continue;
+    for (const l of b.text.split("\n")) {
+      const m = IMAGE_LINE.exec(l);
+      if (m) out.push({ alt: m[1], src: imageSrc(m) });
+    }
+  }
   return out;
 }
 

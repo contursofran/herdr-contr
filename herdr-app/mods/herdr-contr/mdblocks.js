@@ -9,6 +9,7 @@ import { linkRefs, refsVersion } from "./refs.js";
 import { inlinePiece, inlineFit, inlineContent } from "./inline.js";
 import { setting } from "./config.js";
 import { isMermaid, mermaidOf, mermaidSize } from "./mermaid.js";
+import { agentImageOf, agentImageSize, noteImages } from "./agentimages.js";
 
 export { splitBlocks, tableCells };
 
@@ -30,9 +31,9 @@ export function codeMarkdown(text) {
 
 // The code box under `y` (px from the text's top, at `width`), as written for Copy; null when `y` is not
 // on one. Box places are the estimate's, the same guess the row heights use.
-export function codeBlockAt(text, width, y, k = 1, zoom = 1) {
+export function codeBlockAt(text, width, y, k = 1, zoom = 1, log = null) {
   const spans = [];
-  markdownHeight(String(text ?? ""), width, spans, k, zoom);
+  markdownHeight(String(text ?? ""), width, spans, k, zoom, log);
   const s = spans.find((b) => y >= b.top && y <= b.bottom);
   return s ? s.lines.join("\n") : null;
 }
@@ -49,6 +50,14 @@ function codeBox(key, b, t, k, width) {
   return v_flex().w_full().my(6).px(14).py(10).rounded(12).bg(t.raised).border(1).border_color(t.border)
     .font_family("Menlo").text_size(13 * k).text_color(t.foreground)
     .child(TextView.markdown(key, codeMarkdown(b.text)).selectable(true));
+}
+
+// An image line with its copy (agentimages.js): the image in a rounded border, at the size estimate.js counts
+// (no wider than the text, at most IMG_MAX_H high).
+function imageBox(b, t, width) {
+  const s = agentImageSize(b.img, width);
+  return div().flex_none().my(6).w(s.w + 2).h(s.h + 2).rounded(8).border(1).border_color(t.border).bg(t.chrome).overflow_hidden()
+    .child(image(b.img.rel).w(s.w).h(s.h).rounded(7));
 }
 
 // Cells get a fixed width: a TextView in a flexible cell keeps its full one-line width and spills
@@ -80,8 +89,10 @@ function textView(key, md, repo, k) {
 // grows a code box while the agent writes keeps its first view (and the selection in it).
 // `k`: the chat's text size over the default 16 px (settings: text_size). At 1 nothing sets a size.
 // `repo`: "owner/repo" for a bare "#51" (refs.js); PR and issue references in prose become links.
-export function markdownView(id, text, t, width, k = 1, repo = null) {
-  const blocks = splitBlocks(text);
+// `log`: an assistant row's log on this machine: its image lines show their images (agentimages.js), else null.
+export function markdownView(id, text, t, width, k = 1, repo = null, log = null) {
+  if (log) noteImages(log, text);
+  const blocks = splitBlocks(text, log ? (src) => agentImageOf(log, src) : null);
   // "Inline PR icons" on: paragraphs and list items with a reference drawn with icons (#68).
   const inline = setting("inline_icons") === "on";
   const prose = (key, md, next) => (inline && safeSplit(key, id, md, next, repo, t, width, k)) || textView(key, md, repo, k);
@@ -89,6 +100,7 @@ export function markdownView(id, text, t, width, k = 1, repo = null) {
   return v_flex().w_full().children(blocks.map((b, i) =>
     b.k === "code" ? codeBox(`md-${id}-k${i}`, b, t, k, width)
       : b.k === "table" ? table(`md-${id}-t${i}`, b, t, width, k)
+        : b.k === "img" ? imageBox(b, t, width)
         : prose(`md-${id}-${i}`, b.text, blocks[i + 1]?.k ?? null)));
 }
 

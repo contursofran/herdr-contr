@@ -19,6 +19,7 @@ import { repoFor, refsVersion, lookupNames } from "./refs.js";
 import { inlineTick } from "./inline.js";
 import { picturesTick, userPictures, picturesView, pastedView } from "./pictures.js";
 import { mermaidTick, mermaidVersion } from "./mermaid.js";
+import { agentImagesTick, agentImagesVersion } from "./agentimages.js";
 import { textScale, setting } from "./config.js";
 
 // Herdr's zoom: line heights round in zoomed px (estimate.js lineHeight).
@@ -175,6 +176,8 @@ export class ChatView {
     // Mermaid diagrams (mermaid.js): the blocks the last draw showed, drawn by the helper here. A new one changes
     // the row heights (mermaidVersion is in the height cache's key).
     cx.spawn(async (cx) => { if (await mermaidTick()) cx.notify(); });
+    // An agent's linked images (agentimages.js): the image lines the last draw showed, copied by the helper here.
+    cx.spawn(async (cx) => { if (await agentImagesTick()) cx.notify(); });
     const status = agent?.status;
     if (status === "working") { if (Date.now() - this.lastWork >= WORK_MS) cx.spawn((cx) => this.pollWorking(cx, agent.address)); }
     else {
@@ -263,15 +266,20 @@ export class ChatView {
 
   colWidth() { return columnWidth(this.width); }
 
+  // The log of an agent on this machine, for the images its messages link (agentimages.js). Another machine's
+  // files are not here: null.
+  imageLog() { return machineOf(this.address) ? null : this.feed()?.path ?? null; }
+
   height(row) {
-    const w = this.colWidth(), open = this.open.has(row.id), k = textScale(), zoom = appZoom(), mv = mermaidVersion();
+    const w = this.colWidth(), open = this.open.has(row.id), k = textScale(), zoom = appZoom(), mv = mermaidVersion(), iv = agentImagesVersion();
+    const log = row.k === "assistant" ? this.imageLog() : null;
     // The pictures' height: null until they are known, then theirs (a new answer counts at once).
     const pics = row.k === "user" && row.from == null ? userPictures(row, this.feed()?.path, bubbleTextWidth(w)) : null;
     const ph = pics?.h ?? null;
     const c = this.heights.get(row);
-    if (c && c.w === w && c.open === open && c.k === k && c.zoom === zoom && c.mv === mv && c.ph === ph) return c.h;
-    const h = rowHeight(row, w, open, k, zoom, pics);
-    this.heights.set(row, { w, open, k, zoom, mv, ph, h });
+    if (c && c.w === w && c.open === open && c.k === k && c.zoom === zoom && c.mv === mv && c.iv === iv && c.log === log && c.ph === ph) return c.h;
+    const h = rowHeight(row, w, open, k, zoom, pics, log);
+    this.heights.set(row, { w, open, k, zoom, mv, iv, log, ph, h });
     return h;
   }
 
@@ -290,7 +298,8 @@ export class ChatView {
             .when(pics.h == null && Boolean(row.images), (el) => el.child(div().text_size(IMAGES_FS).text_color(t.muted).child(row.images === 1 ? "1 image" : `${row.images} images`))));
       }
       case "assistant":
-        return div().w_full().py(ROW_PAD_Y).text_color(t.foreground).child(md(row.text));
+        return div().w_full().py(ROW_PAD_Y).text_color(t.foreground)
+          .child(markdownView(row.id, row.text || "", t, this.colWidth(), textScale(), this.repo(), this.imageLog()));
       case "tools": return this.tools(row, t);
       case "sep":
         return h_flex().w_full().h(SEP_H).items_center().justify_center().text_size(11.5).text_color(t.dim).child(row.text || "");
@@ -371,7 +380,7 @@ export class ChatView {
     const w = this.colWidth();
     const at = typeof y0 !== "number" ? null : row.k === "assistant" ? { y: y0 - ROW_PAD_Y, w }
       : row.from == null ? { y: y0 - ROW_PAD_Y - BUBBLE_PAD_Y, w: bubbleTextWidth(w) } : null;
-    const code = at ? codeBlockAt(row.text || "", at.w, at.y - (i === 0 ? barH() : 0), textScale(), appZoom()) : null;
+    const code = at ? codeBlockAt(row.text || "", at.w, at.y - (i === 0 ? barH() : 0), textScale(), appZoom(), row.k === "assistant" ? this.imageLog() : null) : null;
     if (code !== null) items.push({ label: "Copy code", act: "copy", args: { text: code } });
     items.push({ label: "Copy message", act: "copy", args: { text: row.text || "" } });
     return openMenu(items);
