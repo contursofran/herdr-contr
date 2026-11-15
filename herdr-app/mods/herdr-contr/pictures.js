@@ -11,6 +11,7 @@ import { appHome } from "herdr";
 import * as sidecar from "./sidecar.js";
 import { appRel } from "./phone.js";
 import { picturesLayout, PIC_H, PIC_GAP } from "./metrics.js";
+import { agentImages } from "./agentimages.js";
 
 const RETRY_MS = 60_000, MAX_ASKS = 2, MAX_KEPT = 500;
 const answers = new Map();   // key -> { list: [{ rel, width, height }], at, failed?, layouts: Map }
@@ -138,6 +139,9 @@ export function userPictureList(row, path) {
   return pastedOf(row.text).rels.map((rel) => ({ rel }));
 }
 addPictureSource(userPictureList);
+// The images an agent links in its message (agentimages.js, #192): only the drawn ones, so a remote agent's has none.
+export const agentPictureList = (row, path) => (row?.k === "assistant" ? agentImages(path, row.text) : []);
+addPictureSource(agentPictureList);
 
 // [{ rel, width, height, row }]: `row` is the id of the row that has the picture.
 export function chatPictures(rows, path) {

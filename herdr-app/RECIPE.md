@@ -70,7 +70,8 @@ Left to right:
        next, also ← and →. At the first or the last picture the button is dimmed and nothing moves.
        Esc or a click outside the picture closes it; another agent's chat closes it too. The list is
        all pictures of the chat in chat order, taken when the viewer opens; a new kind of picture
-       joins it with one `addPictureSource` call (`pictures.js`).
+       joins it with one `addPictureSource` call (`pictures.js`): the user pictures and the images that an
+       agent links (#192), in chat order.
      - Agent reply: full-width markdown, 16 px text, 26 px lines (the `TextView` default; a mod
        cannot change it). Code fences are 12 px rounded boxes (`raised`,
        1 px border, Menlo 13 px, 21 px lines: one selectable `TextView` paragraph, so a drag selects across lines; right-click a box: Copy code, the box as written). Tables are 12 px rounded frames: a `raised` header
@@ -489,7 +490,8 @@ drawn by Herdr's `frames`; every loader of the mod is this one); done is a check
   size. Render notes the lines it drew; the chat's tick asks the helper. The image is in a rounded 1 px border with
   6 px above and below, at its own size or scaled down to the text width and to 480 px high; estimate.js counts the
   same height (no paragraph gap next to it, as a code box). A URL, a missing file, another format, a user message
-  or an agent on another machine: the line stays text. `agentImages(log, text)` lists a message's drawn images.
+  or an agent on another machine: the line stays text. `agentImages(log, text)` lists a message's drawn images; the viewer shows them
+  (`pictures.js` agentPictureList).
 - `TextView.markdown` takes no style and draws code and tables square. Split the text into blocks
   and draw fences and tables yourself. A `TextView` in a flexible cell keeps its one-line width
   and spills out: give table cells a fixed width.

@@ -8,6 +8,7 @@ import { markdownHeight, rowHeight } from "../mods/herdr-contr/estimate.js";
 import { IMAGE_LINE, imageLines, splitBlocks } from "../mods/herdr-contr/blocks.js";
 import { forgetCommands } from "../mods/herdr-contr/sidecar.js";
 import { ChatView } from "../mods/herdr-contr/chat.js";
+import { chatPictures } from "../mods/herdr-contr/pictures.js";
 import {
   agentImageOf, agentImageSize, agentImages, agentImagesTick, agentImagesVersion, forgetAgentImages, noteImages, IMG_BOX, IMG_MAX_H,
 } from "../mods/herdr-contr/agentimages.js";
@@ -152,4 +153,20 @@ test("an older helper without the command: text, and no agent-images call", asyn
   noteImages(LOG, MSG);
   assert.equal(await agentImagesTick(), false);
   assert.equal(asked().length, 0);
+});
+
+test("the viewer's list: user and agent pictures in chat order; an image not drawn is not in it", async () => {
+  const paste = (n) => `${HOME}/herdr-contr/paste/paste-${n}.png`;
+  const rows = [
+    { id: "u1", k: "user", text: `look ${paste(1)}` },
+    { id: "a2", k: "assistant", text: MSG },
+    { id: "a3", k: "assistant", text: "![web](https://x.dev/a.png)" },
+    { id: "u4", k: "user", text: paste(2) },
+  ];
+  const order = () => chatPictures(rows, LOG).map((p) => [p.row, p.rel, p.width]);
+  assert.deepEqual(order(), [["u1", "herdr-contr/paste/paste-1.png", null], ["u4", "herdr-contr/paste/paste-2.png", null]]);
+  noteImages(LOG, MSG);
+  await agentImagesTick();
+  assert.deepEqual(order(), [["u1", "herdr-contr/paste/paste-1.png", null], ["a2", "herdr-contr/images/img-0.png", 400], ["u4", "herdr-contr/paste/paste-2.png", null]]);
+  assert.deepEqual(chatPictures(rows, "/other/machine.jsonl").map((p) => p.row), ["u1", "u4"], "another log: none of these images");
 });
