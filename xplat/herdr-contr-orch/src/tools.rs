@@ -81,7 +81,7 @@ pub fn agent_tools<'a>(core: &'a dyn Core, env: Env<'a>) -> Vec<Tool<'a>> {
     vec![
         Tool {
             name: "spawn",
-            description: "Start a worker agent in a new hc terminal, in its worktree. It reports back with hc send when its turn ends.",
+            description: "Start a worker agent in a new hc terminal, in its worktree. It reports back with the report tool when its turn ends.",
             schema: schema(
                 &["name", "profile"],
                 &[
