@@ -6,7 +6,7 @@ import { fake, log, reset, theme } from "./stub/herdr.mjs";
 import { byId, textOf } from "./stub/ui.mjs";
 import { fakeCx } from "./fake-cx.mjs";
 import Spaces from "../mods/herdr-contr-spaces/main.js";
-import { split, countLine, moreLine, agentLabel, bySpace, workers, workerWork } from "../mods/herdr-contr-spaces/projects.js";
+import { split, countLine, moreLine, agentLabel, bySpace, workers, workerWork, workerRow } from "../mods/herdr-contr-spaces/projects.js";
 
 const store = new Map();
 Object.defineProperty(globalThis, "localStorage", { configurable: true,
@@ -53,6 +53,22 @@ test("grouping: each project, then its agents; an orchestrator's workers under i
   assert.equal(byId(el, "sub-w2").kids.length, 3, "and no name at the right");
   assert.equal(textOf(byId(el, "sub-w3").kids[1]), "builder");
   assert.equal(textOf(el.kids[0]), "Projects");
+});
+
+test("a worker's title label: the row shows it, with the name muted and the issue in the tooltip", () => {
+  const long = "Agent images in the chat, and a long tail that does not fit in the sidebar";
+  fake.terminals[1].labels = { contr: "agent", title: long, issue: "194" };
+  fake.terminals[2].labels = { contr: "agent", issue: "158" };
+  const el = make().render();
+  const w1 = byId(el, "sub-w1");
+  assert.equal(textOf(w1.kids[1]), long, "the title label wins over the session's own title");
+  assert.ok("truncate" in w1.kids[1]._a && "min_w" in w1.kids[1]._a, "one line, with an ellipsis when long");
+  assert.equal(textOf(w1.kids[2]), "Question card", "the name stays at the right");
+  assert.equal(w1._a.tooltip, `Question card · #194 · ${long}`);
+  const w2 = byId(el, "sub-w2");
+  assert.equal(textOf(w2.kids[1]), "PR links in chat", "no title: the name, as before");
+  assert.equal(w2.kids.length, 3);
+  assert.equal(w2._a.tooltip, "PR links in chat · #158", "the issue shows in the tooltip");
 });
 
 test("the count line: only an agent with live workers has 'Orchestrating · N workers'", () => {
@@ -202,6 +218,16 @@ test("agentLabel: a named tab, the agent's own title, never an automatic tab num
   assert.equal(agentLabel(a, tabs, new Map([["t1", { title: "✳ Fix the bar", program: claude }]]), false), "Fix the bar");
   assert.equal(agentLabel(a, tabs, new Map(), false), "claude");
   assert.equal(agentLabel({ ...a, tab: "t2" }, tabs, new Map(), false), "review");
+});
+
+test("workerRow: the title label, else the session's title, else the name; name, issue and work in the tip", () => {
+  const k = { address: "t9", name: "b-194", program: claude };
+  assert.deepEqual(workerRow({ ...k, labels: { title: " Agent\nimages ", issue: "194" } }, "\u2733 Own title"),
+    { work: "Agent images", name: "b-194", tip: "b-194 · #194 · Agent images" });
+  assert.deepEqual(workerRow({ ...k, labels: { title: "  " } }, "\u2733 Own title"), { work: "Own title", name: "b-194", tip: "b-194 · Own title" });
+  assert.deepEqual(workerRow({ ...k, labels: { title: "b-194", issue: "PR 12" } }), { work: "", name: "b-194", tip: "b-194 · PR 12" });
+  assert.deepEqual(workerRow(k), { work: "", name: "b-194", tip: "" });
+  assert.deepEqual(workerRow({ address: "t9", template: "builder" }), { work: "", name: "builder", tip: "" });
 });
 
 test("workerWork: the worker's own title, cleaned; not its program, a path, user@host or its name", () => {
