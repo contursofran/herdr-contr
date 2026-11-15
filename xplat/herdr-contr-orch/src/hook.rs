@@ -1,7 +1,8 @@
 //! The kit's hooks, which Claude Code runs with the hook input on stdin. Ported from contr's `contr hook`.
 //!
 //! `stop` in a worker (CONTR_COORDINATOR is set): a turn that sent no report gets one, sent to the
-//! coordinator. It never stops the turn.
+//! coordinator, or held for it when hc refuses it. It never stops the turn. In other hc sessions, `stop` and
+//! `prompt` give the reports that were held for the terminal (`held`).
 //!
 //! `stop` in a coordinator: before Claude Code compacts the context, the hook keeps the turn going one time
 //! and asks for an update of the state file. `session-start` gives a coordinator its playbook and state.
@@ -15,6 +16,7 @@ use serde_json::{json, Map, Value};
 use crate::cli::flow_text;
 use crate::home::owner_store;
 use crate::flowseen;
+use crate::held;
 use crate::spawn::ENV_COORDINATOR;
 use crate::turn::{context_and_model, last_turn, ran_command, Turn};
 use crate::workers::{Core, Manager, LABEL_CONTEXT, LABEL_CONTEXT_LIMIT, LABEL_EFFORT, LABEL_MODEL, LABEL_ORCHESTRATING, ROLE_ORCHESTRATOR};
@@ -27,10 +29,16 @@ pub const USAGE: &str = "Usage:
 Claude Code runs them and gives them the hook input on stdin.
 
 stop, in a worker (CONTR_COORDINATOR is set): a turn that sent no report
-with hc send gets one, \"ended its turn without a report. Last words: …\",
-sent to the coordinator. When Claude Code saved no transcript, the hook
-cannot tell if the turn sent one: it sends \"ended its turn; it may have
-sent a report already …\" with the last words. It never stops the turn.
+(hc send or the report tool, with a result that is not an error) gets one,
+\"ended its turn without a report. Last words: …\", sent to the
+coordinator. When Claude Code saved no transcript, the hook cannot tell if
+the turn sent one: it sends \"ended its turn; it may have sent a report
+already …\" with the last words. When hc refuses it (the coordinator's
+prompt is busy), it is held for the coordinator. It never stops the turn.
+
+stop, in an hc session that is not a worker: when reports were held for
+its terminal, it keeps the turn going one time and gives them, and does
+nothing more in this Stop.
 
 stop, in a coordinator (a session that ran /contr:orchestrate, or an hc
 terminal with role orchestrator): when the context passes CONTR_SAVE_AT
@@ -52,7 +60,8 @@ prompt runs only in an hc terminal (HC_TERMINAL_ID), and not in a worker.
 It asks Claude to add each request of the owner to its todos with
 \"[you] \". A prompt that starts with \"<hc from=\" is skipped. When the
 owner changed the flow or the models of the profiles after the session
-saw them last, a coordinator gets them again. It always exits 0.
+saw them last, a coordinator gets them again. Reports that were held for
+the terminal come with it. It always exits 0.
 ";
 
 /// What the prompt hook adds to a prompt of the owner.
@@ -136,7 +145,16 @@ pub fn run(args: &[String], env: &dyn Fn(&str) -> String, input: &mut dyn BufRea
     } else if !env(ENV_COORDINATOR).is_empty() {
         worker_stop(&h.input, env, core)
     } else {
-        h.coordinator_stop(out)
+        // Held reports come first: they keep the turn going, and the next Stop does the rest. An error with the
+        // held reports does not stop the rest.
+        match h.give_held(out) {
+            Ok(true) => Ok(()),
+            Ok(false) => h.coordinator_stop(out),
+            Err(e) => {
+                let _ = writeln!(err, "herdr-contr-orch hook: {e}");
+                h.coordinator_stop(out)
+            }
+        }
     };
     match done {
         Ok(()) => 0,
@@ -162,12 +180,19 @@ fn prompt(env: &dyn Fn(&str) -> String, input: &mut dyn BufRead, out: &mut dyn W
     input.read_to_string(&mut raw).map_err(|e| format!("bad hook input: {e}"))?;
     let hook_input: Value = serde_json::from_str(&raw).map_err(|e| format!("bad hook input: {e}"))?;
     let asked = hook_input["prompt"].as_str().unwrap_or_default().trim();
+    let waiting = held::take(env, &id).map(|r| held::text(&r)).unwrap_or_else(|e| {
+        let _ = writeln!(err, "herdr-contr-orch hook prompt: {e}");
+        String::new()
+    });
     let mut parts = Vec::new();
     if !asked.is_empty() && !asked.starts_with("<hc from=") {
         parts.push(YOU_CONTEXT);
     }
     if !flow.is_empty() {
         parts.push(&flow);
+    }
+    if !waiting.is_empty() {
+        parts.push(&waiting);
     }
     if parts.is_empty() {
         return Ok(());
@@ -177,7 +202,8 @@ fn prompt(env: &dyn Fn(&str) -> String, input: &mut dyn BufRead, out: &mut dyn W
 }
 
 /// Sends the coordinator a report for a turn that sent none. With no transcript file (Claude Code saved
-/// none), the hook cannot tell if the turn sent one, so the report says that it can repeat one.
+/// none), the hook cannot tell if the turn sent one, so the report says that it can repeat one. When hc
+/// refuses the send, the report is held for the coordinator.
 fn worker_stop(input: &Input, env: &dyn Fn(&str) -> String, core: &dyn Core) -> Result<(), String> {
     let coordinator = env(ENV_COORDINATOR);
     if input.transcript_path.is_empty() {
@@ -193,7 +219,7 @@ fn worker_stop(input: &Input, env: &dyn Fn(&str) -> String, core: &dyn Core) -> 
     }
     let said = if input.last_assistant_message.trim().is_empty() { &turn.said } else { &input.last_assistant_message };
     let text = if no_transcript { unsure_report(said, &input.cwd) } else { missed_report(said, &input.cwd) };
-    Manager::new(core, env("HC_TERMINAL_ID")).send(&coordinator, &text).map_err(|e| format!("report to {coordinator}: {e}"))
+    held::report(core, env, &coordinator, &text).map(|_| ()).map_err(|e| format!("report to {coordinator}: {e}"))
 }
 
 /// The report for a turn that sent none: the worker's last words on one line, cut to SAID_MAX characters, and
@@ -256,6 +282,21 @@ impl Hook<'_> {
     /// A positive number in the variable `name`, else `default`.
     fn number(&self, name: &str, default: i64) -> i64 {
         (self.env)(name).parse::<i64>().ok().filter(|n| *n > 0).unwrap_or(default)
+    }
+
+    /// Gives this terminal the reports that were held for it, as the reason that keeps the turn going. True
+    /// when there were some.
+    fn give_held(&self, out: &mut dyn Write) -> Result<bool, String> {
+        let terminal = self.terminal();
+        if terminal.is_empty() {
+            return Ok(false);
+        }
+        let text = held::text(&held::take(self.env, &terminal)?);
+        if text.is_empty() {
+            return Ok(false);
+        }
+        writeln!(out, "{}", json!({"decision": "block", "reason": text})).map_err(|e| e.to_string())?;
+        Ok(true)
     }
 
     /// Asks a coordinator, one time for each compaction, to save its state when the context comes near the

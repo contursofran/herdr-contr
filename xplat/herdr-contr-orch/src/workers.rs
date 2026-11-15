@@ -229,6 +229,15 @@ impl Worker {
     }
 }
 
+/// The outcome of a send that hc answered.
+#[derive(Debug, PartialEq, Eq)]
+pub enum Sent {
+    /// hc typed the text and pressed Enter.
+    Typed,
+    /// hc did not type it, for this reason.
+    Refused(String),
+}
+
 /// Lists and controls the workers through `core`. `caller` is the hc terminal this tool runs in
 /// (HC_TERMINAL_ID), or "" outside hc.
 pub struct Manager<'a> {
@@ -270,6 +279,15 @@ impl<'a> Manager<'a> {
     /// Types text into a worker and presses Enter. Blank text is an error: hc would still submit its sender
     /// tag, an empty message. A send that hc refuses is an error with hc's reason.
     pub fn send(&self, name: &str, text: &str) -> Result<(), String> {
+        match self.try_send(name, text)? {
+            Sent::Typed => Ok(()),
+            Sent::Refused(reason) => Err(format!("agents: {name} did not take the text: {reason}")),
+        }
+    }
+
+    /// As `send`, but a send that hc refuses (such as for a terminal that shows a dialog) is `Sent::Refused` with
+    /// hc's reason, not an error. An error is blank text or a failed call.
+    pub fn try_send(&self, name: &str, text: &str) -> Result<Sent, String> {
         if text.trim().is_empty() {
             return Err("agents: no text to send".into());
         }
@@ -278,9 +296,21 @@ impl<'a> Manager<'a> {
         let res = self.core.call("terminal.send", Value::Object(p))?;
         if res["sent"] == false {
             let reason = res["reason"].as_str().filter(|r| !r.is_empty()).unwrap_or("no reason given");
-            return Err(format!("agents: {name} did not take the text: {reason}"));
+            return Ok(Sent::Refused(reason.to_string()));
         }
-        Ok(())
+        Ok(Sent::Typed)
+    }
+
+    /// The caller as hc's sender tag names it: its address and its name, such as "t7 b-195". Only the address
+    /// when hc does not know the name, and "" outside hc.
+    pub fn caller_tag(&self) -> String {
+        if self.caller.is_empty() {
+            return String::new();
+        }
+        match self.get(&self.caller) {
+            Ok(w) if !w.name.is_empty() && w.name != self.caller => format!("{} {}", self.caller, w.name),
+            _ => self.caller.clone(),
+        }
     }
 
     /// Presses a worker's stop key. The outcome is hc's: stopped, exited, still_working or unknown.

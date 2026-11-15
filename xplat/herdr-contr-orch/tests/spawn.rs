@@ -7,6 +7,7 @@ use std::process::Command;
 
 use common::{call, path, Fake};
 use orch::spawn::{review_worktree, CLEAN_SCRIPT, SETUP_WRAPPER};
+use orch::tools::REPORT_TOOL;
 use orch::workers::program;
 use serde_json::{json, Value};
 
@@ -189,12 +190,13 @@ fn a_claude_profile_loads_the_kit_and_its_agent() {
     };
     // CONTR_KIT replaces the kit of the file. The agent of the profile picks the kit's definition.
     let vars = [("CONTR_AGENTS_CONFIG", cfg.as_str()), ("CONTR_KIT", path(&kit))];
-    assert_eq!(head(&vars, "planner-high").0, ["claude", "--plugin-dir", path(&kit), "--agent", "contr:planner", "--effort", "high", "go"]);
+    // The kit's report tool is allowed, so auto mode does not block a report. A flag comes after the list.
+    assert_eq!(head(&vars, "planner-high").0, ["claude", "--allowedTools", REPORT_TOOL, "--plugin-dir", path(&kit), "--agent", "contr:planner", "--effort", "high", "go"]);
     // No definition for the builder in this kit, and a --plugin-dir of the profile stays.
-    assert_eq!(head(&vars, "builder").0[..3], ["claude", "--plugin-dir", path(&kit)]);
+    assert_eq!(head(&vars, "builder").0[..5], ["claude", "--allowedTools", REPORT_TOOL, "--plugin-dir", path(&kit)]);
     assert!(!head(&vars, "builder").0.contains(&"--agent".to_string()));
     assert_eq!(head(&vars, "own").0, ["/opt/bin/claude", "--plugin-dir=/mine", "go"]);
-    assert_eq!(head(&[("CONTR_AGENTS_CONFIG", &cfg)], "builder").0[..3], ["claude", "--plugin-dir", "/file/kit"]);
+    assert_eq!(head(&[("CONTR_AGENTS_CONFIG", &cfg)], "builder").0[..5], ["claude", "--allowedTools", REPORT_TOOL, "--plugin-dir", "/file/kit"]);
     // A program that is not claude gets no kit, no clean wrapper and no path.
     let (prog, len, env) = head(&vars, "pi");
     assert_eq!((prog.as_slice(), len, env), (&["pi".to_string(), "--fast".into(), "go".into()][..], 3, None));

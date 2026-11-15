@@ -79,3 +79,16 @@ fn each_agent_file_is_a_built_in_profile() {
         assert!(AGENTS_USAGE.contains(&format!(" {name}")), "{name} is not a built-in profile");
     }
 }
+
+#[test]
+fn the_report_tool_has_the_name_that_claude_code_gives_it() {
+    // Claude Code names a plugin's MCP tool mcp__plugin_<plugin>_<server>__<tool>. Spawn allows this name.
+    let plugin = json(".claude-plugin/plugin.json")["name"].as_str().unwrap().to_string();
+    let servers = json(".mcp.json")["mcpServers"].as_object().unwrap().keys().cloned().collect::<Vec<_>>();
+    assert_eq!(orch::tools::REPORT_TOOL, format!("mcp__plugin_{plugin}_{}__report", servers[0]));
+    // Each agent definition tells the worker to report with the tool.
+    for entry in fs::read_dir(kit().join("agents")).unwrap() {
+        let text = fs::read_to_string(entry.unwrap().path()).unwrap();
+        assert!(text.contains("with the contr `report` tool"), "an agent does not name the report tool");
+    }
+}

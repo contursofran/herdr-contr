@@ -91,12 +91,12 @@ fn the_server_lists_the_worker_tools_and_the_owner_tools() {
     assert_eq!(got[0]["result"]["serverInfo"], json!({"name": "herdr-contr-orch", "version": env!("CARGO_PKG_VERSION")}));
     let tools = got[1]["result"]["tools"].as_array().unwrap();
     let names: Vec<&str> = tools.iter().map(|t| t["name"].as_str().unwrap()).collect();
-    assert_eq!(names, ["spawn", "set_title", "message", "interrupt", "stop", "read", "prompt", "list", "clear_ended", "ask_owner", "decided", "pin_for_owner", "unpin_for_owner", "owner_items"]);
+    assert_eq!(names, ["spawn", "set_title", "message", "report", "interrupt", "stop", "read", "prompt", "list", "clear_ended", "ask_owner", "decided", "pin_for_owner", "unpin_for_owner", "owner_items"]);
     let spawn = &tools[0]["inputSchema"];
     assert_eq!(spawn["required"], json!(["name", "profile"]));
     assert_eq!(spawn["properties"]["review_pr"]["type"], "integer");
-    assert_eq!(tools[9]["inputSchema"]["properties"]["options"], json!({"type": "array", "items": {"type": "string"}, "description": "Short answers to pick from (2-4)."}));
-    assert!(tools[7]["inputSchema"].get("required").is_none());
+    assert_eq!(tools[10]["inputSchema"]["properties"]["options"], json!({"type": "array", "items": {"type": "string"}, "description": "Short answers to pick from (2-4)."}));
+    assert!(tools[8]["inputSchema"].get("required").is_none());
     assert!(tools.iter().all(|t| !t["description"].as_str().unwrap().is_empty()));
 }
 
