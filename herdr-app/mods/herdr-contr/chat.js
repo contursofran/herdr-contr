@@ -17,7 +17,8 @@ import { switchStrip } from "./viewswitch.js";
 import { markdownView, codeBlockAt } from "./mdblocks.js";
 import { repoFor, refsVersion, lookupNames } from "./refs.js";
 import { inlineTick } from "./inline.js";
-import { picturesTick, userPictures, picturesView, pastedView } from "./pictures.js";
+import { picturesTick, userPictures, picturesView, pastedView, chatPictures } from "./pictures.js";
+import { PictureViewer } from "./viewer.js";
 import { mermaidTick, mermaidVersion } from "./mermaid.js";
 import { agentImagesTick, agentImagesVersion } from "./agentimages.js";
 import { textScale, setting } from "./config.js";
@@ -42,6 +43,8 @@ const ECHO_OPACITY = 0.55;
 // Older rows load by themselves while all rows fit on screen (with FILL_PX to spare), at most AUTO_OLDER
 // times a chat is opened: a log whose last 2 MB is only tool output can hold no rows for a long way back.
 const AUTO_OLDER = 5, FILL_PX = 400;
+// A press that moves more than this (px) before the click is a drag, not a click on the row.
+const DRAG_PX = 4;
 
 // A chat chip: a tool chip, a note from another agent, a running call. The caller adds what it shows.
 function chip(t) {
@@ -99,6 +102,7 @@ export class ChatView {
     this.panel = new PanelCard(cx);
     this.owner = new OwnerCards(cx);   // the coordinator's questions for the owner (#131)
     this.helper = new HelperUI();
+    this.viewer = new PictureViewer(cx);
     this.refresh = (cx) => { this.lastPoll = 0; return this.poll(cx); };
     this.composer.onNewConversation = (_address, cx) => this.refresh(cx);
     // A sent message shows at once; the feed is read again when the send is done, and fast while it waits.
@@ -134,6 +138,7 @@ export class ChatView {
     this.address = address; this.cards.shown = address; this.panel.shown = address; this.owner.shown = address;
     if (address && !this.feeds.has(address)) this.feeds.set(address, emptyFeed(address));
     this.follow = true; this.open = new Set(); this.autoOlder = 0;
+    this.viewer?.close();
     // A newly shown agent gets its own background read.
     this.background = null; this.lastStatus = undefined;
     this.toNewest();
@@ -386,9 +391,13 @@ export class ChatView {
     return openMenu(items);
   }
 
+  // A click on a row: a tool row or a note opens or closes; a row with pictures opens the viewer at its first
+  // picture (viewer.js). The list gives only the row's key, not where in the row the press was (#70).
   click(key, cx) {
-    const row = this.feed()?.rows.find((r) => r.id === key);
+    const f = this.feed(), row = f?.rows.find((r) => r.id === key);
     if (!row) return;
+    const dragged = this.press?.moved; this.press = null;
+    if (!dragged && this.viewer.open(chatPictures(this.rowsOf(f), f.path), row.id)) { cx.notify(); return; }
     if (row.k === "tools" || (row.k === "user" && row.from != null)) {
       if (this.open.has(row.id)) this.open.delete(row.id); else this.open.add(row.id);
       cx.notify();
@@ -423,7 +432,11 @@ export class ChatView {
     const rows = this.rowsOf(f), n = rows.length;
     // The first row starts below the bar; the rest scroll up under it.
     const sizes = rows.map((r, i) => this.height(r) + (i === 0 ? barH() : 0));
+    // A left press and how far it went: a drag that selects text in a row with pictures is not a click.
     const box = v_flex().relative().flex_1().min_h(0)
+      .on_mouse_down("left", (e) => { this.press = { x: e?.position?.x ?? 0, y: e?.position?.y ?? 0, moved: false }; })
+      .on_mouse_move((e) => { const p = this.press; if (p && Math.hypot((e?.position?.x ?? 0) - p.x, (e?.position?.y ?? 0) - p.y) > DRAG_PX) p.moved = true; })
+      .on_mouse_up("left", () => { this.press = null; })
       .on_scroll_wheel((e, cx) => {
         const up = e?.delta?.y > 0;
         if (this.follow && up) { this.follow = false; cx.notify(); }
@@ -480,7 +493,7 @@ export class ChatView {
     else main = this.list(t, f);
     const stop = (_e, cx) => cx.stop_propagation();
     return watchEdge(v_flex().id("root").relative().size_full().min_w(0).bg(t.background))
-      .on_size_change((size, cx) => { noteWindowHeight(size); if (Math.abs(size.width - this.width) >= 1) { this.width = size.width; cx.notify(); } })
+      .on_size_change((size, cx) => { noteWindowHeight(size); this.heightPx = size.height; if (Math.abs(size.width - this.width) >= 1) { this.width = size.width; cx.notify(); } })
       .on_drop((e, cx) => this.composer.addFiles(e?.paths, cx))
       // The chat input keeps ⌘⌥↑/↓ from the app's keys, so the chat switches spaces itself.
       .on_key_down((e, cx) => { const go = spaceKey(e); if (go) { cx.stop_propagation?.(); run(go); } })
@@ -504,6 +517,7 @@ export class ChatView {
         return el.child(div().w_full().on_mouse_down("left", stop).child(this.composer.render(currentAgent(), t, this.colWidth(), this.work?.address === this.address ? this.work : null,
           this.background?.address === this.address ? this.background : null)));
       })
-      .child(overBar(t));
+      .child(overBar(t))
+      .when(this.viewer.shown, (el) => el.child(this.viewer.view(t, this.width, this.heightPx ?? shared(KEY_WIN_H) ?? 800)));
   }
 }

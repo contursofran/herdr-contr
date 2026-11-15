@@ -60,6 +60,17 @@ Left to right:
        A pasted image's path in the text (`herdr-contr/paste` under the app home, PNG or JPEG) is taken
        out of the text and drawn: one line of 120 px high pictures, each as wide as its image, cut at
        the text width. No helper call: the file is there. A path outside the app home stays text.
+     - Picture viewer (#193): a click on a message with pictures opens a layer over the chat
+       (`#000000c0`) at that message's first picture. The list cannot tell where in the row the
+       press was (#70), so a click anywhere in the row opens it; a press that moves more than 4 px
+       (a text selection) does not. The picture is fitted in the chat less 48 px each side and the
+       buttons, its shape kept, never larger than its own size (a pasted picture, with no known size,
+       fits itself in that box); 6 px corners. Under it, "3 / 7" (12.5 px, white at 80%). Each side,
+       a round 36 px button (`raised`, 1 px `border`, `hover` on hover) with a chevron: previous and
+       next, also ← and →. At the first or the last picture the button is dimmed and nothing moves.
+       Esc or a click outside the picture closes it; another agent's chat closes it too. The list is
+       all pictures of the chat in chat order, taken when the viewer opens; a new kind of picture
+       joins it with one `addPictureSource` call (`pictures.js`).
      - Agent reply: full-width markdown, 16 px text, 26 px lines (the `TextView` default; a mod
        cannot change it). Code fences are 12 px rounded boxes (`raised`,
        1 px border, Menlo 13 px, 21 px lines: one selectable `TextView` paragraph, so a drag selects across lines; right-click a box: Copy code, the box as written). Tables are 12 px rounded frames: a `raised` header
@@ -229,8 +240,8 @@ drawn by Herdr's `frames`; every loader of the mod is this one); done is a check
     again). The port is config.json `phone_port` (8787), not in the dialog: for a port already taken.
     herdr-contr never changes Tailscale settings; it shows the Serve command. An install that replaces
     the helper restarts this service. While the dialog is open it asks the helper again every 10 s.
-  - **Shortcuts** (#165, read only): the keys that the three mods bind, in four groups (WINDOW, REPLY
-    BOX, CARDS, SETTINGS). A row is what the key does (13 px `foreground`) and its key caps on the right
+  - **Shortcuts** (#165, read only): the keys that the three mods bind, in five groups (WINDOW, CHAT,
+    REPLY BOX, CARDS, SETTINGS). A row is what the key does (13 px `foreground`) and its key caps on the right
     (22 px high, 5 px corners, `chrome`, `border`, 12 px); "or" between two keys, "…" in a range
     (⌃1 … ⌃9). The caps follow `window().platform`: ⌘ ⌥ ⇧ ⌃ on macOS, Ctrl / Alt / Shift elsewhere.
     The table is `shortcuts.js`: the reply box binds its keys from it, and a test compares it with
