@@ -20,6 +20,14 @@ export function fitPicture(p, w, h) {
   return { w: Math.max(1, Math.floor(p.width * k)), h: Math.max(1, Math.floor(p.height * k)) };
 }
 
+// The viewer's keys, with no modifier: "prev" (←), "next" (→), "close" (Esc), else null. shortcuts.js lists them.
+export function viewerKey(e) {
+  const m = e?.modifiers ?? {};
+  if (m.shift || m.alt || m.control || m.platform || m.function) return null;
+  const k = String(e?.keystroke ?? e?.key ?? "");
+  return k === "left" ? "prev" : k === "right" ? "next" : k === "escape" ? "close" : null;
+}
+
 export class PictureViewer {
   constructor(cx) {
     this.list = null; this.at = 0;
@@ -52,11 +60,10 @@ export class PictureViewer {
 
   // Esc closes, ← and → move. true when the key was the viewer's.
   key(e) {
-    const k = e?.keystroke ?? e?.key;
-    if (k === "escape") { this.close(); return true; }
-    if (k === "left") { this.move(-1); return true; }
-    if (k === "right") { this.move(1); return true; }
-    return false;
+    const k = viewerKey(e);
+    if (k === "close") this.close();
+    else if (k) this.move(k === "prev" ? -1 : 1);
+    return k !== null;
   }
 
   button(t, id, name, can, step) {

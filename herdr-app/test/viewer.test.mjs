@@ -94,6 +94,8 @@ test("keys: ← and → move, Esc closes, other keys are not the viewer's", () =
   assert.equal(v.key({ keystroke: "left" }), true);
   assert.equal(v.label(), "2 / 4");
   assert.equal(v.key({ keystroke: "a" }), false);
+  assert.equal(v.key({ key: "right", modifiers: { shift: true } }), false, "with a modifier the key is not the viewer's");
+  assert.equal(v.label(), "2 / 4");
   assert.equal(v.key({ keystroke: "escape" }), true);
   assert.equal(v.shown, false);
   assert.equal(v.label(), "");
