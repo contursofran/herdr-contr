@@ -44,6 +44,8 @@ pub struct Spec {
     pub parent: String,
     /// The project name; no control characters.
     pub project: String,
+    /// A few words of what the worker does, or ""; no control characters.
+    pub title: String,
 }
 
 fn words(list: &[&str]) -> Vec<String> {
@@ -182,6 +184,7 @@ pub fn spawn(core: &dyn Core, cfg: &Config, env: &dyn Fn(&str) -> String, mut s:
     if s.project.chars().any(char::is_control) {
         return Err("agents: the project name has a control character".into());
     }
+    s.title = workers::check_title(&s.title)?;
     if !s.worktree.is_empty() {
         s.worktree = worktree_dir(&s.worktree)?;
     }
@@ -200,6 +203,9 @@ pub fn spawn(core: &dyn Core, cfg: &Config, env: &dyn Fn(&str) -> String, mut s:
     }
     if !s.issue.is_empty() {
         labels.insert(workers::LABEL_ISSUE.into(), json!(s.issue));
+    }
+    if !s.title.is_empty() {
+        labels.insert(workers::LABEL_TITLE.into(), json!(s.title));
     }
     // A relative kit path is made absolute, because the agent runs in its worktree.
     let kit = if cfg.kit.is_empty() { String::new() } else { std::path::absolute(&cfg.kit).map(|k| k.display().to_string()).unwrap_or_else(|_| cfg.kit.clone()) };

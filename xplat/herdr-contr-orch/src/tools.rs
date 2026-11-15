@@ -52,6 +52,7 @@ struct AgentArgs {
     task: String,
     task_file: String,
     issue: String,
+    title: String,
     worktree: String,
     project: String,
     role: String,
@@ -85,6 +86,7 @@ pub fn agent_tools<'a>(core: &'a dyn Core, env: Env<'a>) -> Vec<Tool<'a>> {
                     ("task", "string", "The self-contained brief: the first message. Give task or task_file."),
                     ("task_file", "string", "An absolute path to a file that holds the brief, instead of task."),
                     ("issue", "string", "Issue number."),
+                    ("title", "string", "A few words of what the worker does (for example Agent images in the chat). The sidebar shows it."),
                     ("worktree", "string", "The worker's working folder (its git worktree)."),
                     ("role", "string", "Role label; the profile name by default."),
                     ("project", "string", "Project name; groups the worker with its project's questions."),
@@ -106,9 +108,15 @@ pub fn agent_tools<'a>(core: &'a dyn Core, env: Env<'a>) -> Vec<Tool<'a>> {
                 if a.review_pr != 0 {
                     worktree = review_worktree(if worktree.is_empty() { "." } else { &worktree }, a.review_pr)?;
                 }
-                let spec = Spec { name: a.name, profile: a.profile, task, issue: a.issue, worktree, role: a.role, project: a.project, parent: env("HC_TERMINAL_ID") };
+                let spec = Spec { name: a.name, profile: a.profile, task, issue: a.issue, worktree, role: a.role, project: a.project, title: a.title, parent: env("HC_TERMINAL_ID") };
                 pretty(&spawn(core, &cfg, env, spec)?)
             }),
+        },
+        Tool {
+            name: "set_title",
+            description: "Change the title of a live worker: a few words of what it does, that the sidebar shows.",
+            schema: schema(&["name", "title"], &[name, ("title", "string", "The new title: one line.")]),
+            run: run(core, env, |m, a| m.set_title(&a.name, &a.title).map(|_| "titled".into())),
         },
         Tool {
             name: "message",

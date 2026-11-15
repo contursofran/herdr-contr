@@ -91,12 +91,12 @@ fn the_server_lists_the_worker_tools_and_the_owner_tools() {
     assert_eq!(got[0]["result"]["serverInfo"], json!({"name": "herdr-contr-orch", "version": env!("CARGO_PKG_VERSION")}));
     let tools = got[1]["result"]["tools"].as_array().unwrap();
     let names: Vec<&str> = tools.iter().map(|t| t["name"].as_str().unwrap()).collect();
-    assert_eq!(names, ["spawn", "message", "interrupt", "stop", "read", "prompt", "list", "clear_ended", "ask_owner", "decided", "pin_for_owner", "unpin_for_owner", "owner_items"]);
+    assert_eq!(names, ["spawn", "set_title", "message", "interrupt", "stop", "read", "prompt", "list", "clear_ended", "ask_owner", "decided", "pin_for_owner", "unpin_for_owner", "owner_items"]);
     let spawn = &tools[0]["inputSchema"];
     assert_eq!(spawn["required"], json!(["name", "profile"]));
     assert_eq!(spawn["properties"]["review_pr"]["type"], "integer");
-    assert_eq!(tools[8]["inputSchema"]["properties"]["options"], json!({"type": "array", "items": {"type": "string"}, "description": "Short answers to pick from (2-4)."}));
-    assert!(tools[6]["inputSchema"].get("required").is_none());
+    assert_eq!(tools[9]["inputSchema"]["properties"]["options"], json!({"type": "array", "items": {"type": "string"}, "description": "Short answers to pick from (2-4)."}));
+    assert!(tools[7]["inputSchema"].get("required").is_none());
     assert!(tools.iter().all(|t| !t["description"].as_str().unwrap().is_empty()));
 }
 
@@ -115,7 +115,7 @@ fn the_worker_tools_call_hc() {
         .reply("terminal.read", json!({"text": "a screen\n"}));
     let got = talk(
         &[
-            tool(1, "spawn", json!({"name": "b-158", "profile": "builder", "issue": "158", "worktree": wt, "task": "read TASK.md"})),
+            tool(1, "spawn", json!({"name": "b-158", "profile": "builder", "issue": "158", "title": "Fix the test", "worktree": wt, "task": "read TASK.md"})),
             tool(2, "message", json!({"name": "b-158", "text": "fix the test"})),
             tool(3, "interrupt", json!({"name": "b-158"})),
             tool(4, "read", json!({"name": "b-158", "lines": 5})),
@@ -123,6 +123,8 @@ fn the_worker_tools_call_hc() {
             tool(6, "prompt", json!({"name": "b-158"})),
             tool(7, "message", json!({"name": "b-158", "message": "a wrong field"})),
             tool(8, "spawn", json!({"name": "b-159", "profile": "builder", "worktree": wt})),
+            tool(9, "set_title", json!({"name": "b-158", "title": "Agent images in the chat"})),
+            tool(10, "set_title", json!({"name": "b-158", "title": "  "})),
         ],
         &vars,
         &core,
@@ -138,12 +140,16 @@ fn the_worker_tools_call_hc() {
     let (bad, is_error) = text(&got[6]);
     assert!(is_error && bad.starts_with("message: bad arguments: unknown field `message`"), "{bad}");
     assert_eq!(text(&got[7]), ("spawn: give the brief as task or task_file", true));
+    assert_eq!(text(&got[8]), ("titled", false));
+    assert_eq!(text(&got[9]), ("set_title: agents: no title to set", true));
 
     let calls = core.calls();
     let (method, run) = &calls[0];
     assert_eq!(method, "terminal.run");
     assert_eq!((&run["parent"], &run["name"], &run["cwd"]), (&json!("t1"), &json!("b-158"), &json!(wt)));
     assert_eq!(run["argv"].as_array().unwrap().last().unwrap(), "read TASK.md");
+    assert_eq!(run["labels"]["title"], "Fix the test");
+    assert_eq!(calls.last().unwrap(), &("terminal.label".to_string(), json!({"terminal": "b-158", "caller": "t1", "labels": {"title": "Agent images in the chat"}})));
     assert_eq!(calls[1], ("terminal.send".to_string(), json!({"terminal": "b-158", "caller": "t1", "text": "fix the test"})));
     assert_eq!(calls[3], ("terminal.read".to_string(), json!({"terminal": "b-158", "caller": "t1", "lines": 5})));
     // The wrong field and the spawn with no brief reach no terminal.

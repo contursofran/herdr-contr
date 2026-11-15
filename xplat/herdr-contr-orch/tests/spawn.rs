@@ -61,6 +61,12 @@ fn spawn_starts_the_profile_with_its_labels_and_parent() {
     assert_eq!((&p["name"], &p["parent"], &p["cwd"], &p["wait"], &p["outlive_parent"]), (&json!("b-158"), &json!("t1"), &json!(wt), &json!(false), &json!(true)));
     assert!(p.get("no_parent").is_none() && p.get("display").is_none());
 
+    // A title is a label, trimmed.
+    let core = run_reply("b-159");
+    let r = call(&["agents", "spawn", "--name", "b-159", "--profile", "builder", "--title", " Agent images in the chat ", "go"], &vars, &core);
+    assert_eq!(r.code, 0, "{}", r.err);
+    assert_eq!(core.calls()[0].1["labels"]["title"], "Agent images in the chat");
+
     // --role and --project are labels; without hc there is no parent and no variable for it.
     let core = run_reply("o");
     let r = call(&["agents", "spawn", "--name", "o", "--profile", "builder", "--role", "orchestrator", "--project", "contr"], &[("CONTR_AGENTS_CONFIG", &cfg)], &core);
@@ -106,6 +112,7 @@ fn spawn_refuses_a_bad_profile_name_project_or_worktree() {
     fails(&["--name", "x", "--profile", "orchestrator"], "allowed: builder, planner, reviewer, debugger, explorer");
     fails(&["--profile", "builder"], "a worker needs a name");
     fails(&["--name", "x", "--profile", "builder", "--project", "a\u{7}b"], "control character");
+    fails(&["--name", "x", "--profile", "builder", "--title", "a\nb"], "the title has a control character");
     fails(&["--name", "x", "--profile", "builder", "--worktree", &format!("{}/missing", path(tmp.path()))], "agents: worktree ");
     fails(&["--name", "x", "--profile", "builder", "--worktree", &cfg], "is not a folder");
     assert!(core.calls().is_empty());

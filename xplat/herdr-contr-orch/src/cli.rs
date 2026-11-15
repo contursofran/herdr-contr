@@ -1,4 +1,4 @@
-//! The command line: `agents flow | config | set | spawn | ls | send | interrupt | stop | rm | read | prompt`, and
+//! The command line: `agents flow | config | set | spawn | ls | title | send | interrupt | stop | rm | read | prompt`, and
 //! `owner ask | answer | done | open`. Ported from contr's `contr agents` and `contr owner`. `agents watch` is not
 //! ported: no part of the kit or of this repository calls it.
 use std::io::{BufRead, Write};
@@ -19,17 +19,20 @@ pub const USAGE: &str = "Usage:
 
 pub const AGENTS_USAGE: &str = "Usage:
   herdr-contr-orch agents ls [--all] [--json]      list the workers
-  herdr-contr-orch agents spawn --name N --profile P [--issue I] [--worktree DIR] [--project P]
-                     [--role R] [--review-pr PR] [--no-parent] [--json] [--any-profile]
-                     [--task-file F | [--] task…]
-                                                   start a worker; --task-file reads the
-                                                   task from a file; --review-pr makes a
+  herdr-contr-orch agents spawn --name N --profile P [--issue I] [--title T] [--worktree DIR]
+                     [--project P] [--role R] [--review-pr PR] [--no-parent] [--json]
+                     [--any-profile] [--task-file F | [--] task…]
+                                                   start a worker; --title is a few words of
+                                                   what it does, that the sidebar shows;
+                                                   --task-file reads the task from a file;
+                                                   --review-pr makes a
                                                    detached worktree at the pull request's
                                                    head (<main>-wt/review-<PR>) of the
                                                    repository at --worktree (default: here)
                                                    and starts the worker there; a profile
                                                    that the flow names for no role needs
                                                    --any-profile
+  herdr-contr-orch agents title <name> <title…>    change the title of a worker
   herdr-contr-orch agents send <name> <text…>      type text and press Enter
   herdr-contr-orch agents interrupt <name>         press the stop key
   herdr-contr-orch agents stop <name> [--keep]     end the worker's program and remove its
@@ -177,7 +180,7 @@ fn run_agents(args: &[String], env: &dyn Fn(&str) -> String, out: &mut dyn Write
         }
         return 0;
     }
-    if ["ls", "spawn", "send", "interrupt", "stop", "rm", "read", "prompt"].contains(&sub.as_str()) {
+    if ["ls", "spawn", "title", "send", "interrupt", "stop", "rm", "read", "prompt"].contains(&sub.as_str()) {
         return run_worker_command(sub, &args[1..], env, out, err, core);
     }
     if sub == "config" || sub == "set" {
@@ -204,7 +207,7 @@ fn run_agents(args: &[String], env: &dyn Fn(&str) -> String, out: &mut dyn Write
 }
 
 /// The flags that take a value; the others are true or false.
-const VALUE_FLAGS: [&str; 9] = ["lines", "name", "profile", "issue", "worktree", "project", "role", "task-file", "review-pr"];
+const VALUE_FLAGS: [&str; 10] = ["lines", "name", "profile", "issue", "title", "worktree", "project", "role", "task-file", "review-pr"];
 const BOOL_FLAGS: [&str; 6] = ["all", "json", "keep", "ended", "no-parent", "any-profile"];
 
 /// The flags of the worker commands that the command line gave, in order, each with its value.
@@ -268,7 +271,7 @@ fn parse_flags(args: &[String]) -> Result<(Flags, Vec<String>), String> {
     Ok((f, pos))
 }
 
-/// `agents ls | send | interrupt | stop | rm | read`: one command on the workers of the hc core.
+/// `agents ls | spawn | title | send | interrupt | stop | rm | read | prompt`: one command on the workers of the hc core.
 fn run_worker_command(sub: &str, rest: &[String], env: &dyn Fn(&str) -> String, out: &mut dyn Write, err: &mut dyn Write, core: &dyn Core) -> i32 {
     let (flags, pos) = match parse_flags(rest) {
         Ok(x) => x,
@@ -279,7 +282,7 @@ fn run_worker_command(sub: &str, rest: &[String], env: &dyn Fn(&str) -> String, 
     };
     let allowed: &[&str] = match sub {
         "ls" => &["all", "json"],
-        "spawn" => &["name", "profile", "issue", "worktree", "project", "role", "no-parent", "json", "task-file", "review-pr", "any-profile"],
+        "spawn" => &["name", "profile", "issue", "title", "worktree", "project", "role", "no-parent", "json", "task-file", "review-pr", "any-profile"],
         "read" => &["lines"],
         "stop" => &["keep"],
         "rm" => &["ended"],
@@ -291,7 +294,7 @@ fn run_worker_command(sub: &str, rest: &[String], env: &dyn Fn(&str) -> String, 
     }
     let count_ok = match sub {
         "ls" => pos.is_empty(),
-        "send" => pos.len() >= 2,
+        "send" | "title" => pos.len() >= 2,
         "rm" | "spawn" => true,
         _ => pos.len() == 1,
     };
@@ -330,6 +333,7 @@ fn run_worker_command(sub: &str, rest: &[String], env: &dyn Fn(&str) -> String, 
             Ok(())
         }),
         "send" => m.send(&pos[0], &pos[1..].join(" ")),
+        "title" => m.set_title(&pos[0], &pos[1..].join(" ")),
         "interrupt" => m.interrupt(&pos[0]).map(|o| text = o + "\n"),
         "stop" => m.stop(&pos[0], flags.on("keep")),
         "rm" if !flags.on("ended") => m.remove(&pos[0]),
@@ -371,7 +375,7 @@ fn spawn_worker(flags: &Flags, pos: &[String], cfg: &Config, env: &dyn Fn(&str) 
     if !flags.on("any-profile") {
         cfg.check_profile(&profile)?;
     }
-    let mut spec = Spec { name: flags.text("name"), profile, role: flags.text("role"), issue: flags.text("issue"), worktree: flags.text("worktree"), project: flags.text("project"), task, ..Spec::default() };
+    let mut spec = Spec { name: flags.text("name"), profile, role: flags.text("role"), issue: flags.text("issue"), worktree: flags.text("worktree"), project: flags.text("project"), title: flags.text("title"), task, ..Spec::default() };
     let pr = flags.number("review-pr");
     if pr != 0 {
         spec.worktree = review_worktree(if spec.worktree.is_empty() { "." } else { &spec.worktree }, pr)?;
