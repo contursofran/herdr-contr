@@ -59,6 +59,7 @@ does not download; `install-isolated.sh` copies the sidecar in.
 | `usage` | — (Rust sidecar only; read only) | `usage` |
 | `pictures` | `--path <log> --dir <folder> --pics <json>` (Rust sidecar only) | `picture` for each entry of `--pics` |
 | `favicon` | `--path <file> --dir <folder>` (Rust sidecar only) | `favicon` |
+| `agent-images` | `--log <log> --dir <folder> --srcs <json>` (Rust sidecar only) | `agent-image` for each entry of `--srcs` |
 | `helper install` | `--machine <m> --sha256 <hex> [--cache <file>]` | `installed` |
 | `helper remove` | `--machine <m> [--cache <file>]` | `removed` |
 | `phone status` / `on` / `off` | `--home <herdr-app home>` (Rust sidecar only) | `phone` |
@@ -168,7 +169,7 @@ Targets: `x86_64-unknown-linux-musl`, `aarch64-unknown-linux-musl`, `universal-a
 ### `version`
 
 ```json
-{"commands":["version","feed","status","card","approve","answer","send","paste-image","mermaid","pictures","helper","queue","phone","commands","working","model","usage","favicon","panel","keys","suggestion"],"release":"0.9.0","type":"version"}
+{"commands":["version","feed","status","card","approve","answer","send","paste-image","mermaid","pictures","helper","queue","phone","commands","working","model","usage","favicon","panel","keys","suggestion","agent-images"],"release":"0.9.0","type":"version"}
 ```
 
 `commands`: the commands this sidecar has. The mod hides actions whose command is missing.
@@ -247,6 +248,24 @@ written once to the folder as `pic-<digest>.png` or `.jpg`; one that is there is
 `<herdr-app home>/herdr-contr/pics`. `width`, `height`: the picture's size in px. `path: null`: the picture is not
 in the log any more, or it is WebP or GIF (the mod draws only PNG and JPEG). When a new file is written, pictures
 not written or asked for in 7 days are removed from the folder; other files never.
+
+### `agent-image` (`agent-images --log <log> --dir <folder> --srcs <json>`)
+
+```json
+{"height":480.0,"index":0,"path":"/home/you/.config/herdr-app/herdr-contr/images/img-00ff00ff00ff00ff.png","type":"agent-image","width":640.0}
+{"index":1,"path":null,"type":"agent-image"}
+```
+
+The local images that an agent links in its message (`![alt](path)`), as files the chat can draw: `image()` reads
+only files under the app home. `--srcs` is a JSON list of the links' paths (at most 32), `--log` the agent's log
+on this machine (the `log` line's `path`). A src is an absolute path, `~/…`, `file://…`, or a path relative to the
+session's cwd: the last `cwd` (Claude Code, pi) or `payload.cwd` (Codex) in the log's last MB, else in its first
+MB. A URL (`https:`, `data:` or another scheme) is never read. Each file is copied to the folder as
+`img-<digest of its path>.<ext>`: when it is not there, and again when the source is newer or another size. The
+mod passes `<herdr-app home>/herdr-contr/images`. `width`, `height`: the size in px (PNG and JPEG from the header;
+SVG from the root's `width` and `height`, else its `viewBox`). `path: null`: a URL, a relative path with no cwd, no
+file, a file over 32 MB, another format, or content that does not match the extension. Copies not written or
+asked for in 7 days are removed from the folder; other files never. Errors: `usage`, `write`.
 
 ### `favicon` (`favicon --path <file> --dir <folder>`)
 

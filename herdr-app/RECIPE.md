@@ -70,7 +70,8 @@ Left to right:
        next, also ← and →. At the first or the last picture the button is dimmed and nothing moves.
        Esc or a click outside the picture closes it; another agent's chat closes it too. The list is
        all pictures of the chat in chat order, taken when the viewer opens; a new kind of picture
-       joins it with one `addPictureSource` call (`pictures.js`).
+       joins it with one `addPictureSource` call (`pictures.js`): the user pictures and the images that an
+       agent links (#192), in chat order.
      - Agent reply: full-width markdown, 16 px text, 26 px lines (the `TextView` default; a mod
        cannot change it). Code fences are 12 px rounded boxes (`raised`,
        1 px border, Menlo 13 px, 21 px lines: one selectable `TextView` paragraph, so a drag selects across lines; right-click a box: Copy code, the box as written). Tables are 12 px rounded frames: a `raised` header
@@ -485,6 +486,14 @@ drawn by Herdr's `frames`; every loader of the mod is this one); done is a check
   asks the helper for them, two at a time. The image is in the code box's frame, at its own size or scaled
   down to the text width; estimate.js counts the same height, and a new answer makes the chat measure its
   rows again. Until the answer is there, or when the helper cannot read the text, it is the code box.
+- A line that is only a local image link (`![alt](path)`, agentimages.js, #192), in a reply of an agent on this
+  machine, is the image: `image()` reads only files under the app home, so the helper's `agent-images` copies the
+  file (PNG, JPEG, SVG; a path relative to the session's cwd from the log) to `herdr-contr/images` and gives its
+  size. Render notes the lines it drew; the chat's tick asks the helper. The image is in a rounded 1 px border with
+  6 px above and below, at its own size or scaled down to the text width and to 480 px high; estimate.js counts the
+  same height (no paragraph gap next to it, as a code box). A URL, a missing file, another format, a user message
+  or an agent on another machine: the line stays text. `agentImages(log, text)` lists a message's drawn images; the viewer shows them
+  (`pictures.js` agentPictureList).
 - `TextView.markdown` takes no style and draws code and tables square. Split the text into blocks
   and draw fences and tables yourself. A `TextView` in a flexible cell keeps its one-line width
   and spills out: give table cells a fixed width.
@@ -510,6 +519,8 @@ drawn by Herdr's `frames`; every loader of the mod is this one); done is a check
   stays inside its cells.
 - A reply with a ```mermaid flowchart or sequence diagram shows the diagram in a rounded box, readable in a
   dark and a light theme, no wider than the text; the rows under it do not overlap it.
+- A reply with a line `![chart](/abs/path/chart.png)` shows the image, no wider than the text; a reply with
+  `![x](https://…)` or a missing file shows the link as text.
 - Typing in the reply box and pressing Enter puts the text into the agent's terminal.
 - ⌘V in the reply box after copying a file in Finder attaches the file (no name typed); after a
   screenshot to the clipboard it attaches a PNG; after copying text it types the text at the cursor.
