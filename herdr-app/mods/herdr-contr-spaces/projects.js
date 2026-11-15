@@ -38,7 +38,7 @@ export function split(rows, has) {
   return { shown, idle };
 }
 
-// A worker's text: what it works on (its name), else its template or program.
+// A worker's name: its name, else its template or program, else its address.
 export const workerText = (k) => k.name || k.template || k.program?.name || k.address;
 
 const clean = (s) => (s ?? "").replace(/^[^\p{L}\p{N}]+/u, "").trim();
@@ -56,6 +56,21 @@ function telling(raw, program) {
 export function workerWork(k, title) {
   const w = telling(title, k.program);
   return w && w !== k.name && w !== k.address ? w : "";
+}
+
+const oneLine = (s) => String(s ?? "").replace(/\s+/g, " ").trim();
+
+// A worker row's texts. `work`: what it works on: the title that the orchestration tool keeps as the hc label
+// `title` (spawn --title, `agents title`), else workerWork(); "" when neither says something. `name`: the
+// worker's name, shown muted at the right when there is work. `tip`: the tooltip's first line, the name,
+// the issue ("#194", from the `issue` label) and the work; "" when it would be the name alone.
+export function workerRow(k, title) {
+  const label = oneLine(k.labels?.title);
+  const work = label && label !== k.name && label !== k.address ? label : workerWork(k, title);
+  const name = workerText(k);
+  const issue = oneLine(k.labels?.issue);
+  const parts = [name, /^\d+$/.test(issue) ? `#${issue}` : issue, work].filter(Boolean);
+  return { work, name, tip: parts.length > 1 ? parts.join(" · ") : "" };
 }
 
 // Each tab's lead pane: its first agent, else its first focused terminal, else its first terminal.

@@ -12,8 +12,11 @@ fn worker(addr: &str, name: &str, state: &str, status: Value) -> Value {
 
 #[test]
 fn ls_prints_a_table_or_json() {
+    let mut titled = worker("t3", "r-158", "finished", Value::Null);
+    titled["labels"]["title"] = json!("Review the sidebar");
+    titled["title"] = json!("claude");
     let core = Fake::default().reply("terminal.list", json!({"terminals": [
-        worker("t3", "r-158", "finished", Value::Null),
+        titled,
         worker("t2", "b-158", "live", json!({"state": "blocked", "kind": "permission"})),
     ]}));
     let r = call(&["agents", "ls", "--all"], &[], &core);
@@ -30,6 +33,7 @@ fn ls_prints_a_table_or_json() {
     let ws: Value = serde_json::from_str(&r.out).unwrap();
     assert_eq!(ws[0], json!({"name": "b-158", "address": "t2", "role": "builder", "issue": "158", "profile": "builder",
         "worktree": "/w/a", "live": true, "status": "blocked", "kind": "permission", "turn": 0, "exit_code": 0}));
+    assert_eq!((&ws[1]["title"], &ws[1]["terminal_title"]), (&json!("Review the sidebar"), &json!("claude")));
     assert_eq!(core.calls()[1].1["all"], false);
     assert!(r.out.starts_with("[\n  {\n    \"name\": \"b-158\",\n    \"address\": \"t2\","), "{}", r.out);
     assert_eq!(call(&["agents", "ls", "--json"], &[], &Fake::default()).out, "[]\n");
@@ -82,6 +86,26 @@ fn a_send_with_no_text_or_that_hc_refuses_is_an_error() {
     assert!(call(&["agents", "send", "w1", "hi"], &[], &core).err.ends_with("no reason given\n"));
     let core = Fake::default().reply("terminal.send", json!({"sent": true}));
     assert_eq!(call(&["agents", "send", "w1", "hi"], &[], &core).code, 0);
+}
+
+#[test]
+fn title_changes_the_title_label() {
+    let core = Fake::default();
+    let r = call(&["agents", "title", "b-158", "Agent", "images", "in", "the", "chat"], &[("HC_TERMINAL_ID", "t1")], &core);
+    assert_eq!((r.code, r.out.as_str(), r.err.as_str()), (0, "", ""));
+    assert_eq!(core.calls(), [("terminal.label".to_string(), json!({"terminal": "b-158", "caller": "t1", "labels": {"title": "Agent images in the chat"}}))]);
+}
+
+#[test]
+fn a_blank_title_one_with_a_control_character_or_that_hc_refuses_is_an_error() {
+    let core = Fake::default();
+    let r = call(&["agents", "title", "b-158", " ", ""], &[], &core);
+    assert_eq!((r.code, r.err.as_str()), (1, "herdr-contr-orch agents title: agents: no title to set\n"));
+    let r = call(&["agents", "title", "b-158", "two\nlines"], &[], &core);
+    assert_eq!((r.code, r.err.as_str()), (1, "herdr-contr-orch agents title: agents: the title has a control character\n"));
+    assert!(core.calls().is_empty());
+    let r = call(&["agents", "title", "nope", "x"], &[], &Fake::default().err("terminal.label", "hc: no terminal nope (not_found)"));
+    assert_eq!((r.code, r.err.as_str()), (1, "herdr-contr-orch agents title: hc: no terminal nope (not_found)\n"));
 }
 
 #[test]
@@ -150,6 +174,8 @@ fn usage_errors_make_no_call() {
         (vec!["agents", "rm", "a", "--keep"], "flag --keep does not apply"),
         (vec!["agents", "ls", "x"], "wrong number of arguments"),
         (vec!["agents", "send", "w1"], "wrong number of arguments"),
+        (vec!["agents", "title", "w1"], "wrong number of arguments"),
+        (vec!["agents", "title", "w1", "x", "--all"], "flag --all does not apply"),
         (vec!["agents", "read"], "wrong number of arguments"),
         (vec!["agents", "interrupt", "a", "b"], "wrong number of arguments"),
         (vec!["agents", "read", "w1", "--lines"], "flag needs an argument: -lines"),
@@ -183,12 +209,14 @@ fn state_text_of_each_state() {
 fn a_worker_from_a_terminal_of_this_tool() {
     let clean = ["/bin/sh", "-c", "script", "contr-clean-env", "/opt/bin/claude", "--model", "opus", "--effort=low", "the task"];
     let setup: Vec<&str> = ["/bin/sh", "-c", "wrapper", "contr-setup", "npm ci"].into_iter().chain(clean).collect();
-    let w = Worker::from_terminal(&json!({"address": "t2", "name": "b-1", "parent": "t1", "state": "live", "turn": 3, "title": "Fix it",
+    let w = Worker::from_terminal(&json!({"address": "t2", "name": "b-1", "parent": "t1", "state": "live", "turn": 3, "title": "✳ Fix it",
         "argv": setup, "foreground": null, "status": {"state": "working", "kind": null, "msg": "m"},
-        "labels": {"contr": "agent", "role": "builder", "profile": "builder-high", "worktree": "/w", "project": "app",
+        "labels": {"contr": "agent", "role": "builder", "profile": "builder-high", "worktree": "/w", "project": "app", "title": "Fix it",
             "contr.model": "sonnet", "contr.orchestrating": "1", "contr.context": "1200", "contr.context-limit": "200000"}}));
     assert_eq!((w.command.as_str(), w.model.as_str(), w.effort.as_str()), ("claude", "sonnet", "low"));
     assert_eq!((w.parent.as_str(), w.project.as_str(), w.turn, w.title.as_str(), w.msg.as_str()), ("t1", "app", 3, "Fix it", "m"));
+    // The title is the label; the terminal's own title is apart.
+    assert_eq!(w.terminal_title, "✳ Fix it");
     assert_eq!((w.orchestrating, w.context_tokens, w.context_limit, w.foreign, w.exit_code), (true, 1200, 200000, false, None));
     // The foreground program's name comes first; one context label that is not a positive integer gives no data.
     let w = Worker::from_terminal(&json!({"address": "t2", "argv": ["claude"], "foreground": {"name": "node"},

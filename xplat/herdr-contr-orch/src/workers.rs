@@ -1,5 +1,5 @@
-//! The workers: hc terminals with the label contr=agent and labels for their role, issue, profile and worktree.
-//! This file lists them, sends to them, and stops, removes and reads them. Ported from contr's
+//! The workers: hc terminals with the label contr=agent and labels for their role, issue, title, profile and worktree.
+//! This file lists them, titles them, sends to them, and stops, removes and reads them. Ported from contr's
 //! `internal/agents`; spawn, prompt and watch come with the next parts of the slice (#160).
 use herdr_core::hc::HcClient;
 use herdr_core::HerdrError;
@@ -13,6 +13,8 @@ pub const LABEL_ISSUE: &str = "issue";
 pub const LABEL_PROFILE: &str = "profile";
 pub const LABEL_WORKTREE: &str = "worktree";
 pub const LABEL_PROJECT: &str = "project";
+/// A few words of what the worker does, from spawn --title or `agents title`.
+pub const LABEL_TITLE: &str = "title";
 /// Set by the kit's Stop hook on a Claude Code session's own terminal: the short model name and the effort.
 pub const LABEL_MODEL: &str = "contr.model";
 pub const LABEL_EFFORT: &str = "contr.effort";
@@ -83,8 +85,12 @@ pub struct Worker {
     #[serde(skip_serializing_if = "String::is_empty")]
     pub msg: String,
     pub turn: u64,
+    /// What the worker does: its title label.
     #[serde(skip_serializing_if = "String::is_empty")]
     pub title: String,
+    /// The terminal's own title, that the program sets.
+    #[serde(skip_serializing_if = "String::is_empty")]
+    pub terminal_title: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub exit_code: Option<i64>,
     /// The hook's label, else the --model of the program's command line. The label follows /model.
@@ -183,7 +189,8 @@ impl Worker {
             kind: text(&t["status"]["kind"]),
             msg: text(&t["status"]["msg"]),
             turn: t["turn"].as_u64().unwrap_or(0),
-            title: text(&t["title"]),
+            title: label(LABEL_TITLE),
+            terminal_title: text(&t["title"]),
             exit_code: t["exit_code"].as_i64(),
             model: or(label(LABEL_MODEL), flag_value(&argv, "--model")),
             effort: or(label(LABEL_EFFORT), flag_value(&argv, "--effort")),
@@ -315,6 +322,17 @@ impl<'a> Manager<'a> {
         Ok(())
     }
 
+    /// Changes a worker's title label. The title is one line of text that is not blank.
+    pub fn set_title(&self, name: &str, title: &str) -> Result<(), String> {
+        let title = check_title(title)?;
+        if title.is_empty() {
+            return Err("agents: no title to set".into());
+        }
+        let mut p = self.looking(name);
+        p.insert("labels".into(), json!({LABEL_TITLE: title}));
+        self.core.call("terminal.label", Value::Object(p)).map(|_| ())
+    }
+
     /// A worker's screen and history; `lines` > 0 keeps only the last lines.
     pub fn read(&self, name: &str, lines: i64) -> Result<String, String> {
         let mut p = self.looking(name);
@@ -324,6 +342,14 @@ impl<'a> Manager<'a> {
         let res = self.core.call("terminal.read", Value::Object(p))?;
         Ok(res["text"].as_str().unwrap_or_default().to_string())
     }
+}
+
+/// The title trimmed, or an error when it has a control character (such as a line break). "" stays "".
+pub fn check_title(title: &str) -> Result<String, String> {
+    if title.chars().any(char::is_control) {
+        return Err("agents: the title has a control character".into());
+    }
+    Ok(title.trim().to_string())
 }
 
 /// The state column of the list: the program's status, why it is blocked, or how it ended.
