@@ -53,15 +53,24 @@ helper is built with `HERDR_CONTR_KNOWN_FILES` (a table of the older files' chec
 replaced, and the plan names the version. Without the table, no file counts as an older version's. A key you already use keeps your command. Add `--dry-run` to see the plan
 first. The home is `--home <folder>`, else `$HERDR_APP_HOME`, else `~/.config/herdr-app`.
 
-Build the helper and install from the repo (in its root). For development, use a test home (below):
+Build the helper and the orchestration tool, and install from the repo (in its root). For
+development, use a test home (below):
 
 ```sh
-(cd xplat && cargo build --release -p herdr-contr-feed)
-xplat/target/release/herdr-contr-feed install --helper xplat/target/release/herdr-contr-feed
+(cd xplat && cargo build --release --locked -p herdr-contr-feed -p herdr-contr-orch)
+H=xplat/target/release/herdr-contr-feed
+O=xplat/target/release/herdr-contr-orch
+"$H" install --dry-run --helper "$H" --orch "$O"
+"$H" install --helper "$H" --orch "$O"
 ```
 
-Then pick the layout in herdr-app with `layout.switch {"name": "herdr-contr-own"}`. `ctrl-shift-l`
-switches back to your own layout.
+`--orch` puts the orchestration tool `herdr-contr-orch` in `herdr-contr/bin/`. The settings screen and
+the kit's hooks run it. Without it, the settings screen shows "The settings could not be read:
+… herdr-contr-orch: No such file or directory".
+
+Then pick a layout in herdr-app: `herdr-app do layout.switch '{"name": "herdr-contr"}'` (with
+Herdr's own sidebar) or `herdr-contr-own` (without it). `ctrl-shift-l` switches back to your own
+layout.
 
 ## Try it in a test home
 
