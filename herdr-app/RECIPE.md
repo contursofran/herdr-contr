@@ -270,6 +270,11 @@ drawn by Herdr's `frames`; every loader of the mod is this one); done is a check
     (⌃1 … ⌃9). The caps follow `window().platform`: ⌘ ⌥ ⇧ ⌃ on macOS, Ctrl / Alt / Shift elsewhere.
     The table is `shortcuts.js`: the reply box binds its keys from it, and a test compares it with
     `keys.json` and the key handlers, so a key that a mod binds and the table does not list fails `npm test`.
+  - **Health** (#217): the helper's `health` checks of the install (docs/protocol.md, `check`), run when
+    the dialog opens and on Re-check (`small` button at the right of the INSTALL heading; "Checking…" while
+    it runs). A row a check: a mark (✓ `done`, ! `working`, ✕ `blocked`), what it found (13 px
+    `foreground`) and, when not ok, "Fix: …" (12 px `muted`). A helper that does not answer or gives no
+    checks: one line that says why, in the `blocked` box of a bad config.json. The view is `health.js`.
 - **Sidebar**: ⌘B or the sidebar button shows and hides it. With it hidden, the pointer at the
   window's left 4 px slides it out as a floating panel (260 px wide, 8 px from the edges, 14 px
   corners, a large shadow), which closes when the pointer leaves it, on Esc or a click beside it.
