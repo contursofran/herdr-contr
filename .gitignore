@@ -9,3 +9,7 @@ xcuserdata/
 !.claude/settings.json
 __pycache__/
 tmp/
+
+# Worker reports (the coordinator reads them; never committed)
+RESULT.md
+PLAN.md

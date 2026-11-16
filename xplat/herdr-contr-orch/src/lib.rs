@@ -6,6 +6,7 @@ pub mod cli;
 pub mod config;
 pub mod due;
 pub mod flowseen;
+pub mod batch;
 pub mod held;
 pub mod home;
 pub mod hook;
