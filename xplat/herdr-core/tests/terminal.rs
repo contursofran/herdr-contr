@@ -20,9 +20,11 @@ fn b64(bytes: &[u8]) -> String {
     base64::engine::general_purpose::STANDARD.encode(bytes)
 }
 
-fn until(sec: f64, mut ok: impl FnMut() -> bool) -> bool {
+/// Waits until `ok`. The bound is only for a fake that never answers: each wait starts or talks to a shell
+/// child, which on a loaded machine can take seconds (#244), so the bound is the same long one for all.
+fn until(mut ok: impl FnMut() -> bool) -> bool {
     let t = Instant::now();
-    while t.elapsed().as_secs_f64() < sec {
+    while t.elapsed() < WAIT {
         if ok() {
             return true;
         }
@@ -30,6 +32,8 @@ fn until(sec: f64, mut ok: impl FnMut() -> bool) -> bool {
     }
     ok()
 }
+
+const WAIT: Duration = Duration::from_secs(30);
 
 type Events = Arc<Mutex<Vec<TerminalEvent>>>;
 
@@ -94,37 +98,37 @@ fn terminal_session_against_fake_control() {
     let (ts, rx) = TerminalSession::new("term_x", &session(), TerminalMode::Control { takeover: false }, None, None, Some(vec![script.clone()]));
     let ev = collect(rx);
     ts.start();
-    assert!(until(3.0, || frames(&ev).first().map(|f| f.full && f.width == 80) == Some(true)), "term: first frame is full, 80 wide");
+    assert!(until(|| frames(&ev).first().map(|f| f.full && f.width == 80) == Some(true)), "term: first frame is full, 80 wide");
     assert!(ts.size() == Some((80, 24)), "term: size from the frame");
     assert!(ts.bracketed_paste(), "term: bracketed paste on by default / after ?2004h");
     assert!(log_text(&log).contains("ARGS terminal session control term_x"), "term: control args");
 
     let bytes: Vec<u8> = vec![0x1b, 0x5b, 0x41, 0x03, 0xff, 0xe4, 0xbd, 0xa0];
     ts.send_bytes(&bytes);
-    assert!(until(2.0, || log_text(&log).contains(&b64(&bytes))), "term: arbitrary bytes sent as base64 terminal.input");
+    assert!(until(|| log_text(&log).contains(&b64(&bytes))), "term: arbitrary bytes sent as base64 terminal.input");
     ts.send_text("你好");
-    assert!(until(2.0, || log_text(&log).contains(&b64("你好".as_bytes()))), "term: UTF-8 text sent");
+    assert!(until(|| log_text(&log).contains(&b64("你好".as_bytes()))), "term: UTF-8 text sent");
     ts.paste("a\nb", None);
-    assert!(until(2.0, || log_text(&log).contains(&b64("\u{1b}[200~a\nb\u{1b}[201~".as_bytes()))), "term: paste wrapped in bracketed paste");
+    assert!(until(|| log_text(&log).contains(&b64("\u{1b}[200~a\nb\u{1b}[201~".as_bytes()))), "term: paste wrapped in bracketed paste");
     ts.paste("x\u{1b}[201~\nrm -rf y\n", None);
-    assert!(until(2.0, || log_text(&log).contains(&b64("\u{1b}[200~x[201~\nrm -rf y\n\u{1b}[201~".as_bytes()))), "term: an end marker inside the paste loses its ESC");
+    assert!(until(|| log_text(&log).contains(&b64("\u{1b}[200~x[201~\nrm -rf y\n\u{1b}[201~".as_bytes()))), "term: an end marker inside the paste loses its ESC");
 
     ts.resize(100, 30);
-    assert!(until(2.0, || log_text(&log).contains(r#""cols":100"#) && log_text(&log).contains(r#""rows":30"#)), "term: resize sent");
-    assert!(until(2.0, || ts.size() == Some((100, 30))), "term: size follows the resize frame");
+    assert!(until(|| log_text(&log).contains(r#""cols":100"#) && log_text(&log).contains(r#""rows":30"#)), "term: resize sent");
+    assert!(until(|| ts.size() == Some((100, 30))), "term: size follows the resize frame");
     assert!(!ts.bracketed_paste(), "term: ?2004l in a frame turns bracketed paste off");
     ts.resize(0, 30);
     std::thread::sleep(Duration::from_millis(100));
     assert!(!log_text(&log).contains(r#""cols":0"#), "term: resize with 0 is ignored");
 
     ts.right_click(10, 5, MouseEncoding::Sgr);
-    assert!(until(2.0, || log_text(&log).contains(&b64("\u{1b}[<2;10;5M\u{1b}[<2;10;5m".as_bytes()))), "term: right click as SGR press+release at col,row");
+    assert!(until(|| log_text(&log).contains(&b64("\u{1b}[<2;10;5M\u{1b}[<2;10;5m".as_bytes()))), "term: right click as SGR press+release at col,row");
     ts.right_click(3, 4, MouseEncoding::Legacy);
-    assert!(until(2.0, || log_text(&log).contains(&b64(&[0x1b, 0x5b, 0x4d, 34, 35, 36, 0x1b, 0x5b, 0x4d, 35, 35, 36]))), "term: right click legacy (X10) encoding");
+    assert!(until(|| log_text(&log).contains(&b64(&[0x1b, 0x5b, 0x4d, 34, 35, 36, 0x1b, 0x5b, 0x4d, 35, 35, 36]))), "term: right click legacy (X10) encoding");
     assert!(!ts.right_click(0, 4, MouseEncoding::Sgr), "term: right click with col 0 is ignored");
     ts.wheel(3, true, false);
     assert!(
-        until(2.0, || {
+        until(|| {
             let t = log_text(&log);
             t.contains(r#""type":"terminal.scroll""#) && t.contains(r#""lines":3"#) && t.contains(r#""direction":"up""#)
         }),
@@ -132,7 +136,7 @@ fn terminal_session_against_fake_control() {
     );
     ts.wheel(2, false, true);
     assert!(
-        until(2.0, || {
+        until(|| {
             let t = log_text(&log);
             t.matches(r#""direction":"down""#).count() == 2 && t.contains(r#""lines":1"#)
         }),
@@ -143,14 +147,14 @@ fn terminal_session_against_fake_control() {
     let spawns0 = spawns(&log);
     ts.send_raw(r#"{"type":"crash"}"#);
     assert!(
-        until(5.0, || ev.lock().unwrap().iter().any(|e| matches!(e, TerminalEvent::Reconnecting { .. })) && frames(&ev).len() >= 3),
+        until(|| ev.lock().unwrap().iter().any(|e| matches!(e, TerminalEvent::Reconnecting { .. })) && frames(&ev).len() >= 3),
         "term: reconnects after the process dies, new full frame"
     );
     let t2 = log_text(&log);
     assert!(t2.matches("ARGS ").count() == spawns0 + 1 && t2.contains("--cols 100 --rows 30"), "term: reconnect keeps the last size");
 
     ts.release();
-    assert!(until(3.0, || has_closed(&ev, |r| r == "detached")), "term: release -> closed(detached)");
+    assert!(until(|| has_closed(&ev, |r| r == "detached")), "term: release -> closed(detached)");
     std::thread::sleep(Duration::from_millis(800));
     assert!(spawns(&log) == spawns0 + 1, "term: no reconnect after release");
 
@@ -160,7 +164,7 @@ fn terminal_session_against_fake_control() {
     let (ts2, rx2) = TerminalSession::new("term_y", &session(), TerminalMode::Control { takeover: false }, None, None, Some(vec![script2]));
     let ev2 = collect(rx2);
     ts2.start();
-    assert!(until(3.0, || has_closed(&ev2, |r| r.contains("taken over"))), "term: taken over is reported");
+    assert!(until(|| has_closed(&ev2, |r| r.contains("taken over"))), "term: taken over is reported");
     std::thread::sleep(Duration::from_millis(800));
     assert!(spawns(&log2) == 1, "term: no reconnect after taken over");
 
@@ -179,7 +183,7 @@ fn control_args_carry_takeover_and_size() {
     let (ts, rx) = TerminalSession::new("term_q", &session(), TerminalMode::Control { takeover: true }, Some(90), Some(20), Some(vec![script]));
     let ev = collect(rx);
     ts.start();
-    assert!(until(3.0, || !frames(&ev).is_empty()));
+    assert!(until(|| !frames(&ev).is_empty()));
     assert!(log_text(&log).contains("ARGS terminal session control term_q --takeover --cols 90 --rows 20"), "{}", log_text(&log));
     ts.stop();
 }
@@ -311,10 +315,10 @@ fn stop_during_spawn_kills_child() {
         }
     });
     ts.start();
-    assert!(until(5.0, || std::fs::read_to_string(&pidfile).map_or(false, |s| !s.trim().is_empty())), "child wrote its pid");
+    assert!(until(|| std::fs::read_to_string(&pidfile).map_or(false, |s| !s.trim().is_empty())), "child wrote its pid");
     let pid = std::fs::read_to_string(&pidfile).unwrap().trim().to_string();
     let alive = |pid: &str| std::process::Command::new("kill").args(["-0", pid]).stderr(std::process::Stdio::null()).status().map_or(false, |s| s.success());
-    assert!(until(3.0, || !alive(&pid)), "child {pid} is killed after stop() raced the spawn");
+    assert!(until(|| !alive(&pid)), "child {pid} is killed after stop() raced the spawn");
 }
 
 #[test]
@@ -325,10 +329,10 @@ fn store_start_after_stop_restarts() {
     let sess = HerdrSession { name: Some("fake".into()), socket_path: fake.path.to_string_lossy().into_owned() };
     let st = HerdrStore::new(&sess);
     st.start();
-    assert!(until(3.0, || st.connected()), "connected after start");
+    assert!(until(|| st.connected()), "connected after start");
     st.stop();
     st.start(); // right after stop: the old loop is still winding down
-    assert!(until(3.0, || st.connected() && !st.workspaces().is_empty()), "restart connects again");
+    assert!(until(|| st.connected() && !st.workspaces().is_empty()), "restart connects again");
     // and a second start() while running changes nothing
     st.start();
     std::thread::sleep(Duration::from_millis(400)); // the old loop has noticed its cancel by now
@@ -348,10 +352,10 @@ fn dropping_a_store_ends_log_threads() {
     st.conversation_state(Some("drop1"));
     let (readers, log) = st.log_probe("drop1");
     let log = log.expect("tailing started");
-    assert!(until(2.0, || log.active_tailers() == 1 && readers.load(std::sync::atomic::Ordering::SeqCst) == 1), "tailer and reader are running");
+    assert!(until(|| log.active_tailers() == 1 && readers.load(std::sync::atomic::Ordering::SeqCst) == 1), "tailer and reader are running");
     drop(st);
     assert!(
-        until(3.0, || log.active_tailers() == 0 && readers.load(std::sync::atomic::Ordering::SeqCst) == 0),
+        until(|| log.active_tailers() == 0 && readers.load(std::sync::atomic::Ordering::SeqCst) == 0),
         "tailer ({}) and reader ({}) threads end after the store is dropped",
         log.active_tailers(),
         readers.load(std::sync::atomic::Ordering::SeqCst)
@@ -372,15 +376,15 @@ fn store_conversation_revision_moves_only_on_new_snapshots() {
     assert!(st.conversation_revision(Some("rev-session")).is_none(), "revision: none before tailing");
     assert!(st.conversation_revision(None).is_none(), "revision: none for no session");
     let _ = st.conversation(Some("rev-session"));
-    assert!(until(3.0, || st.conversation_revision(Some("rev-session")).is_some_and(|r| r > 0)), "revision: first snapshot counted");
+    assert!(until(|| st.conversation_revision(Some("rev-session")).is_some_and(|r| r > 0)), "revision: first snapshot counted");
     // Loading, then Ready: both are new snapshots. Under load Ready can come late, so wait for it.
-    assert!(until(5.0, || st.conversation_state(Some("rev-session")) == ConversationLoadState::Ready), "revision: log loaded");
+    assert!(until(|| st.conversation_state(Some("rev-session")) == ConversationLoadState::Ready), "revision: log loaded");
     std::thread::sleep(Duration::from_millis(300));
     let r1 = st.conversation_revision(Some("rev-session")).unwrap();
     std::thread::sleep(Duration::from_millis(700));
     assert_eq!(st.conversation_revision(Some("rev-session")), Some(r1), "revision: stable while the log is idle");
     let line = r#"{"type":"user","uuid":"u1","timestamp":"2026-10-10T10:00:00Z","message":{"role":"user","content":"hello"}}"#;
     std::fs::write(&log, format!("{line}\n")).unwrap();
-    assert!(until(3.0, || st.conversation_revision(Some("rev-session")).is_some_and(|r| r > r1)), "revision: moves on append");
+    assert!(until(|| st.conversation_revision(Some("rev-session")).is_some_and(|r| r > r1)), "revision: moves on append");
     st.stop();
 }
