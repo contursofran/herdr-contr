@@ -203,17 +203,19 @@ pub fn set(path: &Path, pairs: &[(String, String)]) -> Result<(), String> {
     jsonfile::write(path, &out, 0o644).map_err(|e| format!("agents: {}: {e}", path.display()))
 }
 
-/// The questions that have no answer, oldest first, with the fields that a question card shows.
-pub fn open_questions(store: &Store) -> Result<Value, String> {
-    let (qs, _) = store.read()?.open("");
-    Ok(Value::Array(
-        qs.into_iter()
-            .map(|q| {
-                json!({"id": q.id, "coordinator": q.coordinator, "title": q.title, "from": q.from, "question": q.question,
-                       "options": q.options, "impacts": q.impacts, "recommended": q.recommended, "refs": q.refs})
-            })
-            .collect(),
-    ))
+/// The open items, with the fields that their cards show: the questions that have no answer
+/// (`kind` "question"), then the to-dos that are not done (`kind` "todo"; `todo_kind` is do or know).
+/// Each group is oldest first.
+pub fn open_items(store: &Store) -> Result<Value, String> {
+    let (qs, ts) = store.read()?.open("");
+    let qs = qs.into_iter().map(|q| {
+        json!({"kind": "question", "id": q.id, "coordinator": q.coordinator, "title": q.title, "from": q.from, "question": q.question,
+               "options": q.options, "impacts": q.impacts, "recommended": q.recommended, "refs": q.refs})
+    });
+    let ts = ts.into_iter().map(|t| {
+        json!({"kind": "todo", "id": t.id, "coordinator": t.coordinator, "from": t.from, "todo_kind": t.kind, "text": t.text})
+    });
+    Ok(Value::Array(qs.chain(ts).collect()))
 }
 
 #[cfg(test)]

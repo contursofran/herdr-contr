@@ -81,7 +81,8 @@ pub const OWNER_USAGE: &str = "Usage:
   herdr-contr-orch owner ask [flags] <question…> ask a question; prints its id (D1, …)
   herdr-contr-orch owner answer <id> <answer…>   answer a question (D1, …) and tell its coordinator
   herdr-contr-orch owner done <id>               mark a to-do (T1, …) done and tell its coordinator
-  herdr-contr-orch owner open --json             print the questions with no answer as JSON, oldest first
+  herdr-contr-orch owner open --json             print the open questions, then the open to-dos, as JSON,
+                                                 oldest first; each item has kind question or todo
 
 Flags of ask (each of option, impact and ref can repeat):
   --title T         a 2-4 word name
@@ -432,7 +433,7 @@ fn run_owner(args: &[String], env: &dyn Fn(&str) -> String, out: &mut dyn Write,
             let _ = write!(err, "herdr-contr-orch owner open: give --json\n{OWNER_USAGE}");
             return 2;
         }
-        return match owner_store(env).and_then(|s| crate::settings::open_questions(&s)) {
+        return match owner_store(env).and_then(|s| crate::settings::open_items(&s)) {
             Ok(v) => {
                 let _ = writeln!(out, "{v}");
                 0
