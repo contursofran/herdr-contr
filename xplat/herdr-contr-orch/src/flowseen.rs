@@ -12,7 +12,7 @@ use crate::workers::{Core, Manager, ROLE_ORCHESTRATOR};
 /// The first line of the context of a changed flow.
 pub const CHANGED_LEAD: &str = "contr: the owner changed the flow and models in agents.json; follow these from now on.\n";
 
-/// The state folder: CONTR_STATE_DIR; else `state` in this tool's folder of the Herdr home. None when no
+/// The state folder: CONTR_STATE_DIR; else `state` in the backend root. None when no
 /// folder can be found.
 pub fn state_dir(env: &dyn Fn(&str) -> String) -> Option<PathBuf> {
     let set = env("CONTR_STATE_DIR");

@@ -91,7 +91,7 @@ fn the_prompt_hook_gives_held_reports() {
 fn a_note_that_cannot_be_held_is_an_error() {
     let dir = tempfile::tempdir().unwrap();
     let input = json!({"transcript_path": transcript(dir.path(), &[PROMPT, WORDS])}).to_string();
-    // No state folder: no CONTR_STATE_DIR, HERDR_APP_HOME or HOME.
+    // No state folder: no CONTR_STATE_DIR, CONTR_HOME, HERDR_APP_HOME or HOME.
     let r = call_with(&["hook", "stop"], &[("CONTR_COORDINATOR", "t1"), ("HC_TERMINAL_ID", "t7")], &busy(), &input);
     assert!(r.code == 1 && r.err.contains("t1 did not take the report (blocked), and it was not held: held: no state folder"), "{}", r.err);
 }
@@ -165,4 +165,15 @@ fn an_error_with_held_reports_does_not_stop_the_coordinators_hooks() {
     assert!(core.methods().contains(&"terminal.label".to_string()), "the Stop still labels the terminal");
     let r = call_with(&["hook", "prompt"], &vars, &core, r#"{"prompt":"fix it"}"#);
     assert!(r.code == 0 && r.err.contains("held: bad terminal name") && r.out.contains("[you]"), "{} {}", r.out, r.err);
+}
+
+#[test]
+fn held_folder_follows_contr_home() {
+    let (root, app) = (tempfile::tempdir().unwrap(), tempfile::tempdir().unwrap());
+    let (r, a) = (path(root.path()).to_string(), path(app.path()).to_string());
+    let env = |k: &str| match k { "CONTR_HOME" => r.clone(), "HERDR_APP_HOME" => a.clone(), _ => String::new() };
+    held::hold(&env, "t1", &Report { from: "t7".into(), text: "ok".into() }).unwrap();
+    assert_eq!(fs::read_dir(root.path().join("state/held/t1")).unwrap().count(), 1);
+    assert!(!app.path().join("herdr-contr").exists());
+    assert_eq!(held::take(&env, "t1").unwrap(), [Report { from: "t7".into(), text: "ok".into() }]);
 }

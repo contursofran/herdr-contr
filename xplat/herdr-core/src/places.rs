@@ -1,7 +1,12 @@
-//! The Herdr home and the files of herdr-contr in it. This is the only code that knows these names.
+//! The backend root (the folder of the tool's and the helper's files) and the Herdr home. This is the only code
+//! that knows these names.
 //!
-//! The home is the flag value, else HERDR_APP_HOME, else the installed place (the home that a helper in
-//! `<home>/herdr-contr/bin` is in), else `~/.config/herdr-app` (HOME, else USERPROFILE).
+//! The root is `<flag home>/herdr-contr`, else CONTR_HOME, else `<HERDR_APP_HOME>/herdr-contr`, else the installed
+//! place (a helper in `<root>/bin`, when the root's name is `herdr-contr`), else `~/.config/herdr-app/herdr-contr`
+//! (HOME, else USERPROFILE). An empty value counts as unset.
+//!
+//! The Herdr home is the flag value, else HERDR_APP_HOME, else the installed place, else `~/.config/herdr-app`.
+//! Only the install of the mod uses it.
 use std::path::{Path, PathBuf};
 
 /// The name of the folder of herdr-contr in the Herdr home.
@@ -18,6 +23,19 @@ pub fn home(flag: Option<&str>, installed: Option<&Path>, env: &dyn Fn(&str) -> 
         .or_else(|| given(env("HOME")).or_else(|| given(env("USERPROFILE"))).map(|h| Path::new(&h).join(".config").join("herdr-app")))
 }
 
+/// The backend root. `installed`: the Herdr home that the program is installed in (`installed_home`). `env` gives
+/// the value of a variable, or an empty string. None: no root is known.
+pub fn root(flag_home: Option<&str>, installed: Option<&Path>, env: &dyn Fn(&str) -> String) -> Option<PathBuf> {
+    if let Some(h) = flag_home.filter(|h| !h.is_empty()) {
+        return Some(Path::new(h).join(FOLDER));
+    }
+    let contr = env("CONTR_HOME");
+    if !contr.is_empty() {
+        return Some(PathBuf::from(contr));
+    }
+    home(None, installed, env).map(|h| h.join(FOLDER))
+}
+
 /// The home that the program `exe` is installed in, when it is `<home>/herdr-contr/bin/<program>`.
 pub fn installed_home(exe: &Path) -> Option<PathBuf> {
     let bin = exe.parent()?;
@@ -25,19 +43,24 @@ pub fn installed_home(exe: &Path) -> Option<PathBuf> {
     (bin.file_name()? == "bin" && folder.file_name()? == FOLDER).then(|| folder.parent().map(Path::to_path_buf)).flatten()
 }
 
-/// The places in the folder of herdr-contr of one Herdr home.
+/// The places in one backend root.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Places {
-    pub home: PathBuf,
+    pub root: PathBuf,
 }
 
 impl Places {
+    /// The places in `<home>/herdr-contr` of one Herdr home.
     pub fn new(home: impl Into<PathBuf>) -> Self {
-        Places { home: home.into() }
+        Places::at(home.into().join(FOLDER))
     }
-    /// `<home>/herdr-contr`.
+    /// The places in the backend root `root`.
+    pub fn at(root: impl Into<PathBuf>) -> Self {
+        Places { root: root.into() }
+    }
+    /// The backend root.
     pub fn folder(&self) -> PathBuf {
-        self.home.join(FOLDER)
+        self.root.clone()
     }
     /// The profiles file of the orchestration tool.
     pub fn agents(&self) -> PathBuf {
@@ -103,6 +126,8 @@ mod tests {
         assert_eq!(installed_home(Path::new("/opt/h/herdr-contr/bin/herdr-contr-feed")), Some(PathBuf::from("/opt/h")));
         assert_eq!(installed_home(Path::new("/opt/h/other/bin/herdr-contr-feed")), None);
         assert_eq!(installed_home(Path::new("/usr/local/bin/herdr-contr-feed")), None);
+        assert_eq!(Places::at("/h/herdr-contr"), Places::new("/h"));
+        assert_eq!(Places::at("/r").agents(), Path::new("/r").join("agents.json"));
         let p = Places::new("/h");
         let x = if cfg!(windows) { ".exe" } else { "" };
         for (got, want) in [
@@ -119,6 +144,33 @@ mod tests {
         ] {
             let want: PathBuf = want.split('/').fold(PathBuf::from("/h"), |a, s| a.join(s));
             assert_eq!(got, want);
+        }
+    }
+
+    #[test]
+    fn root_order() {
+        let inst = Path::new("/opt/h");
+        let hc = |h: &str| Some(Path::new(h).join(FOLDER));
+        // (flag home, installed, CONTR_HOME, HERDR_APP_HOME, HOME, USERPROFILE, the root)
+        let rows: [(Option<&str>, Option<&Path>, &str, &str, &str, &str, Option<PathBuf>); 12] = [
+            (Some("/flag"), Some(inst), "/c", "/env", "/u", "/w", hc("/flag")),
+            (Some(""), Some(inst), "/c", "/env", "/u", "/w", Some(PathBuf::from("/c"))),
+            (None, Some(inst), "/c", "/env", "/u", "/w", Some(PathBuf::from("/c"))),
+            (None, Some(inst), "", "/env", "/u", "/w", hc("/env")),
+            (None, Some(inst), "", "", "/u", "/w", hc("/opt/h")),
+            (None, None, "", "", "/u", "/w", hc("/u/.config/herdr-app")),
+            (None, None, "", "", "", "/w", hc("/w/.config/herdr-app")),
+            (None, None, "", "", "", "", None),
+            (Some(""), None, "", "", "", "", None),
+            (None, None, "/c", "", "", "", Some(PathBuf::from("/c"))),
+            (Some("/flag"), None, "", "", "", "", hc("/flag")),
+            (None, None, "", "/env", "", "", hc("/env")),
+        ];
+        for (flag, installed, contr, app, user, profile, want) in rows {
+            let env = |k: &str| {
+                match k { "CONTR_HOME" => contr, "HERDR_APP_HOME" => app, "HOME" => user, "USERPROFILE" => profile, _ => "" }.to_string()
+            };
+            assert_eq!(root(flag, installed, &env), want, "{flag:?} {installed:?} {contr} {app} {user} {profile}");
         }
     }
 }

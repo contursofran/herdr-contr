@@ -26,7 +26,7 @@ pub struct Report {
 /// The folder of the reports that wait for the terminal `to`.
 fn folder(env: &dyn Fn(&str) -> String, to: &str) -> Result<PathBuf, String> {
     let name = Path::new(to).file_name().ok_or_else(|| format!("held: bad terminal name {to:?}"))?;
-    Ok(state_dir(env).ok_or("held: no state folder ($CONTR_STATE_DIR, $HERDR_APP_HOME or $HOME)")?.join("held").join(name))
+    Ok(state_dir(env).ok_or("held: no state folder ($CONTR_STATE_DIR, $CONTR_HOME, $HERDR_APP_HOME or $HOME)")?.join("held").join(name))
 }
 
 /// Keeps a report for the terminal `to`. The file name starts with the time, so the reports keep their order.

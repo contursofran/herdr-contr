@@ -198,3 +198,42 @@ fn the_default_files_are_in_the_herdr_home() {
     assert_eq!(r.code, 1);
     assert!(r.err.contains("HOME"), "{}", r.err);
 }
+
+#[test]
+fn contr_home_names_the_profiles_file() {
+    let (root, app, home) = (tempfile::tempdir().unwrap(), tempfile::tempdir().unwrap(), tempfile::tempdir().unwrap());
+    let vars = [("CONTR_HOME", path(root.path())), ("HERDR_APP_HOME", path(app.path())), ("HOME", path(home.path()))];
+    let r = call(&["agents", "config", "--json"], &vars, &Fake::default());
+    assert_eq!((r.code, r.err.as_str()), (0, ""));
+    let v: serde_json::Value = serde_json::from_str(&r.out).unwrap();
+    assert_eq!(v["path"], path(&root.path().join("agents.json")), "CONTR_HOME is the root itself, before HERDR_APP_HOME");
+    // The owner file is in the same root.
+    let r = call(&["owner", "ask", "Go?"], &[("CONTR_HOME", path(root.path())), ("CONTR_PROJECT", "app")], &Fake::default());
+    assert_eq!((r.code, r.out.as_str()), (0, "D1\n"));
+    assert!(root.path().join("owner.json").exists());
+    assert!(!app.path().join("herdr-contr").exists());
+}
+
+#[test]
+fn no_home_at_all_says_which_variables() {
+    let r = call(&["owner", "ask", "Go?"], &[("CONTR_PROJECT", "app")], &Fake::default());
+    assert_eq!(r.code, 1);
+    assert!(r.err.contains("none of $CONTR_HOME, $HERDR_APP_HOME and $HOME is defined"), "{}", r.err);
+    // An empty CONTR_HOME counts as unset.
+    let r = call(&["owner", "ask", "Go?"], &[("CONTR_HOME", ""), ("CONTR_PROJECT", "app")], &Fake::default());
+    assert!(r.code == 1 && r.err.contains("$CONTR_HOME"), "{}", r.err);
+}
+
+#[test]
+fn owner_file_variable_beats_contr_home() {
+    let (root, dir) = (tempfile::tempdir().unwrap(), tempfile::tempdir().unwrap());
+    let named = dir.path().join("mine.json");
+    Store::new(&named).ask(orch::owner::Question { question: "Named?".into(), coordinator: "hc:t1".into(), ..Default::default() }).unwrap();
+    Store::new(root.path().join("owner.json")).ask(orch::owner::Question { question: "Root?".into(), coordinator: "hc:t1".into(), ..Default::default() }).unwrap();
+    let vars = [("CONTR_HOME", path(root.path())), ("CONTR_OWNER_FILE", path(&named))];
+    let r = call(&["owner", "open", "--json"], &vars, &Fake::default());
+    assert_eq!((r.code, r.err.as_str()), (0, ""));
+    let v: serde_json::Value = serde_json::from_str(&r.out).unwrap();
+    assert_eq!(v.as_array().unwrap().len(), 1);
+    assert_eq!(v[0]["question"], "Named?");
+}
