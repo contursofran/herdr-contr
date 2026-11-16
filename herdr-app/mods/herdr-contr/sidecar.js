@@ -19,13 +19,14 @@ export function parseAnswer(stdout) {
   return out;
 }
 
-// Runs one command. Always resolves: a broken or missing sidecar comes back as `error`.
+// Runs one command. Always resolves: a broken or missing sidecar comes back as `error`. `timeout` (ms) is
+// for a long command; Herdr's exec stops a command after 30 s by default.
 // Every call names this app's home (--home), so the helper follows the same herdr-contr/config.json. It goes
 // last, and the helper reads the last --home, so a text that says "--home" is not taken for it.
-export async function call(cmd, args = []) {
+export async function call(cmd, args = [], { timeout } = {}) {
   const argv = [cmd, ...args, "--home", appHome()];
   let r;
-  try { r = await exec(sidecarPath(), argv); }
+  try { r = await (timeout ? exec(sidecarPath(), argv, { timeout }) : exec(sidecarPath(), argv)); }
   catch (e) { return { header: null, end: null, lines: [], error: { code: "no-sidecar", message: `The herdr-contr sidecar could not start (${e}).` } }; }
   const a = parseAnswer(r && r.stdout);
   if (!a.header || !a.end) {

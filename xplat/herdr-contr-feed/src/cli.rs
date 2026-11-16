@@ -18,6 +18,8 @@
 //!   herdr-contr-feed send   --terminal <addr> --text <s> [--file <path>]... [--expect-kind <k>] [--expect-path <log>]
 //!   herdr-contr-feed helper install --machine <m> --sha256 <hex>   (the helper on another machine; after the user's yes)
 //!   herdr-contr-feed helper remove --machine <m>
+//!   herdr-contr-feed update check [--force]   (the installed and the newest release build; read only)
+//!   herdr-contr-feed update install   (downloads the newest build, checks it, installs it; after the user's press)
 //!
 //! Every command takes `--home <herdr-app home>` (the mod passes it): its herdr-contr/config.json has the
 //! settings the helper follows. Without it, the folder this helper is in when that is <home>/herdr-contr/bin.
@@ -64,7 +66,7 @@ pub fn run(argv: &[String]) -> String {
     r.out.emit_value(json!({"type": "header", "protocol": PROTOCOL_VERSION, "sidecar": SIDECAR_VERSION, "build": crate::protocol::BUILD, "cmd": cmd}));
     match cmd.as_str() {
         "version" => {
-            r.out.emit_value(json!({"type": "version", "commands": ["version", "feed", "status", "card", "approve", "answer", "send", "paste-image", "mermaid", "pictures", "helper", "queue", "phone", "commands", "working", "model", "usage", "favicon", "panel", "keys", "suggestion", "agent-images", "health"], "release": update::release()}));
+            r.out.emit_value(json!({"type": "version", "commands": ["version", "feed", "status", "card", "approve", "answer", "send", "paste-image", "mermaid", "pictures", "helper", "queue", "phone", "commands", "working", "model", "usage", "favicon", "panel", "keys", "suggestion", "agent-images", "update", "health"], "release": update::release()}));
             r.finish(true)
         }
         "health" => {
@@ -180,6 +182,30 @@ pub fn run(argv: &[String]) -> String {
             match mermaid::draw(text, &colors, Path::new(&dir)) {
                 Ok(d) => {
                     r.out.emit_value(json!({"type": "mermaid", "path": d.path, "width": d.width, "height": d.height}));
+                    r.finish(true)
+                }
+                Err((code, message)) => r.fail(code, &message),
+            }
+        }
+        "update" => {
+            let Some(dir) = config::dir(home().as_deref()) else { return r.fail("usage", "update needs --home <herdr-app home>") };
+            let gh = crate::release::Gh::from_process();
+            let done = match args.first().map(String::as_str) {
+                Some("check") => {
+                    let now = SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).map(|d| d.as_secs()).unwrap_or(0);
+                    crate::release::check(&gh, &dir, now, has("--force")).map(|l| vec![l])
+                }
+                Some("install") => match dir.parent() {
+                    Some(h) => crate::release::install(&gh, h, &std::env::temp_dir()),
+                    None => return r.fail("usage", "update install needs --home <herdr-app home>"),
+                },
+                _ => return r.fail("usage", "update needs check or install"),
+            };
+            match done {
+                Ok(lines) => {
+                    for l in lines {
+                        r.out.emit_value(l);
+                    }
                     r.finish(true)
                 }
                 Err((code, message)) => r.fail(code, &message),

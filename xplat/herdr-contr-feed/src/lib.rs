@@ -17,6 +17,7 @@ pub mod panel;
 pub mod paste;
 pub mod protocol;
 pub mod queue;
+pub mod release;
 pub mod remote;
 pub mod rows;
 pub mod serve;

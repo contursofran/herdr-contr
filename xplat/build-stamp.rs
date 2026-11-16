@@ -1,6 +1,7 @@
 // The build stamp, for build.rs of herdr-contr-feed and herdr-contr-orch (include!). It sets HERDR_CONTR_BUILD
 // to "<short sha> <commit date>". CI sets HERDR_CONTR_BUILD_SHA and HERDR_CONTR_BUILD_DATE; a local build asks
-// git. Without both, the stamp is "unknown".
+// git. Without both, the stamp is "unknown". HERDR_CONTR_REPO is the GitHub repository (owner/name) whose
+// releases `update` reads: GITHUB_REPOSITORY in CI, else the origin remote; empty when neither is known.
 fn build_stamp() {
     use std::process::Command;
     println!("cargo:rerun-if-env-changed=HERDR_CONTR_BUILD_SHA");
@@ -24,4 +25,11 @@ fn build_stamp() {
         _ => "unknown".to_string(),
     };
     println!("cargo:rustc-env=HERDR_CONTR_BUILD={stamp}");
+    println!("cargo:rerun-if-env-changed=GITHUB_REPOSITORY");
+    let repo = var("GITHUB_REPOSITORY").or_else(|| {
+        let url = git(&["remote", "get-url", "origin"])?;
+        let tail = url.trim_end_matches(".git").rsplit(|c| c == ':' || c == '/').take(2).collect::<Vec<_>>();
+        (tail.len() == 2).then(|| format!("{}/{}", tail[1], tail[0]))
+    });
+    println!("cargo:rustc-env=HERDR_CONTR_REPO={}", repo.unwrap_or_default());
 }

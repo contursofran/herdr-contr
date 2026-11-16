@@ -64,6 +64,8 @@ does not download; `install-isolated.sh` copies the sidecar in.
 | `helper install` | `--machine <m> --sha256 <hex> [--cache <file>]` | `installed` |
 | `helper remove` | `--machine <m> [--cache <file>]` | `removed` |
 | `phone status` / `on` / `off` | `--home <herdr-app home>` (Rust sidecar only) | `phone` |
+| `update check` | `--home <herdr-app home>` `[--force]` (Rust sidecar only; read only) | `update` |
+| `update install` | `--home <herdr-app home>` (Rust sidecar only; only after the owner's press) | `update-plan`, `update-done` |
 
 `card` and `commands` only read. `approve` and `answer` send keys to the agent; the mod runs them only when the
 owner presses a button, never on a timer. `keys` too: only on the owner's key or press on the panel card. `send` types a message and presses Enter.
@@ -202,6 +204,25 @@ settings and restarts it. `off` stops it and removes that file, only when it has
   `phone-qr*.svg` files there. The mod draws it from the path under the app home (`svg()` reads from the app root).
 - `service.state`: `off` (no file), `running`, `stopped`, `error` (`message` says where its log is), or
   `by-hand` (a file without the marker; never changed).
+
+### `update` (`update check`), `update-plan` and `update-done` (`update install`)
+
+```json
+{"type":"update","installed":"1111111 2026-11-10","newest":"abc1234 2026-11-16","tag":"build-2026-11-16-abc1234","url":"https://…","differs":true,"checked_at":1763251200}
+{"type":"update-plan","text":"Dry run: would install into …"}
+{"type":"update-done","installed":"abc1234 2026-11-16","tag":"build-2026-11-16-abc1234","text":"Installing into …"}
+```
+
+- The releases come from `gh release view` and `gh release download` for the repository the helper was built from
+  (`HERDR_CONTR_REPO` overrides it; `HERDR_CONTR_GH` names the gh program). The newest is the latest release with a
+  `build-<date>-<sha7>` tag and the asset `herdr-contr-<tag>.zip`.
+- `installed` is `<home>/herdr-contr/install.json` `build`, else the helper's own build. `newest` is the tag as a build
+  stamp. `differs`: the two shas differ.
+- `check` keeps the newest release in `<home>/herdr-contr/update.json` for a day; `--force` asks again.
+- `install` downloads the zip into a new folder in the temp folder, checks the release digest (when gh gives one) and
+  every line of `remote/SHA256SUMS`, and that the helper for this machine is the one the sums name. Then the zip's helper
+  runs `install --home <home> --helper … --remote … [--orch …] --dry-run`, then the same without `--dry-run`. The first
+  error stops it (codes `no-repo`, `no-gh`, `gh`, `no-build`, `check`, `unzip`, `install`); the temp folder goes after.
 
 ### `installed` (`helper install`), `removed` (`helper remove`)
 

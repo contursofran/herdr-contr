@@ -244,6 +244,10 @@ drawn by Herdr's `frames`; every loader of the mod is this one); done is a check
   nothing until the file is fixed or removed (it is never overwritten). A change keeps the other keys,
   is written against the text just read (someone else's change is read again, not lost), and every
   view shows it at once. The file is read again each minute and when the dialog opens.
+  - **Version** (#219, General, under VERSION): "herdr-contr <installed build>" and "Newest: <newest build>", or
+    "This is the newest build.". An Update button (small button) only when the two differ. The dialog runs
+    `update check` when it opens (the helper keeps the answer a day); no timer. Update runs `update install`; under the
+    row (12 px): "Updating…", then "Installed <build>. Restart Herdr to load it." (`muted`), or the error (`blocked`).
   - **Inline PR icons (experimental)** On: icons before pull request and issue references in prose (see the chat).
   - **Status row** Hide: no model button and no context ring in the reply box (the branch and the status line stay).
   - **Helper on other machines** Never: for a tab on another machine the chat says, in one line,
