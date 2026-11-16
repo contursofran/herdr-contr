@@ -23,7 +23,10 @@ fn walk(dir: &Path, base: &Path, out: &mut Vec<(String, PathBuf)>) {
     }
 }
 
+include!("../build-stamp.rs");
+
 fn main() {
+    build_stamp();
     let base = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../herdr-app");
     assert!(base.join("keys.json").is_file(), "herdr-app/ must sit next to xplat/");
     let mut files = vec![

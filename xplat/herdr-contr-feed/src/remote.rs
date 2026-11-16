@@ -316,7 +316,7 @@ fn prepare(client: &HcClient, machine: &str, memo: &mut Memo) -> Result<Option<(
 }
 
 fn header(out: &mut JsonLines, cmd: &str) {
-    out.emit_value(json!({"type": "header", "protocol": PROTOCOL_VERSION, "sidecar": SIDECAR_VERSION, "cmd": cmd}));
+    out.emit_value(json!({"type": "header", "protocol": PROTOCOL_VERSION, "sidecar": SIDECAR_VERSION, "build": crate::protocol::BUILD, "cmd": cmd}));
 }
 
 fn error_lines(cmd: &str, f: Fail, extra: Value) -> String {

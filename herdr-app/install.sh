@@ -45,5 +45,7 @@ if [ -z "$exe" ] || [ ! -x "$exe" ]; then
   exit 1
 fi
 set -- --helper "$exe" "$@"
+# The release zip has the orchestration tool for macOS only.
+if [ "$rel" = bin/herdr-contr-feed ] && [ -x "$here/bin/herdr-contr-orch" ]; then set -- --orch "$here/bin/herdr-contr-orch" "$@"; fi
 if [ -f "$here/remote/SHA256SUMS" ]; then set -- --remote "$here/remote" "$@"; fi
 exec "$exe" install "$@"

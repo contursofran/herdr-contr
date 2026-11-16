@@ -94,6 +94,24 @@ and `gpui-kit.d.ts`. Read them there. Do not copy them into this repository.
 - **One thing at a time.** Do not start a new screen while the one before
   it is not in use by the owner.
 
+## Releases
+
+- `.github/workflows/release.yml` runs after the `CI` check passes on a push
+  to `main`. It builds the helper for macOS (universal) and Linux (musl,
+  x86_64 and aarch64) and the orchestration tool for macOS. It publishes
+  one zip as the release `build-<commit date>-<short sha>`, and deletes all
+  but the last 10 `build-` releases.
+- The zip holds `install.sh`, `bin/`, `remote/<target>/` and
+  `remote/SHA256SUMS`. On the other machine: unzip, then `./install.sh`.
+- The build stamp (`<short sha> <commit date>`) comes from
+  `HERDR_CONTR_BUILD_SHA` and `HERDR_CONTR_BUILD_DATE`, else from git
+  (`xplat/build-stamp.rs`).
+- To sign the macOS binaries, set the secrets `MACOS_CERT_P12` (a
+  Developer ID Application certificate as base64 `.p12`),
+  `MACOS_CERT_PASSWORD` and `MACOS_SIGN_IDENTITY`. Without them the
+  release is unsigned and its notes say so.
+- Run the workflow by hand (`workflow_dispatch`) to test it on a branch.
+
 ## Safety
 
 - The owner's Herdr app and hc core are live. Do not edit files in the
