@@ -31,6 +31,8 @@ fn keys_to_another_machine_go_to_the_helper_there() {
     std::fs::copy(carried(), &installed).unwrap();
     std::env::set_var("HC_SOCKET", &here.path);
     std::env::remove_var("HC_SESSION");
+    // The settings are this test's own: the backend root is an empty temp folder, not one of this machine.
+    std::env::set_var("CONTR_HOME", dir.path().join("root"));
     let cache = dir.path().join("cache.json");
 
     // The card there gives the request id; approve with it goes to t3 there, nothing here.

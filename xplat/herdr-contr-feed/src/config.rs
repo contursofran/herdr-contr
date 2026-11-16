@@ -1,4 +1,5 @@
-//! `<herdr-app home>/herdr-contr/config.json`: the herdr-contr settings the person sets in the mod.
+//! `config.json` in the backend root (`<herdr-app home>/herdr-contr` by default): the herdr-contr settings the
+//! person sets in the mod.
 //! `{"status_row": "show", "remote_helper": "ask"}`; a missing file or key is the
 //! default, and so is a file that is not JSON (the mod's herdr-contr settings say they could not read it).
 //! The install never creates or changes this file. The helper reads the keys that change what it does.
@@ -6,7 +7,7 @@
 use serde_json::Value;
 use std::path::{Path, PathBuf};
 
-use herdr_core::places::Places;
+use herdr_core::places;
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Config {
@@ -26,13 +27,13 @@ impl Default for Config {
     }
 }
 
-/// `<home>/herdr-contr`: from `--home` (the mod always passes its appHome()), else the folder this helper is in
-/// when it is `<home>/herdr-contr/bin/herdr-contr-feed`. None: no settings, the defaults apply.
+/// The backend root (`herdr_core::places::root`): `<home>/herdr-contr` from `--home` (the mod always passes its
+/// appHome()), else CONTR_HOME, else `<HERDR_APP_HOME>/herdr-contr`, else the folder this helper is in when it is
+/// `<home>/herdr-contr/bin/herdr-contr-feed`, else `~/.config/herdr-app/herdr-contr`. None: no settings, the
+/// defaults apply.
 pub fn dir(home: Option<&str>) -> Option<PathBuf> {
-    if let Some(h) = home.filter(|h| !h.is_empty()) {
-        return Some(Places::new(h).folder());
-    }
-    herdr_core::places::installed_home(&std::env::current_exe().ok()?).map(|h| Places::new(h).folder())
+    let installed = std::env::current_exe().ok().and_then(|e| places::installed_home(&e));
+    places::root(home, installed.as_deref(), &|k| std::env::var(k).unwrap_or_default())
 }
 
 pub fn parse(text: &str) -> Config {

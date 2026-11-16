@@ -77,8 +77,9 @@ Environment:
                         it the parent of the worker
   CONTR_KIT             the Claude Code plugin folder of the kit; it replaces \"kit\" of
                         the profiles file
-  CONTR_AGENTS_CONFIG   profiles file (default: agents.json in the Herdr home's herdr-contr folder;
-                        the Herdr home is HERDR_APP_HOME, else ~/.config/herdr-app).
+  CONTR_HOME            the backend root, the folder of this tool's files
+                        (without CONTR_HOME: HERDR_APP_HOME/herdr-contr, else ~/.config/herdr-app/herdr-contr)
+  CONTR_AGENTS_CONFIG   profiles file (default: agents.json in the backend root, see CONTR_HOME).
                         Built-in profiles: orchestrator (claude opus, medium effort), builder,
                         planner, reviewer, debugger, explorer. A profile in the file replaces the
                         built-in one of the same name. A file with \"presets\" and no
@@ -112,8 +113,9 @@ coordinator that asked gets \"Owner answered <id>: <answer>\" or
 stays saved and the command exits 1.
 
 Environment:
-  CONTR_OWNER_FILE   the owner file (default: owner.json in the Herdr home's herdr-contr folder;
-                     the Herdr home is HERDR_APP_HOME, else ~/.config/herdr-app)
+  CONTR_HOME         the backend root, the folder of this tool's files
+                     (without CONTR_HOME: HERDR_APP_HOME/herdr-contr, else ~/.config/herdr-app/herdr-contr)
+  CONTR_OWNER_FILE   the owner file (default: owner.json in the backend root, see CONTR_HOME)
 ";
 
 /// CONTR_PROJECT, or the name of the folder the session runs in.

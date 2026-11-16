@@ -24,7 +24,8 @@ pub struct Options {
     pub origin: Option<String>,
     pub read_only: bool,
     pub print: Option<String>,
-    /// `--home`: the herdr-app home whose herdr-contr settings (`herdr-contr/config.json`) serve follows. None: `app_home`.
+    /// `--home`: the herdr-app home whose herdr-contr settings (`herdr-contr/config.json`) serve follows. None: the
+    /// backend root of `config::dir` (CONTR_HOME, HERDR_APP_HOME, the installed place, the default).
     pub home: Option<String>,
 }
 
@@ -153,10 +154,9 @@ pub fn main(args: &[String]) -> i32 {
         print!("{}", service(&kind, &program, &home, &o));
         return 0;
     }
-    // The home whose settings serve follows: `--home`, else the rule of herdr_core::places.
-    let installed = std::env::current_exe().ok().and_then(|e| herdr_core::places::installed_home(&e));
-    let env = |k: &str| std::env::var(k).unwrap_or_default();
-    o.home = herdr_core::places::home(o.home.as_deref(), installed.as_deref(), &env).map(|h| h.to_string_lossy().into_owned());
+    // The backend root whose settings and files serve uses: `--home`, else the rule of herdr_core::places. Its
+    // commands get `--home` only when serve got it; else they find the same root.
+    let root = crate::config::dir(o.home.as_deref());
     if o.cache.is_none() {
         o.cache = default_cache();
     }
@@ -173,10 +173,10 @@ pub fn main(args: &[String]) -> i32 {
     let port = listener.local_addr().map(|a| a.port()).unwrap_or(o.port);
     eprintln!("serve: listening on http://127.0.0.1:{port} for {} (Tailscale Serve only; Funnel is refused)", o.user);
     // Notifications from serve's own loop, page open or not (`push`). Off, with the reason, when the files are not right.
-    if let Some(h) = o.home.clone() {
-        let (read, dir) = (h.clone(), push::folder(std::path::Path::new(&h)));
+    if let Some(r) = root.clone() {
+        let (read, dir) = (o.home.clone(), push::folder(&r));
         let post = move |e: &str, hs: &[String], b: &[u8]| push::curl_post(&dir, e, hs, b);
-        match push::start(std::path::Path::new(&h), std::time::Duration::from_secs(3), Box::new(post), move || hub::workspaces(Some(&read))) {
+        match push::start(&r, std::time::Duration::from_secs(3), Box::new(post), move || hub::workspaces(read.as_deref())) {
             Ok(()) => eprintln!("serve: notifications ready"),
             Err(e) => eprintln!("serve: notifications off: {e}"),
         }
@@ -184,7 +184,7 @@ pub fn main(args: &[String]) -> i32 {
     let settings = net::Settings {
         user: o.user.clone(),
         origin: o.origin.clone(),
-        hub: hub::Config { cache: o.cache.clone(), read_only: o.read_only, hub: "herdr-contr".into(), home: o.home.clone() },
+        hub: hub::Config { cache: o.cache.clone(), read_only: o.read_only, hub: "herdr-contr".into(), home: o.home.clone(), root },
     };
     net::serve(listener, settings);
     0

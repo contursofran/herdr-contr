@@ -7,7 +7,8 @@
 //! - Only https endpoints of the known push services are ever contacted; redirects are not followed (curl, as the
 //!   update check). A 404 or 410 deletes the subscription.
 //! - The key (`vapid.key`) and the subscriptions (`subscriptions.json`) are files only the owner can read (mode 600)
-//!   in `<herdr-app home>/herdr-contr/serve`. A key file that does not hold a key is never overwritten: push stays off.
+//!   in `serve` of the backend root (`<herdr-app home>/herdr-contr` by default). A key file that does not hold a key
+//!   is never overwritten: push stays off.
 
 use aes_gcm::aead::{Aead, KeyInit, Payload};
 use base64::Engine;
@@ -182,8 +183,8 @@ pub fn write_private(path: &Path, data: &[u8]) -> std::io::Result<()> {
 }
 
 /// Where push keeps its files.
-pub fn folder(home: &Path) -> PathBuf {
-    home.join("herdr-contr").join("serve")
+pub fn folder(root: &Path) -> PathBuf {
+    root.join("serve")
 }
 
 /// The key in `vapid.key`, or a new one written there. Err when the file is there but holds no key (a new key would
@@ -560,10 +561,11 @@ pub fn center() -> std::sync::MutexGuard<'static, Option<Center>> {
     locked(&CENTER)
 }
 
-/// Starts push for `home`: the key, the subscriptions, and the loop that reads the workspaces every `every`.
+/// Starts push for the backend root `root`: the key, the subscriptions, and the loop that reads the workspaces every
+/// `every`.
 /// Err (push stays off): why.
-pub fn start(home: &Path, every: Duration, transport: Box<Transport>, read: impl Fn() -> Vec<Workspace> + Send + 'static) -> Result<(), String> {
-    let dir = folder(home);
+pub fn start(root: &Path, every: Duration, transport: Box<Transport>, read: impl Fn() -> Vec<Workspace> + Send + 'static) -> Result<(), String> {
+    let dir = folder(root);
     let key = load_key(&dir)?;
     let store = Store::open(&dir)?;
     *center() = Some(Center::new(key, store));

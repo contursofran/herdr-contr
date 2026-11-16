@@ -79,3 +79,69 @@ fn version_names_the_baked_release() {
     assert_eq!(v["release"], serde_json::json!(want), "{line}");
 }
 
+
+/// Runs the helper with only these variables (no CONTR_HOME, HERDR_APP_HOME or HOME of this machine).
+fn run_with(args: &[&str], vars: &[(&str, &std::path::Path)]) -> String {
+    let o = Command::new(env!("CARGO_BIN_EXE_herdr-contr-feed"))
+        .args(args)
+        .env_clear()
+        .env("PATH", "/usr/bin:/bin")
+        .env("HOME", "/nonexistent-home")
+        .envs(vars.iter().copied())
+        .output()
+        .unwrap();
+    String::from_utf8(o.stdout).unwrap()
+}
+
+fn never_in(root: &std::path::Path) {
+    fs::create_dir_all(root).unwrap();
+    fs::write(root.join("config.json"), r#"{"remote_helper": "never"}"#).unwrap();
+}
+
+const REMOTE: [&str; 3] = ["feed", "--terminal", "m1/t1"];
+
+/// `--home` names the root: its settings apply, and those in CONTR_HOME do not.
+#[test]
+fn home_flag_beats_contr_home() {
+    let (flag, contr) = (t(), t());
+    flag.config(r#"{"remote_helper": "never"}"#);
+    let sock = flag.home.join("no-core.sock");
+    let vars = [("CONTR_HOME", contr.home.join("herdr-contr")), ("HC_SOCKET", sock)];
+    let vars: Vec<(&str, &std::path::Path)> = vars.iter().map(|(k, v)| (*k, v.as_path())).collect();
+    let mut args = REMOTE.to_vec();
+    args.extend(["--home", flag.home.to_str().unwrap()]);
+    assert!(run_with(&args, &vars).contains(r#""code":"remote-off""#), "the --home settings apply");
+    // Never only in CONTR_HOME: --home (no settings there) wins.
+    fs::remove_file(flag.home.join("herdr-contr/config.json")).unwrap();
+    contr.config(r#"{"remote_helper": "never"}"#);
+    let out = run_with(&args, &vars);
+    assert!(!out.contains("remote-off"), "{out}");
+}
+
+/// Without `--home`, CONTR_HOME is the root itself, before HERDR_APP_HOME.
+#[test]
+fn contr_home_gives_the_settings() {
+    let (tmp, app) = (tempfile::tempdir().unwrap(), t());
+    let root = tmp.path().join("backend");
+    never_in(&root);
+    let sock = tmp.path().join("no-core.sock");
+    let vars = [("CONTR_HOME", root.as_path()), ("HERDR_APP_HOME", app.home.as_path()), ("HC_SOCKET", sock.as_path())];
+    assert!(run_with(&REMOTE, &vars).contains(r#""code":"remote-off""#));
+    // An empty CONTR_HOME counts as unset: HERDR_APP_HOME (no settings) gives the root.
+    let empty = std::path::Path::new("");
+    let vars = [("CONTR_HOME", empty), ("HERDR_APP_HOME", app.home.as_path()), ("HC_SOCKET", sock.as_path())];
+    assert!(!run_with(&REMOTE, &vars).contains("remote-off"));
+    // HERDR_APP_HOME alone: `<it>/herdr-contr`.
+    app.config(r#"{"remote_helper": "never"}"#);
+    assert!(run_with(&REMOTE, &vars).contains(r#""code":"remote-off""#));
+}
+
+/// `update install` writes a Herdr home: a CONTR_HOME that is not `<home>/herdr-contr` has none, so it stops first.
+#[test]
+fn update_install_needs_a_herdr_home() {
+    let tmp = tempfile::tempdir().unwrap();
+    let root = tmp.path().join("backend");
+    fs::create_dir_all(&root).unwrap();
+    let out = run_with(&["update", "install"], &[("CONTR_HOME", root.as_path())]);
+    assert!(out.contains("update install needs --home <herdr-app home>"), "{out}");
+}
