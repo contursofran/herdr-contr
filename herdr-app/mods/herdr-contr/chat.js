@@ -433,6 +433,7 @@ export class ChatView {
     // The first row starts below the bar; the rest scroll up under it.
     const sizes = rows.map((r, i) => this.height(r) + (i === 0 ? barH() : 0));
     // A left press and how far it went: a drag that selects text in a row with pictures is not a click.
+    // These handlers only note the press; they must not stop it, or the text selection does not start.
     const box = v_flex().relative().flex_1().min_h(0)
       .on_mouse_down("left", (e) => { this.press = { x: e?.position?.x ?? 0, y: e?.position?.y ?? 0, moved: false }; })
       .on_mouse_move((e) => { const p = this.press; if (p && Math.hypot((e?.position?.x ?? 0) - p.x, (e?.position?.y ?? 0) - p.y) > DRAG_PX) p.moved = true; })
@@ -498,9 +499,10 @@ export class ChatView {
       // The chat input keeps ⌘⌥↑/↓ from the app's keys, so the chat switches spaces itself.
       .on_key_down((e, cx) => { const go = spaceKey(e); if (go) { cx.stop_propagation?.(); run(go); } })
       // Another agent's chat fades in; a new card fades in and rises into place.
-      // No press stop on the content: under Herdr 0.1.13 an ancestor's stop_propagation on the left press
-      // makes TextView text unselectable. Put the stop back (so content presses don't drag the window; the
-      // block has window_drag for the bar) once Herdr fixes that. The reply box and the cards keep theirs.
+      // No press stop on the content: a text selection starts only from a left press that no element stops.
+      // So a press in the content also reaches the block's window_drag, if it has one: a drag then moves the
+      // window. In the herdr-contr layout the chat block has no window_drag (the tabs block is the bar, #201).
+      // The own layout's chat block keeps it for its bar. The reply box and the cards keep their stop.
       // Under Herdr's tab bar: the Chat | Terminal switch, for an agent (the own layout's bar has it in the tab menu).
       .when(herdrTabBar() && Boolean(f), (el) => el.child(switchStrip(t, "chat")))
       .child(v_flex().flex_1().min_h(0)

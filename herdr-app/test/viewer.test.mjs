@@ -150,6 +150,18 @@ test("the chat: a click on the picture keeps the viewer, a click outside or Esc 
   assert.equal(v.viewer.shown, false, "another agent's chat closes it");
 });
 
+test("the chat: the list box notes a left press but does not stop it, so a drag selects text (#201)", async () => {
+  const { root } = await chat();
+  const box = (function find(e) { if (!e || typeof e !== "object") return null; if ((e.kids || []).includes(lastList)) return e; for (const k of e.kids || []) { const f = find(k); if (f) return f; } return null; })(root());
+  let stops = 0;
+  const ecx = { stop_propagation() { stops++; }, notify() {} };
+  box._h.on_mouse_down({ position: { x: 100, y: 100 } }, ecx);
+  box._h.on_mouse_move({ position: { x: 160, y: 104 } }, ecx);
+  box._h.on_mouse_up({}, ecx);
+  assert.equal(stops, 0);
+  assert.equal(box._h.on_mouse_down_right, undefined, "the right press stays with the list's row menu");
+});
+
 test("the chat: a drag that selects text in a row with pictures does not open the viewer", async () => {
   const { cx, v, root } = await chat();
   const box = (function find(e) { if (!e || typeof e !== "object") return null; if ((e.kids || []).includes(lastList)) return e; for (const k of e.kids || []) { const f = find(k); if (f) return f; } return null; })(root());

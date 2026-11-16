@@ -278,11 +278,13 @@ drawn by Herdr's `frames`; every loader of the mod is this one); done is a check
   - `sidebar`: a `column`, 250 px (min 220, max 320), `hidden`, `chrome`, a 1 px divider, holding
     one block `side`.
   - `work`: a `column` holding the `stack` `screen` (active `chat`) with the blocks `chat`,
-    `needs`, `overview` (each `window_drag`) and the `column` `tab`: the block `top` (56 px) above
+    `needs`, `overview` (each `window_drag`, for the bar each draws over its top) and the `column` `tab`: the block `top` (56 px) above
     `tab-panes` (`content: {tab: "active", pane: {gap 6, radius 8, border 1 border, focus 1 muted}}`,
     padding 8).
   - The ids `sidebar`, `screen`, `chat` and `tab` are what the mod switches.
-- **Layout** `layouts/herdr-contr.json`: the same `work` column and theme, but `sidebar` is
+- **Layout** `layouts/herdr-contr.json`: the same `work` column and theme (but the blocks `chat`, `needs` and
+  `overview` have no `window_drag`: a `window_drag` block moves the window on each left press that no element
+  stops, and a text selection does not stop it, #201; only `brand` and `tabs` move the window), but `sidebar` is
   Herdr's, as in Herdr's `main` layout (268 px, shown), with `traffic_lights: [12, 16]`, and three blocks (#97, after
   the owner's design): `brand` (46 px, `window_drag`, mod `herdr-contr-spaces`, view `head`), `projects` (mod
   `herdr-contr-spaces`, the Projects list) and `foot` (mod `herdr-contr`, view `foot`).
