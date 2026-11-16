@@ -31,7 +31,9 @@ Claude Code runs them and gives them the hook input on stdin.
 stop, in a worker (CONTR_COORDINATOR is set): a turn that sent no report
 (hc send or the report tool, with a result that is not an error) gets one,
 \"ended its turn without a report. Last words: …\", sent to the
-coordinator. When Claude Code saved no transcript, the hook cannot tell if
+coordinator. A turn that ends while a background task of the worker
+(a Bash call with run_in_background) still runs gets none: the task's
+end wakes the worker. When Claude Code saved no transcript, the hook cannot tell if
 the turn sent one: it sends \"ended its turn; it may have sent a report
 already …\" with the last words. When hc refuses it (the coordinator's
 prompt is busy), it is held for the coordinator. It never stops the turn.
@@ -252,7 +254,8 @@ fn worker_stop(input: &Input, env: &dyn Fn(&str) -> String, core: &dyn Core) -> 
         Err(e) if e.kind() == io::ErrorKind::NotFound => (Turn::default(), true),
         Err(e) => return Err(format!("{}: {e}", input.transcript_path)),
     };
-    if turn.reported {
+    // A worker that waits on its own background task is woken by the task's end: it needs no note now.
+    if turn.reported || turn.waiting {
         return Ok(());
     }
     let said = if input.last_assistant_message.trim().is_empty() { &turn.said } else { &input.last_assistant_message };

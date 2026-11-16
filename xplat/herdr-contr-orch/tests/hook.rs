@@ -105,3 +105,24 @@ fn the_last_words_are_one_line_and_not_too_long() {
     assert!(got.ends_with(&("é".repeat(SAID_MAX) + "…")) && !got.ends_with(&("é".repeat(SAID_MAX + 1) + "…")), "{got}");
     assert_eq!(missed_report("  ", ""), "ended its turn without a report. Last words: (none)");
 }
+
+fn fixture(name: &str) -> String {
+    path(&Path::new(env!("CARGO_MANIFEST_DIR")).join("../fixtures").join(name)).to_string()
+}
+
+#[test]
+fn a_turn_that_waits_on_its_background_task_gets_no_report() {
+    let core = Fake::default();
+    let input = json!({"transcript_path": fixture("background-running.jsonl")}).to_string();
+    let r = stop(&WORKER, &input, &core);
+    assert_eq!((r.code, r.err.as_str()), (0, ""));
+    assert!(core.calls().is_empty());
+}
+
+#[test]
+fn a_turn_after_the_background_task_ended_gets_a_report() {
+    let core = Fake::default();
+    let input = json!({"transcript_path": fixture("background-finished.jsonl")}).to_string();
+    assert_eq!(stop(&WORKER, &input, &core).code, 0);
+    assert_eq!(core.calls()[0].1["text"], "ended its turn without a report. Last words: All three loops passed.");
+}
