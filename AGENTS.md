@@ -15,9 +15,9 @@ next. The Herdr app gives the window, the sidebar, the tabs and the terminal.
   to-dos, the MCP tools, the kit) moves here from the contr repository
   (#160): `xplat/herdr-contr-orch` and `kit/`. The helper's `install` puts both in
   the Herdr home (`herdr-contr/kit`, `herdr-contr/bin`). The tool's files
-  (`agents.json`, `owner.json`, `state/`) are in the Herdr home's
-  `herdr-contr` folder. The mod reads and changes them only through the tool
-  (#186).
+  (`agents.json`, `owner.json`, `state/`) are in the backend root:
+  `CONTR_HOME`, else the Herdr home's `herdr-contr` folder (#255). The mod
+  reads and changes them only through the tool (#186).
 
 ## Goal: one thing at a time (owner, 2026-11-11)
 

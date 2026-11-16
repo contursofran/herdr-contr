@@ -23,6 +23,12 @@ with `--orch <file>`, the tool in `<Herdr home>/herdr-contr/bin`
 server look for `herdr-contr-orch` in `../bin` of the kit folder first, then
 on the PATH. Start `claude` with the kit: `claude --plugin-dir <kit>`.
 
+The tool keeps its files (`agents.json`, `owner.json`, `state/`) in the
+backend root: `$CONTR_HOME` when set, else `$HERDR_APP_HOME/herdr-contr` (with `CONTR_HOME` unset),
+else `~/.config/herdr-app/herdr-contr`. `CONTR_AGENTS_CONFIG`,
+`CONTR_OWNER_FILE` and `CONTR_STATE_DIR` name one file or folder each, and
+come before the root.
+
 To have the kit in every `claude` session, register it once:
 `claude plugin marketplace add <Herdr home>/herdr-contr`, then
 `claude plugin install contr@contr`. The plugin reads the kit folder in
