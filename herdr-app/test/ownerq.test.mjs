@@ -243,7 +243,7 @@ test("codeSpans: each span once, as written, outside code blocks; none in plain 
 });
 
 test("a to-do shows only in the chat of the coordinator that pinned it: text, from, a count of the others", async () => {
-  write([], [td("T1", "t1", "Test the **build**"), td("T2", "t1", "CI is slow", { kind: "know" }), td("T3", "t2", "Other")]);
+  write([], [td("T1", "t1", "Test the **build**"), td("T2", "t1", "CI is slow", { kind: "know" }), td("T3", "t2", "Other"), td("T4", "box/t1", "Remote")]);
   const cx = fakeCx(); const c = new OwnerCards(cx);
   await c.poll(cx, "t1");
   const el = c.todoView("t1", T);
@@ -296,8 +296,9 @@ test("a failed Done keeps the to-do with the tool's message; marked done but not
     const r = run(cmd, args);
     return cmd === "env" && args.includes("done") ? { code: 1, stdout: "", stderr: "herdr-contr-orch owner done: saved; coordinator not reached: no terminal t1" } : r;
   };
+  c.reading = true;   // no read after it: the to-do leaves because the tool saved it
   await c.done(cx, "t1");
-  fake.exec = run;
+  c.reading = false; fake.exec = run;
   el = c.todoView("t1", T);
   assert.match(textOf(el), /The to-do is marked done, but the coordinator did not get it.*no terminal t1/);
   assert.doesNotMatch(textOf(el), /T1 · To do/);
