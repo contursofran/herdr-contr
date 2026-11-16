@@ -2,7 +2,7 @@
 
 ## Herdr
 
-This mod talks to [Herdr](https://herdr.dev) through Herdr's public socket API and its mod API. It contains no Herdr code. Herdr is a product of Herdr, Inc. This project is not affiliated with, endorsed by, or supported by Herdr, Inc.
+This mod talks to [Herdr](https://herdr.dev) through Herdr's public socket API and its mod API. It contains no Herdr app code; the mods named below are adapted from mods that ship with the Herdr app. Herdr is a product of Herdr, Inc. This project is not affiliated with, endorsed by, or supported by Herdr, Inc.
 
 ## Herdr mods (spaces, tabs, agents)
 
