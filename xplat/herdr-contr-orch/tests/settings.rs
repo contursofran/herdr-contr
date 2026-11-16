@@ -200,7 +200,7 @@ fn owner_open_lists_the_open_todos_after_the_questions_oldest_first() {
     let v: Value = serde_json::from_str(&r.out).unwrap();
     let kinds: Vec<_> = v.as_array().unwrap().iter().map(|i| (i["kind"].clone(), i["id"].clone())).collect();
     assert_eq!(kinds, [(json!("question"), json!("D1")), (json!("todo"), json!("T1")), (json!("todo"), json!("T3"))]);
-    assert_eq!(v[1], json!({"kind": "todo", "id": "T1", "coordinator": "hc:t1", "from": "builder #9", "todo_kind": "do", "text": "Test `make app`"}));
+    assert_eq!(v[1], json!({"kind": "todo", "id": "T1", "coordinator": "hc:t1", "from": "builder #9", "todo_kind": "do", "text": "Test `make app`", "due": ""}));
     assert_eq!(v[2]["todo_kind"], "know");
     // A to-do marked done leaves the list.
     assert_eq!(call(&["owner", "done", "T1"], &vars, &Fake::default()).code, 0);
