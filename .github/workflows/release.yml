@@ -1,0 +1,165 @@
+name: Release
+
+# A release for each commit on main that passes CI: the helper for macOS (universal) and Linux (musl, x86_64 and
+# aarch64), the orchestration tool for macOS, and install.sh, in one zip. Tag: build-<commit date>-<short sha>.
+# The last 10 build- releases stay. workflow_dispatch builds the current head of the chosen branch (a test run).
+on:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+env:
+  SHA: ${{ github.event.workflow_run.head_sha || github.sha }}
+
+jobs:
+  stamp:
+    if: github.event_name == 'workflow_dispatch' || (github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push')
+    runs-on: ubuntu-latest
+    outputs:
+      sha: ${{ steps.s.outputs.sha }}
+      date: ${{ steps.s.outputs.date }}
+      tag: ${{ steps.s.outputs.tag }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.SHA }}
+      - id: s
+        run: |
+          date="$(git log -1 --format=%cs)"
+          echo "sha=$SHA" >> "$GITHUB_OUTPUT"
+          echo "date=$date" >> "$GITHUB_OUTPUT"
+          echo "tag=build-$date-${SHA::7}" >> "$GITHUB_OUTPUT"
+
+  macos:
+    needs: stamp
+    runs-on: macos-latest
+    timeout-minutes: 40
+    env:
+      HERDR_CONTR_BUILD_SHA: ${{ needs.stamp.outputs.sha }}
+      HERDR_CONTR_BUILD_DATE: ${{ needs.stamp.outputs.date }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.stamp.outputs.sha }}
+      - run: rustup target add aarch64-apple-darwin x86_64-apple-darwin
+      - name: Build both architectures
+        run: |
+          for t in aarch64-apple-darwin x86_64-apple-darwin; do
+            cargo build --locked --release --manifest-path xplat/Cargo.toml -p herdr-contr-feed -p herdr-contr-orch --target "$t"
+          done
+      - name: Make universal binaries
+        run: |
+          mkdir -p out
+          for b in herdr-contr-feed herdr-contr-orch; do
+            lipo -create -output "out/$b" xplat/target/aarch64-apple-darwin/release/$b xplat/target/x86_64-apple-darwin/release/$b
+          done
+      # Signs only when the three secrets are set (see AGENTS.md, "Releases"); else the binaries stay unsigned.
+      - name: Sign
+        env:
+          CERT_P12: ${{ secrets.MACOS_CERT_P12 }}
+          CERT_PASSWORD: ${{ secrets.MACOS_CERT_PASSWORD }}
+          IDENTITY: ${{ secrets.MACOS_SIGN_IDENTITY }}
+        run: |
+          if [ -z "$CERT_P12" ] || [ -z "$CERT_PASSWORD" ] || [ -z "$IDENTITY" ]; then
+            echo unsigned > out/SIGNED; exit 0
+          fi
+          kc="$RUNNER_TEMP/sign.keychain-db"; pw="$(uuidgen)"
+          echo "$CERT_P12" | base64 --decode > "$RUNNER_TEMP/cert.p12"
+          security create-keychain -p "$pw" "$kc"
+          security set-keychain-settings -lut 3600 "$kc"
+          security unlock-keychain -p "$pw" "$kc"
+          security import "$RUNNER_TEMP/cert.p12" -k "$kc" -P "$CERT_PASSWORD" -T /usr/bin/codesign
+          security set-key-partition-list -S apple-tool:,apple: -s -k "$pw" "$kc"
+          security list-keychains -d user -s "$kc"
+          for b in herdr-contr-feed herdr-contr-orch; do
+            codesign --force --options runtime --timestamp --keychain "$kc" --sign "$IDENTITY" "out/$b"
+          done
+          echo signed > out/SIGNED
+      - name: Check the stamp
+        run: out/herdr-contr-feed --version | grep -F "(${SHA::7} $HERDR_CONTR_BUILD_DATE)"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: macos
+          path: out/
+
+  linux:
+    needs: stamp
+    strategy:
+      matrix:
+        include:
+          - target: x86_64-unknown-linux-musl
+            runner: ubuntu-latest
+          - target: aarch64-unknown-linux-musl
+            runner: ubuntu-24.04-arm
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 40
+    env:
+      HERDR_CONTR_BUILD_SHA: ${{ needs.stamp.outputs.sha }}
+      HERDR_CONTR_BUILD_DATE: ${{ needs.stamp.outputs.date }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.stamp.outputs.sha }}
+      - run: sudo apt-get update && sudo apt-get install -y musl-tools && rustup target add ${{ matrix.target }}
+      - run: cargo build --locked --release --manifest-path xplat/Cargo.toml -p herdr-contr-feed --target ${{ matrix.target }}
+      - name: Check the stamp
+        run: xplat/target/${{ matrix.target }}/release/herdr-contr-feed --version | grep -F "(${SHA::7} $HERDR_CONTR_BUILD_DATE)"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.target }}
+          path: xplat/target/${{ matrix.target }}/release/herdr-contr-feed
+
+  publish:
+    needs: [stamp, macos, linux]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      TAG: ${{ needs.stamp.outputs.tag }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.stamp.outputs.sha }}
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+      # The layout that herdr-app/install.sh reads: bin/ (macOS), remote/<target>/ and remote/SHA256SUMS.
+      - name: Make the zip
+        run: |
+          d="herdr-contr-$TAG"; mkdir -p "$d/bin"
+          cp herdr-app/install.sh "$d/"
+          cp artifacts/macos/herdr-contr-feed artifacts/macos/herdr-contr-orch "$d/bin/"
+          for t in universal-apple-darwin x86_64-unknown-linux-musl aarch64-unknown-linux-musl; do mkdir -p "$d/remote/$t"; done
+          cp artifacts/macos/herdr-contr-feed "$d/remote/universal-apple-darwin/"
+          for t in x86_64-unknown-linux-musl aarch64-unknown-linux-musl; do cp "artifacts/$t/herdr-contr-feed" "$d/remote/$t/"; done
+          chmod +x "$d/install.sh" "$d"/bin/* "$d"/remote/*/herdr-contr-feed
+          (cd "$d/remote" && sha256sum */herdr-contr-feed > SHA256SUMS)
+          zip -r -y "$d.zip" "$d"
+          echo "ZIP=$d.zip" >> "$GITHUB_ENV"
+      - name: Publish
+        run: |
+          {
+            echo "Build of ${SHA} ($(git log -1 --format=%cs)) on main."
+            echo
+            echo "Install: unzip, then run \`./install.sh\` in the folder (\`--dry-run\` first to see what it does)."
+            if [ "$(cat artifacts/macos/SIGNED)" != signed ]; then
+              echo
+              echo "The macOS binaries are not signed (no certificate in the repository secrets)."
+              echo "If macOS blocks them, run \`xattr -d com.apple.quarantine bin/* remote/*/herdr-contr-feed\` in the folder."
+            fi
+          } > notes.md
+          gh release create "$TAG" "$ZIP" --target "$SHA" --title "$TAG" --notes-file notes.md
+      - name: Keep the last 10 builds
+        run: |
+          gh release list --limit 200 --json tagName,createdAt --jq '[.[] | select(.tagName | startswith("build-"))] | sort_by(.createdAt) | reverse | .[10:] | .[].tagName' |
+            while read -r t; do gh release delete "$t" --yes --cleanup-tag; done

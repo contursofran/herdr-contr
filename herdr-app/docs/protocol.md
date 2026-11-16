@@ -121,13 +121,14 @@ Targets: `x86_64-unknown-linux-musl`, `aarch64-unknown-linux-musl`, `universal-a
 ### `header` (every answer, line 1)
 
 ```json
-{"cmd":"feed","protocol":1,"sidecar":"0.1.0","type":"header"}
+{"build":"21f63b9 2026-11-16","cmd":"feed","protocol":1,"sidecar":"0.1.0","type":"header"}
 ```
 
 | Field | Meaning |
 |---|---|
 | `protocol` | This document's version. Changes the mod must know about raise it. |
 | `sidecar` | The sidecar's own version. |
+| `build` | The build stamp: `<short sha> <commit date>` of the commit it was built from, or `unknown`. `herdr-contr-feed --version` and `herdr-contr-orch --version` print it too, and `install` writes it in `herdr-contr/install.json`. Information only: the mod does not compare it. |
 | `cmd` | The command it ran. |
 
 ### `end` (every answer, last line)

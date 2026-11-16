@@ -519,7 +519,7 @@ pub fn run(args: &[String]) -> i32 {
             put(&dir.join("SHA256SUMS"), sums, false)?;
         }
         let marker: BTreeMap<&str, String> = files.keys().map(|rel| (*rel, sha_file(&home.join(rel)).unwrap_or_default())).collect();
-        put(&marker_path, (serde_json::to_string_pretty(&serde_json::json!({ "files": marker })).unwrap() + "\n").as_bytes(), false)
+        put(&marker_path, (serde_json::to_string_pretty(&serde_json::json!({ "build": crate::protocol::BUILD, "files": marker })).unwrap() + "\n").as_bytes(), false)
     })();
     if let Err(e) = written {
         return stop(&[format!("STOP: writing into {} failed: {e}", home.display())]);
