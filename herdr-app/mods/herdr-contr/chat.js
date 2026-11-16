@@ -3,7 +3,7 @@
 // cannot be scrolled from code, and the chat must open at the newest message. Every row shows in full.
 import { div, svg } from "gpui-kit";
 import { v_flex, h_flex, TextView, Scrollbar, v_virtual_list, VirtualListScrollHandle } from "gpui-base";
-import { theme, run, shared, settings, agents } from "herdr";
+import { theme, run, shared, settings, agents, window } from "herdr";
 import { currentAgent, machineOf, icon, loader, FADE, shownScreen, watchEdge, noteWindowHeight, KEY_WIN_H } from "./state.js";
 import { Appear } from "./motion.js";
 import { now, record, flush, loadTiming } from "./timing.js";
@@ -38,6 +38,9 @@ const WORK_MS = 1000;
 // How often the background note ("1 shell still running") is read while the shown agent is idle.
 const BACKGROUND_MS = 5000;
 const CHECK_MS = 400;
+// A left press in the chat this recent still counts as a text selection under way (#204). A release outside the
+// list is not seen, so an old press stops counting.
+export const PRESS_MS = 10000;
 // A sent message waits dimmed until the agent's log has it.
 const ECHO_OPACITY = 0.55;
 // Older rows load by themselves while all rows fit on screen (with FILL_PX to spare), at most AUTO_OLDER
@@ -144,13 +147,37 @@ export class ChatView {
     this.toNewest();
   }
 
+  // Whether a card of the shown agent has the keyboard: a question or approval card or its own-answer box, a
+  // terminal panel card, or a question of the coordinator.
+  cardHasFocus() {
+    const a = this.address, on = (h) => Boolean(h?.is_focused?.());
+    return (Boolean(this.cards.card(a)) && (on(this.cards.focus) || Boolean(this.cards.typing)))
+      || (Boolean(this.panel.lines(a)) && on(this.panel.focus))
+      || (Boolean(this.owner.card(a)) && (on(this.owner.focus) || Boolean(this.owner.typing)));
+  }
+
+  // The reply box takes the keyboard when the chat shows (#204), unless the owner is busy in the chat: a card
+  // has the keyboard, the picture viewer is open, or a left press (a text selection) is under way.
+  focusReply() {
+    if (shownScreen() !== "chat" || !this.address) return false;
+    if (this.viewer.shown || this.cardHasFocus()) return false;
+    if (this.press && Date.now() - (this.press.at ?? 0) < PRESS_MS) return false;
+    return this.composer.focus();
+  }
+
   tick(cx) {
     const a = currentAgent()?.address ?? null;
-    if (a !== this.address) { this.switchTo(a); this.lastPoll = 0; cx.notify(); }
+    // The changes that give the reply box the keyboard: another agent, the chat screen shown again (⌘J, the
+    // Chat | Terminal switch, Overview), the window made active. Not a redraw or a new message.
+    let show = false;
+    if (a !== this.address) { this.switchTo(a); this.lastPoll = 0; cx.notify(); show = true; }
     // Coming back to the chat screen (from Overview, Needs you, a shell tab) also opens at the end.
     const screen = shownScreen();
-    if (screen === "chat" && this.screen !== "chat") { this.follow = true; this.toNewest(); cx.notify(); }
+    if (screen === "chat" && this.screen !== "chat") { this.follow = true; this.toNewest(); cx.notify(); show = true; }
     this.screen = screen;
+    const active = window()?.active !== false;
+    if (active && this.active === false) show = true;
+    this.active = active;
     if (this.helper.changed()) cx.notify();
     const repo = this.repo();
     if (repo !== this.shownRepo) { this.shownRepo = repo; cx.notify(); }
@@ -161,6 +188,8 @@ export class ChatView {
     cx.spawn((cx) => this.composer.pollStatus(cx));
     const agent = currentAgent();
     this.composer.syncPlaceholder(agent, cx);
+    // After the placeholder sync: a new agent's name makes a new text state, and the keyboard goes to that one.
+    if (show) this.focusReply();
     const want = wanted(agent, this.feed()?.rows);
     cx.spawn((cx) => this.cards.poll(cx, this.address, want));
     // A panel in the terminal (#141): read while the agent does not work and no approval or question card shows.
@@ -435,7 +464,7 @@ export class ChatView {
     // A left press and how far it went: a drag that selects text in a row with pictures is not a click.
     // These handlers only note the press; they must not stop it, or the text selection does not start.
     const box = v_flex().relative().flex_1().min_h(0)
-      .on_mouse_down("left", (e) => { this.press = { x: e?.position?.x ?? 0, y: e?.position?.y ?? 0, moved: false }; })
+      .on_mouse_down("left", (e) => { this.press = { x: e?.position?.x ?? 0, y: e?.position?.y ?? 0, moved: false, at: Date.now() }; })
       .on_mouse_move((e) => { const p = this.press; if (p && Math.hypot((e?.position?.x ?? 0) - p.x, (e?.position?.y ?? 0) - p.y) > DRAG_PX) p.moved = true; })
       .on_mouse_up("left", () => { this.press = null; })
       .on_scroll_wheel((e, cx) => {
