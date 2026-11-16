@@ -59,12 +59,24 @@ stay ours. The top bar is our copy of Herdr's `tabs` mod.
 | `herdr-app/install.sh`, `herdr-app/install-isolated.sh` | the install into a Herdr home, and into a test home |
 | `xplat/herdr-contr-feed` | the helper (Rust): reads the agents' session logs and talks to hc |
 | `xplat/herdr-core` | the helper's hc client |
-| `xplat/herdr-contr-orch` | the orchestration tool (Rust), ported from contr slice by slice (#160): the profiles and the flow, the owner file and its open questions and to-dos as JSON (`owner open --json`), the profiles file as JSON and its changes (`agents config --json`, `agents set`), the worker commands on hc (`spawn`, `resume`, `ls`, `title`, `send`, `interrupt`, `stop`, `rm`, `read`, `prompt`), the MCP server with the coordinator's tools and a worker's `report` tool (`mcp`), the reports held for a busy coordinator (`held`), the limits of spawn and send: workers at once and open PRs (`limit`), the hooks of a worker and of a coordinator (`hook stop`, `hook session-start`, `hook prompt`), the check of a PR against the brief's boundary (`pr check-boundary`) |
+| `xplat/herdr-contr-orch` | the orchestration tool (Rust), ported from contr slice by slice (#160); its parts are in the list below the table |
 | `kit` | the Claude Code plugin of a coordinator and its workers: the agent definitions, the playbook (`commands/orchestrate.md`), the chat-writing skill, the hooks and the MCP server, which run `herdr-contr-orch`; `.claude-plugin/marketplace.json` at the root names it for Claude Code |
 | `xplat/fixtures` | the session logs and hub answers that the helper's tests read |
 | `xplat/herdr-contr-feed/web` | the phone page that the helper embeds (built output; do not edit) |
 | `web`, `scripts/web-build.mjs`, `scripts/sw-test.mjs` | the phone page's source, its build into `xplat/herdr-contr-feed/web`, and its service worker test |
 | `docs/design`, `docs/research` | the notes on the phone page's protocol and on the question keys, that the helper's code names |
+
+The parts of `xplat/herdr-contr-orch`:
+
+- the profiles and the flow
+- the owner file and its open questions and to-dos as JSON (`owner open --json`)
+- the profiles file as JSON and its changes (`agents config --json`, `agents set`)
+- the worker commands on hc (`spawn`, `resume`, `ls`, `title`, `send`, `interrupt`, `stop`, `rm`, `read`, `prompt`)
+- the MCP server with the coordinator's tools and a worker's `report` tool (`mcp`)
+- the reports held for a busy coordinator (`held`)
+- the limits of spawn and send: workers at once and open PRs (`limit`)
+- the hooks of a worker and of a coordinator (`hook stop`, `hook session-start`, `hook prompt`)
+- the check of a PR against the brief's boundary (`pr check-boundary`)
 
 Herdr's API for mods is in the Herdr app's home: `AGENTS.md`, `herdr.d.ts`
 and `gpui-kit.d.ts`. Read them there. Do not copy them into this repository.
