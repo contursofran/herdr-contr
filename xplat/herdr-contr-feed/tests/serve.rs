@@ -336,6 +336,7 @@ fn frame(text: &str) -> Vec<u8> {
 }
 
 /// A peer that asks but never reads: once the hub cannot write for its write timeout, it lets the connection go.
+/// The peer sees the end as a failed write (reset), so the test never reads and never waits a fixed time.
 /// Each hello is answered with a large snapshot (2000 terminals), so a few dozen small requests are megabytes the
 /// peer never takes: the hub's writes stall for sure, whatever the machine's load.
 #[test]
@@ -350,21 +351,19 @@ fn a_peer_that_does_not_read_is_let_go() {
     for _ in 0..60 {
         s.write_all(&hello).unwrap();
     }
-    // Long past the hub's write timeout, then read: what was sent, then the end. A hub still holding the
-    // connection would send the rest and then wait (the read times out).
-    std::thread::sleep(Duration::from_secs(15));
-    // A socket the hub already reset may refuse the option (macOS: EINVAL); then it has ended.
-    if s.set_read_timeout(Some(Duration::from_secs(10))).is_err() {
-        return;
-    }
-    let mut buf = vec![0u8; 1 << 16];
+    // Never read. Send a small ping every half second: the hub reads it while it lives. Once the hub lets the
+    // connection go, the socket is reset and a write fails. No fixed wait, so a slow (loaded) hub only takes
+    // longer; the bound is far above the hub's write timeout and only stops a hub that never lets go.
+    let ping = [0x89u8, 0x80, 1, 2, 3, 4];
+    let until = std::time::Instant::now() + Duration::from_secs(90);
     let ended = loop {
-        match s.read(&mut buf) {
-            Ok(0) => break true,
-            Ok(_) => continue,
-            Err(e) if matches!(e.kind(), std::io::ErrorKind::WouldBlock | std::io::ErrorKind::TimedOut) => break false,
-            Err(_) => break true, // reset
+        if s.write_all(&ping).is_err() {
+            break true;
         }
+        if std::time::Instant::now() > until {
+            break false;
+        }
+        std::thread::sleep(Duration::from_millis(500));
     };
     assert!(ended, "the hub let the connection go");
 }
