@@ -295,7 +295,8 @@ pub fn run(argv: &[String]) -> String {
                 }
                 "status" => {
                     let env = herdr_core::hc::session::process_env();
-                    status::run(&kind, log, &status::default_settings(&env), &mut r.out, SystemTime::now());
+                    let cwd = Some(Path::new(&found.pane.cwd)).filter(|c| !c.as_os_str().is_empty());
+                    status::run(&kind, log, &status::default_settings(&env), cwd, &mut r.out, SystemTime::now());
                     return r.finish(true);
                 }
                 "queue" => {

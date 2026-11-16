@@ -429,8 +429,15 @@ approval is the `card` command's job.
 
 | Field | Meaning |
 |---|---|
-| `source` | `statusline` (herdr-contr's status line wrapper is on), `log` (only the model, from the log), `none`. |
-| `tags[]` | `kind` (`model`, `effort`, `context`, `cost`, `own`), `text`, `percent` (context only), `warn` (context 80% or more). With `autoCompactWindow` in Claude Code's settings and the tokens known, the context `text` is `ctx 120k / 250k`, and `percent` and `warn` are against that limit. With source `log`, the context tag comes from the log's newest assistant usage, only when `autoCompactWindow` is set. |
+| `source` | `statusline` (herdr-contr's status line wrapper is on), `log` (the model and the context, from the log), `none`. |
+| `tags[]` | `kind` (`model`, `effort`, `context`, `cost`, `own`), `text`, `percent` (context only), `warn` (context 80% or more). With an auto-compact limit and the tokens known, the context `text` is `ctx 120k / 250k`, and `percent` and `warn` are against that limit. With source `log`, the context tag comes from the log's newest assistant usage: against the limit; with no limit, `ctx 12%` of the model's context window when the model id tells it (`[1m]`: 1,000,000 tokens); else no context tag. |
+
+The auto-compact limit: `modelSettings.<model>.autoCompactWindow` for the log's model, else the top-level
+`autoCompactWindow`. The helper reads Claude Code's settings files in its order: the agent's
+`<cwd>/.claude/settings.local.json`, `<cwd>/.claude/settings.json`, then the user's `settings.json`
+(`$CLAUDE_CONFIG_DIR`, else `~/.claude`). A per-model value in any file comes before a top-level value. A
+`modelSettings` key matches the model also with or without a date (`-20261101`) or a `[1m]` suffix; the exact key
+comes first. A value that is not a positive number does not count.
 
 The mod adds the cwd, the branch and the agent name from herdr-app's own `panes()` data.
 
