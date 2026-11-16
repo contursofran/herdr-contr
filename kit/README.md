@@ -10,8 +10,10 @@ orchestration tool of this repository, `xplat/herdr-contr-orch`):
 - `hooks/hooks.json`: the Stop hook (a worker's turn that sent no report; the reports held for a busy
   coordinator; a coordinator's state before a compaction) and the SessionStart hook: in an hc terminal one line that names `contr:chat-writing`; at startup of an orchestrator and after a compaction, the playbook.
 - `.mcp.json`: starts `herdr-contr-orch mcp`, which gives the session the agent tools (spawn, set_title, message,
-  report, interrupt, stop, read, list, clear_ended). A worker reports with `report`. `stop` removes the
-  worker's terminal unless `keep` is set. See Install for where `herdr-contr-orch` is found.
+  report, interrupt, stop, resume, read, list, clear_ended). A worker reports with `report`. `stop` removes the
+  worker's terminal unless `keep` is set. Spawn keeps each Claude worker's session id in
+  `state/workers/<name>.json`; `list` shows a worker that ended without a `stop` as `gone`, and `resume`
+  starts it again from that session. See Install for where `herdr-contr-orch` is found.
 
 ## Install
 

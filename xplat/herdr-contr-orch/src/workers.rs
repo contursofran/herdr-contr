@@ -389,6 +389,9 @@ pub fn check_title(title: &str) -> Result<String, String> {
 
 /// The state column of the list: the program's status, why it is blocked, or how it ended.
 pub fn state_text(w: &Worker) -> String {
+    if w.status == crate::resume::GONE {
+        return "gone (agents resume)".into();
+    }
     match (w.live, w.exit_code) {
         (false, Some(code)) => format!("ended ({code})"),
         (false, None) => "ended".into(),
