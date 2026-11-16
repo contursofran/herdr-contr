@@ -100,7 +100,7 @@ export class ChatView {
     this.appear = new Appear();
     this.cards = new Cards(cx);
     this.panel = new PanelCard(cx);
-    this.owner = new OwnerCards(cx);   // the coordinator's questions for the owner (#131)
+    this.owner = new OwnerCards(cx);   // the coordinator's questions (#131) and to-dos (#195) for the owner
     this.helper = new HelperUI();
     this.viewer = new PictureViewer(cx);
     this.refresh = (cx) => { this.lastPoll = 0; return this.poll(cx); };
@@ -512,6 +512,8 @@ export class ChatView {
       .when(Boolean(f) && f.error?.code !== "not-agent" && !isRemoteProblem(f.error), (el) => {
         const ask = this.owner.view(this.address, t, "chat-owner", this.colWidth());
         if (ask) el.child(this.appear.wrap(h_flex().w_full().px(16).pt(8).justify_center().on_mouse_down("left", stop).child(ask), "chat-owner-in", `${this.address}:${this.owner.key(this.address)}`, cx, 10));
+        const todo = this.owner.todoView(this.address, t, "chat-todo", this.colWidth());
+        if (todo) el.child(this.appear.wrap(h_flex().w_full().px(16).pt(8).justify_center().on_mouse_down("left", stop).child(todo), "chat-todo-in", `${this.address}:${this.owner.todoKey(this.address)}`, cx, 10));
         const card = this.cards.view(this.address, t, "chat-card", this.colWidth());
         if (card) el.child(this.appear.wrap(h_flex().w_full().px(16).pt(8).justify_center().on_mouse_down("left", stop).child(card), "chat-card-in", `${this.address}:${this.cards.key?.(this.address) ?? ""}`, cx, 10));
         const panel = card ? null : this.panel.view(this.address, t, "chat-panel", this.colWidth());

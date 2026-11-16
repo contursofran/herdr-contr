@@ -207,6 +207,19 @@ drawn by Herdr's `frames`; every loader of the mod is this one); done is a check
   <answer>". The item then leaves, and the next one shows. An item answered or decided elsewhere
   leaves at the next read. A failed run keeps the card with the tool's message; "saved, coordinator
   not reached" shows that note alone for 15 s.
+- **Owner to-do card** (#195): the to-dos that a coordinator pinned with `pin_for_owner` (ids T1,
+  T2, …). The same `owner open --json` list gives them, with `kind: "todo"`. An open to-do shows
+  only in the chat of its coordinator (local agents only), under the owner question card, one at a
+  time, oldest first. Head: "T3 · To do" ("To know" for kind know), with "· N more after this" when
+  others wait. Then "from …" (11.5 px, `muted`) and the text as Markdown (13.5 px). Under each
+  paragraph, each code span of it that did not show before gets a row (Menlo 12.5 px, `background`,
+  1 px `border`, radius 8); each code block is a box of the same kind with the code as written.
+  Each row and box has a 24 px copy button at its right (a 14 px icon in `muted`). A press copies
+  the code as written and shows a check in `accent` for 1.5 s; a press on another button moves the
+  check there. Done (primary, at the right) runs the installed tool as `owner done <id>`: the tool
+  marks it done and sends the coordinator "Owner did <id>: <text>". The to-do then leaves, and the
+  next one shows. A to-do marked done elsewhere leaves at the next read. A failed run keeps the
+  card with the tool's message; "saved, coordinator not reached" shows that note alone for 15 s.
 - **Orchestration settings**: the flow and the profiles of the orchestration tool. The tool is the one
   reader and writer of its agents.json (#186). The section runs the installed tool (as for the owner
   question card) as `agents config --json`, and shows its `flow`, the choices of each flow key from
@@ -532,6 +545,9 @@ drawn by Herdr's `frames`; every loader of the mod is this one); done is a check
 - `/model` typed in the terminal shows the panel card in the chat; Down and Enter there pick a model.
 - An open question that the shown coordinator asked with `ask_owner` shows as the owner question
   card; picking and Send answer answers it, and the coordinator gets "Owner answered <id>: …".
+- An open to-do that the shown coordinator pinned with `pin_for_owner` shows as the owner to-do
+  card; a copy button copies its code and shows a check for 1.5 s, and Done marks it done, and the
+  coordinator gets "Owner did <id>: …".
 - ⌘⇧I shows Needs you with the waiting agents; ⌘⇧\ shows Overview with every tab.
 - With the sidebar hidden, moving the pointer to the window's left edge slides out the floating
   sidebar, and it closes when the pointer leaves it.

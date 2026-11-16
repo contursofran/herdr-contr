@@ -5,7 +5,7 @@ use std::fs;
 use std::path::Path;
 
 use common::{call, path, Fake};
-use orch::owner::{Question, Store};
+use orch::owner::{Question, Store, Todo};
 use serde_json::{json, Value};
 
 fn config(cfg: &Path) -> Value {
@@ -175,10 +175,39 @@ fn owner_open_lists_the_questions_with_no_answer_oldest_first() {
     let r = call(&["owner", "open", "--json"], &vars, &Fake::default());
     assert_eq!((r.code, r.err.as_str()), (0, ""));
     let v: Value = serde_json::from_str(&r.out).unwrap();
-    assert_eq!(v[0], json!({"id": "D1", "coordinator": "hc:t2", "title": "Pick one", "from": "#12", "question": "Which?",
+    assert_eq!(v[0], json!({"kind": "question", "id": "D1", "coordinator": "hc:t2", "title": "Pick one", "from": "#12", "question": "Which?",
         "options": ["A", "B"], "impacts": ["a", "b"], "recommended": 1, "refs": ["PR 3"]}));
     assert_eq!(v.as_array().unwrap().len(), 2);
     assert_eq!((v[1]["id"].clone(), v[1]["recommended"].clone()), (json!("D3"), Value::Null));
+}
+
+#[test]
+fn owner_open_lists_the_open_todos_after_the_questions_oldest_first() {
+    let dir = tempfile::tempdir().unwrap();
+    let owner = dir.path().join("owner.json");
+    let vars = [("CONTR_OWNER_FILE", path(&owner))];
+    let store = Store::new(&owner);
+    let pin = |text: &str, kind: &str| {
+        store.pin(Todo { project: "app".into(), coordinator: "hc:t1".into(), from: "builder #9".into(), kind: kind.into(), text: text.into(), ..Todo::default() }).unwrap()
+    };
+    pin("Test `make app`", "");
+    pin("Done already", "");
+    pin("CI is slow", "know");
+    store.ask(Question { question: "Which?".into(), coordinator: "hc:t1".into(), ..Question::default() }).unwrap();
+    store.unpin(&["T2".into()]).unwrap();
+    let r = call(&["owner", "open", "--json"], &vars, &Fake::default());
+    assert_eq!((r.code, r.err.as_str()), (0, ""));
+    let v: Value = serde_json::from_str(&r.out).unwrap();
+    let kinds: Vec<_> = v.as_array().unwrap().iter().map(|i| (i["kind"].clone(), i["id"].clone())).collect();
+    assert_eq!(kinds, [(json!("question"), json!("D1")), (json!("todo"), json!("T1")), (json!("todo"), json!("T3"))]);
+    assert_eq!(v[1], json!({"kind": "todo", "id": "T1", "coordinator": "hc:t1", "from": "builder #9", "todo_kind": "do", "text": "Test `make app`"}));
+    assert_eq!(v[2]["todo_kind"], "know");
+    // A to-do marked done leaves the list.
+    assert_eq!(call(&["owner", "done", "T1"], &vars, &Fake::default()).code, 0);
+    let v: Value = serde_json::from_str(&call(&["owner", "open", "--json"], &vars, &Fake::default()).out).unwrap();
+    assert_eq!(v.as_array().unwrap().iter().map(|i| i["id"].clone()).collect::<Vec<_>>(), [json!("D1"), json!("T3")]);
+    let r = call(&["owner", "done", "T1"], &vars, &Fake::default());
+    assert_eq!((r.code, r.err.as_str()), (1, "herdr-contr-orch owner done: owner: no open to-do T1\n"), "not an open to-do");
 }
 
 #[test]
