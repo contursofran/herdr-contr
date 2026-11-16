@@ -150,14 +150,15 @@ pub fn run(args: &[String], env: &dyn Fn(&str) -> String, input: &mut dyn BufRea
     } else {
         // Held reports come first: they keep the turn going, and the next Stop does the rest. An error with the
         // held reports does not stop the rest.
-        match h.give_held(out) {
-            Ok(true) => Ok(()),
-            Ok(false) => h.coordinator_stop(out),
-            Err(e) => {
-                let _ = writeln!(err, "herdr-contr-orch hook: {e}");
-                h.coordinator_stop(out)
-            }
-        }
+        // Due to-dos come next, the same way.
+        let gave = h.give_held(out).unwrap_or_else(|e| {
+            let _ = writeln!(err, "herdr-contr-orch hook: {e}");
+            false
+        }) || h.give_due(out).unwrap_or_else(|e| {
+            let _ = writeln!(err, "herdr-contr-orch hook: due: {e}");
+            false
+        });
+        if gave { Ok(()) } else { h.coordinator_stop(out) }
     };
     match done {
         Ok(()) => 0,
@@ -332,6 +333,18 @@ impl Hook<'_> {
             return Ok(false);
         }
         let text = held::text(&held::take(self.env, &terminal)?);
+        if text.is_empty() {
+            return Ok(false);
+        }
+        writeln!(out, "{}", json!({"decision": "block", "reason": text})).map_err(|e| e.to_string())?;
+        Ok(true)
+    }
+
+    /// Gives this terminal its to-dos that are due today, one time, as the reason that keeps the turn going.
+    fn give_due(&self, out: &mut dyn Write) -> Result<bool, String> {
+        // With no home there is no owner file, so nothing is due.
+        let Ok(store) = owner_store(self.env) else { return Ok(false) };
+        let text = crate::due::take(&store, &self.terminal(), &crate::due::today(self.env))?;
         if text.is_empty() {
             return Ok(false);
         }
@@ -554,7 +567,8 @@ impl Hook<'_> {
             text += &format!("- {} {}\n", q.id, one_line(if q.title.trim().is_empty() { &q.question } else { &q.title }));
         }
         for t in todos.iter().filter(|t| t.coordinator == terminal) {
-            text += &format!("- {} [{}] {}\n", t.id, t.kind, one_line(&t.text));
+            let due = if t.due.is_empty() { String::new() } else { format!(" (due {})", t.due) };
+            text += &format!("- {} [{}] {}{due}\n", t.id, t.kind, one_line(&t.text));
         }
         if text.len() == before {
             text += "- none\n";
