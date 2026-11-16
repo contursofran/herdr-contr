@@ -23,6 +23,11 @@ with `--orch <file>`, the tool in `<Herdr home>/herdr-contr/bin`
 server look for `herdr-contr-orch` in `../bin` of the kit folder first, then
 on the PATH. Start `claude` with the kit: `claude --plugin-dir <kit>`.
 
+The kit can be installed with no Herdr app: `herdr-contr-feed install
+--backend [--helper <file>] [--orch <file>]` puts the kit, the marketplace
+file and the programs in the backend root (below) only, with no layout,
+theme, mod or `keys.json`. Run it with `--dry-run` first.
+
 The tool keeps its files (`agents.json`, `owner.json`, `state/`) in the
 backend root: `$CONTR_HOME` when set, else `$HERDR_APP_HOME/herdr-contr` (with `CONTR_HOME` unset),
 else `~/.config/herdr-app/herdr-contr`. `CONTR_AGENTS_CONFIG`,

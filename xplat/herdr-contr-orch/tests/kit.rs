@@ -92,3 +92,55 @@ fn the_report_tool_has_the_name_that_claude_code_gives_it() {
         assert!(text.contains("with the contr `report` tool"), "an agent does not name the report tool");
     }
 }
+
+/// A copy of the folder `from` at `to`.
+fn copy_dir(from: &std::path::Path, to: &std::path::Path) {
+    fs::create_dir_all(to).unwrap();
+    for e in fs::read_dir(from).unwrap().flatten() {
+        let p = e.path();
+        if p.is_dir() {
+            copy_dir(&p, &to.join(e.file_name()));
+        } else {
+            fs::copy(&p, to.join(e.file_name())).unwrap();
+        }
+    }
+}
+
+#[cfg(unix)]
+#[test]
+fn hooks_find_the_tool_next_to_an_installed_kit() {
+    use std::os::unix::fs::PermissionsExt;
+    // The layout of `install --backend`: <root>/kit and <root>/bin/herdr-contr-orch.
+    let dir = tempfile::tempdir().unwrap();
+    let root = dir.path().join("r");
+    copy_dir(&kit(), &root.join("kit"));
+    fs::create_dir_all(root.join("bin")).unwrap();
+    let calls = dir.path().join("calls");
+    let tool = root.join("bin").join(TOOL);
+    fs::write(&tool, format!("#!/bin/sh\necho \"$*\" >> '{}'\n", calls.display())).unwrap();
+    fs::set_permissions(&tool, fs::Permissions::from_mode(0o755)).unwrap();
+    let hooks: Value = serde_json::from_str(&fs::read_to_string(root.join("kit/hooks/hooks.json")).unwrap()).unwrap();
+    let mut seen = Vec::new();
+    for groups in hooks["hooks"].as_object().unwrap().values() {
+        for group in groups.as_array().unwrap() {
+            for hook in group["hooks"].as_array().unwrap() {
+                let command = hook["command"].as_str().unwrap();
+                let r = std::process::Command::new("/bin/sh")
+                    .args(["-c", command])
+                    .env_clear()
+                    .env("PATH", "/usr/bin:/bin")
+                    .env("CLAUDE_PLUGIN_ROOT", root.join("kit"))
+                    .env("HC_TERMINAL_ID", "t1")
+                    .env("CONTR_COORDINATOR", "lead")
+                    .output()
+                    .unwrap();
+                assert!(r.status.success(), "{command}: {}", String::from_utf8_lossy(&r.stderr));
+                seen.push(tool_args(command).join(" "));
+            }
+        }
+    }
+    let mut ran: Vec<String> = fs::read_to_string(&calls).unwrap().lines().map(String::from).collect();
+    seen.sort();
+    ran.sort();
+    assert_eq!(ran, seen, "each hook runs the tool in <root>/bin");
+}
