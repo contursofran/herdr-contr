@@ -1,4 +1,4 @@
-//! ModFeedKit in Rust: the herdr-app mod's sidecar (contract: the mod's docs/protocol.md).
+//! ModFeedKit in Rust: the herdr-app mod's sidecar (contract: docs/protocol.md).
 
 pub mod agentimages;
 pub mod agentmodel;
