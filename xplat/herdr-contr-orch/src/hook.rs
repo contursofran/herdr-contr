@@ -58,7 +58,8 @@ contr:chat-writing.
 
 prompt runs only in an hc terminal (HC_TERMINAL_ID), and not in a worker.
 It asks Claude to add each request of the owner to its todos with
-\"[you] \". A prompt that starts with \"<hc from=\" is skipped. When the
+\"[you] \". A prompt with only task notifications, system reminders and hc
+notes gets no such line. When the
 owner changed the flow or the models of the profiles after the session
 saw them last, a coordinator gets them again. Reports that were held for
 the terminal come with it. It always exits 0.
@@ -165,6 +166,42 @@ pub fn run(args: &[String], env: &dyn Fn(&str) -> String, input: &mut dyn BufRea
     }
 }
 
+/// The blocks of a prompt that hold no request of the owner: a background-task notification, a system
+/// reminder and an hc note (with or without `from`).
+const NOTES: [&str; 3] = ["task-notification", "system-reminder", "hc"];
+
+/// True when the prompt holds text other than notes (#206).
+pub fn owner_words(prompt: &str) -> bool {
+    let mut s = prompt.to_string();
+    for name in NOTES {
+        s = without_blocks(&s, name);
+    }
+    !s.trim().is_empty()
+}
+
+/// The text with each `<name>…</name>` and `<name …>…</name>` block removed. A block with no end stays.
+fn without_blocks(text: &str, name: &str) -> String {
+    let (open, close) = (format!("<{name}"), format!("</{name}>"));
+    let mut out = String::new();
+    let mut rest = text;
+    while let Some(at) = rest.find(&open) {
+        let after = &rest[at + open.len()..];
+        let is_tag = after.starts_with('>') || after.starts_with(' ');
+        match after.find(&close) {
+            Some(e) if is_tag => {
+                out.push_str(&rest[..at]);
+                rest = &after[e + close.len()..];
+            }
+            _ => {
+                out.push_str(&rest[..at + open.len()]);
+                rest = after;
+            }
+        }
+    }
+    out.push_str(rest);
+    out
+}
+
 /// The UserPromptSubmit hook: the todo line for a prompt of the owner, and the flow when it changed. A
 /// worker's prompts come from the coordinator, and a worker is never a coordinator: it gets no context.
 fn prompt(env: &dyn Fn(&str) -> String, input: &mut dyn BufRead, out: &mut dyn Write, err: &mut dyn Write, core: &dyn Core) -> Result<(), String> {
@@ -185,7 +222,7 @@ fn prompt(env: &dyn Fn(&str) -> String, input: &mut dyn BufRead, out: &mut dyn W
         String::new()
     });
     let mut parts = Vec::new();
-    if !asked.is_empty() && !asked.starts_with("<hc from=") {
+    if owner_words(asked) {
         parts.push(YOU_CONTEXT);
     }
     if !flow.is_empty() {

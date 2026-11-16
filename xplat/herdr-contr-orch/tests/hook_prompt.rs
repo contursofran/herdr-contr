@@ -64,6 +64,31 @@ fn a_prompt_of_the_owner_gets_the_todo_line() {
 }
 
 #[test]
+fn a_prompt_with_only_notes_gets_nothing() {
+    let f = files();
+    let core = Fake::default();
+    for p in [
+        "<task-notification>\n<task-id>b1</task-id>\n<status>completed</status>\n</task-notification>",
+        "<system-reminder>\n<task-notification>done</task-notification>\n</system-reminder>",
+        "<hc from=\"t2 b-1\">b-1: done</hc>\n<hc from=\"t3 b-2\">b-2: done</hc>",
+        "<hc>t2pq b-186 is blocked (permission). See: hc read t2pq</hc>",
+        "<task-notification>a</task-notification>\n\n<hc>t2 b-1 ended</hc>",
+    ] {
+        assert_eq!(context(&f.prompt(p, &core)), "", "{p}");
+    }
+    for p in [
+        "<task-notification>done</task-notification>\nnow fix the bug",
+        "<hc from=\"t2 b-1\">done</hc> merge it",
+        "<hc>t2 b-1 is blocked</hc> answer it",
+        // A block with no end, and a tag that only starts like hc, are text.
+        "<task-notification>cut off",
+        "<hcx>not a note</hcx>",
+    ] {
+        assert_eq!(context(&f.prompt(p, &core)), YOU_CONTEXT, "{p}");
+    }
+}
+
+#[test]
 fn the_hook_does_nothing_outside_an_hc_terminal_and_in_a_worker() {
     let f = files();
     let core = Fake::default();
