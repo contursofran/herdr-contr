@@ -556,25 +556,6 @@ fn an_install_restarts_the_phone_page_that_runs_this_helper() {
     assert!(out(&r).contains("the phone page (herdr-contr settings): restarted"), "{}", out(&r));
 }
 
-/// Every file of the repository's kit, as paths relative to it.
-fn kit_files() -> Vec<String> {
-    fn walk(dir: &Path, base: &Path, out: &mut Vec<String>) {
-        for e in fs::read_dir(dir).unwrap() {
-            let p = e.unwrap().path();
-            if p.is_dir() {
-                walk(&p, base, out);
-            } else if p.file_name().unwrap() != ".DS_Store" {
-                out.push(p.strip_prefix(base).unwrap().to_str().unwrap().to_string());
-            }
-        }
-    }
-    let base = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../kit");
-    let mut out = Vec::new();
-    walk(&base, &base, &mut out);
-    out.sort();
-    out
-}
-
 #[test]
 fn installs_the_kit_and_the_orchestration_tool() {
     let s = sandbox();
@@ -583,10 +564,12 @@ fn installs_the_kit_and_the_orchestration_tool() {
     let r = s.run(&["--home", s.app_s(), "--orch", orch.to_str().unwrap()]);
     assert_eq!(r.status.code(), Some(0), "{}", both(&r));
     let kit = s.app.join("herdr-contr/kit");
-    let files = kit_files();
-    assert!(files.contains(&"hooks/hooks.json".to_string()) && files.contains(&".claude-plugin/plugin.json".to_string()));
-    for rel in &files {
-        assert_eq!(fs::read(kit.join(rel)).unwrap(), fs::read(Path::new(env!("CARGO_MANIFEST_DIR")).join("../../kit").join(rel)).unwrap(), "{rel}");
+    // Compare with the kit in the binary, not with the repository's kit now: that one can change while the
+    // tests run (a merge, an editor's save), and then the test fails for no fault of install (#244).
+    let files: Vec<&str> = modfeedkit::install::KIT.iter().map(|(rel, _)| *rel).collect();
+    assert!(files.contains(&"hooks/hooks.json") && files.contains(&".claude-plugin/plugin.json"), "{files:?}");
+    for (rel, bytes) in modfeedkit::install::KIT {
+        assert_eq!(fs::read(kit.join(rel)).unwrap(), *bytes, "{rel}");
     }
     // The marketplace file names the kit folder next to it, and is the repository's.
     let market: Value = serde_json::from_str(&read(s.app.join("herdr-contr/.claude-plugin/marketplace.json"))).unwrap();
