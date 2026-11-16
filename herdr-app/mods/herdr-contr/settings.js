@@ -3,7 +3,7 @@
 // UPPERCASE headings on the right, a row's title and line on the left and its control on the right.
 // Esc, a click beside it or its close button closes it. Three settings of two or three choices, saved in
 // <appHome>/herdr-contr/config.json (config.js), the Orchestration section (the orchestration tool's
-// settings, orchestration.js), the Phone page (phone.js) and the Shortcuts (shortcuts.js, read only). Tab moves through the
+// settings, orchestration.js), the Version row (update.js), the Phone page (phone.js) and the Shortcuts (shortcuts.js, read only). Tab moves through the
 // sections, then the choices; Enter or Space picks one.
 import { div, svg } from "gpui-kit";
 import { v_flex, h_flex, Input, InputState } from "gpui-base";
@@ -12,6 +12,7 @@ import { setting, setSetting, loadConfig, configBad, configPath } from "./config
 import { icon, settingsClosed } from "./state.js";
 import { SHORTCUTS, SHORTCUT_GROUPS, keyCaps } from "./shortcuts.js";
 import { loadAgents, orchestrationBody } from "./orchestration.js";
+import { checkUpdate, updateBody } from "./update.js";
 import { pollPhone, phoneTick, PHONE_TICK_MS, phoneOn, phoneBlocked, phoneChoose, phoneUser, phoneBody, setPhoneOption } from "./phone.js";
 
 const PHONE = { title: "Phone page", about: "Read your agents on your phone, through Tailscale." };
@@ -57,6 +58,7 @@ export class SettingsView {
     cx?.spawn?.(async (cx) => { await loadConfig(); this.login.set_value(phoneUser()); cx.notify(); });
     cx?.spawn?.(async (cx) => { await loadAgents(); cx.notify(); });
     cx?.spawn?.(async (cx) => { await pollPhone(false); cx.notify(); });
+    cx?.spawn?.(async (cx) => { await checkUpdate(); cx.notify(); });
     // Every 10 s; every 3 s while On waits for Serve (phone.js).
     cx?.timer?.every(PHONE_TICK_MS, (cx) => cx.spawn(async (cx) => { await phoneTick(); cx.notify(); }));
   }
@@ -134,6 +136,7 @@ export class SettingsView {
       body.child(heading(h));
       for (const k of keys) body.child(row(SETTINGS.find((x) => x.key === k)));
     }
+    if (sec.id === "general") body.child(heading("VERSION")).child(updateBody(t, this, { small: smallButton(t), about, div, h_flex, v_flex }));
     if (sec.id === "orchestration") body.child(orchestrationBody({ t, seg, small: smallButton(t), heading, about, div, h_flex, v_flex }, this));
     if (sec.id === "phone") {
       body.child(heading("PHONE PAGE"))
