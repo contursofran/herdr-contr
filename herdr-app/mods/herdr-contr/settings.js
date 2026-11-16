@@ -3,7 +3,8 @@
 // UPPERCASE headings on the right, a row's title and line on the left and its control on the right.
 // Esc, a click beside it or its close button closes it. Three settings of two or three choices, saved in
 // <appHome>/herdr-contr/config.json (config.js), the Orchestration section (the orchestration tool's
-// settings, orchestration.js), the Version row (update.js), the Phone page (phone.js) and the Shortcuts (shortcuts.js, read only). Tab moves through the
+// settings, orchestration.js), the Version row (update.js), the Phone page (phone.js), the Shortcuts
+// (shortcuts.js, read only) and the Health checks of the install (health.js). Tab moves through the
 // sections, then the choices; Enter or Space picks one.
 import { div, svg } from "gpui-kit";
 import { v_flex, h_flex, Input, InputState } from "gpui-base";
@@ -13,6 +14,7 @@ import { icon, settingsClosed } from "./state.js";
 import { SHORTCUTS, SHORTCUT_GROUPS, keyCaps } from "./shortcuts.js";
 import { loadAgents, orchestrationBody } from "./orchestration.js";
 import { checkUpdate, updateBody } from "./update.js";
+import { checkHealth, healthBody } from "./health.js";
 import { pollPhone, phoneTick, PHONE_TICK_MS, phoneOn, phoneBlocked, phoneChoose, phoneUser, phoneBody, setPhoneOption } from "./phone.js";
 
 const PHONE = { title: "Phone page", about: "Read your agents on your phone, through Tailscale." };
@@ -34,6 +36,7 @@ export const SECTIONS = [
   { id: "orchestration", label: "Orchestration", icon: "grid" },
   { id: "phone", label: "Phone page", icon: "phone" },
   { id: "shortcuts", label: "Shortcuts", icon: "keyboard" },
+  { id: "health", label: "Health", icon: "check" },
 ];
 
 const picks = (e) => e?.key === "enter" || e?.key === "space" || e?.key === " ";
@@ -59,6 +62,7 @@ export class SettingsView {
     cx?.spawn?.(async (cx) => { await loadAgents(); cx.notify(); });
     cx?.spawn?.(async (cx) => { await pollPhone(false); cx.notify(); });
     cx?.spawn?.(async (cx) => { await checkUpdate(); cx.notify(); });
+    cx?.spawn?.(async (cx) => { await checkHealth(); cx.notify(); });
     // Every 10 s; every 3 s while On waits for Serve (phone.js).
     cx?.timer?.every(PHONE_TICK_MS, (cx) => cx.spawn(async (cx) => { await phoneTick(); cx.notify(); }));
   }
@@ -147,6 +151,7 @@ export class SettingsView {
           .child(phoneBody(t, this, { seg, small: smallButton(t), heading })));
     }
     if (sec.id === "shortcuts") shortcutsBody(t, body, heading);
+    if (sec.id === "health") body.child(healthBody({ t, small: smallButton(t), heading, div, h_flex, v_flex }));
     // flex_none: the body keeps its height in the scroll column, so it scrolls and does not shrink (#149).
     return v_flex().id("settings-root").size_full().overflow_y_scrollbar().px(32).pb(24).child(body.flex_none());
   }
