@@ -2,8 +2,8 @@
 //! Unlike the Mac hub, nothing is re-encoded: PNG, JPEG and WebP are kept, by their first bytes, never by a name or
 //! MIME type, without their metadata (`strip`: a JPEG keeps only its Orientation). HEIC (an iPhone's own type) cannot be read here: the page is told to pick JPEG or PNG.
 //!
-//! The files go to `uploads` of the backend root (`<herdr-app home>/herdr-contr` by default) (mode 700), each mode 600 with a name made here
-//! (`phone-YYYYMMDD-HHMMSS-xxxxxx.<ext>`). `send` takes only names this helper holds and types their paths. Only
+//! The files go to `uploads` of the backend root (`<herdr-app home>/herdr-contr` by default; mode 700), each mode 600
+//! with a name made here (`phone-YYYYMMDD-HHMMSS-xxxxxx.<ext>`). `send` takes only names this helper holds and types their paths. Only
 //! files with such names are ever removed: after `KEEP`, or past `MAX_FILES` / `MAX_FOLDER_BYTES`, oldest first.
 //!
 //! One owner: the state is the helper's, over all connections (POST /api makes a session per request).
