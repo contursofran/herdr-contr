@@ -2,6 +2,10 @@
 // (contract: docs/protocol.md in the mod folder). Picks the herdr-core session as the app does (HC_SESSION, HC_SOCKET).
 fn main() {
     let argv: Vec<String> = std::env::args().skip(1).collect();
+    if matches!(argv.first().map(String::as_str), Some("--version" | "-V")) {
+        println!("herdr-contr-feed {} ({})", modfeedkit::protocol::SIDECAR_VERSION, modfeedkit::protocol::BUILD);
+        std::process::exit(0);
+    }
     // install is for a person: plain text and an exit code, not JSON Lines.
     if argv.first().map(String::as_str) == Some("install") {
         std::process::exit(modfeedkit::install::run(&argv[1..]));

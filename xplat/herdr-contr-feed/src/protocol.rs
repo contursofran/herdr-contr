@@ -7,6 +7,8 @@ use serde_json::Value;
 /// Bumped on any change a mod must know about. The mod refuses a sidecar with another number.
 pub const PROTOCOL_VERSION: i64 = 1;
 pub const SIDECAR_VERSION: &str = "0.1.0";
+/// The build stamp: "<short sha> <commit date>", or "unknown" (build.rs).
+pub const BUILD: &str = env!("HERDR_CONTR_BUILD");
 
 /// Collects output lines; `text` prints them. Keys are sorted (serde_json's map is ordered by key) and slashes are
 /// not escaped, as Swift's `.sortedKeys, .withoutEscapingSlashes`.

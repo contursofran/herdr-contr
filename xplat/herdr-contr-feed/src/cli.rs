@@ -60,7 +60,7 @@ pub fn run(argv: &[String]) -> String {
     // The mod puts --home last; the last one counts, so a text that says "--home" is not taken for it.
     let home = || args.iter().rposition(|a| a == "--home").and_then(|i| args.get(i + 1).cloned());
     let mut r = Run { t0: Instant::now(), out: JsonLines::new() };
-    r.out.emit_value(json!({"type": "header", "protocol": PROTOCOL_VERSION, "sidecar": SIDECAR_VERSION, "cmd": cmd}));
+    r.out.emit_value(json!({"type": "header", "protocol": PROTOCOL_VERSION, "sidecar": SIDECAR_VERSION, "build": crate::protocol::BUILD, "cmd": cmd}));
     match cmd.as_str() {
         "version" => {
             r.out.emit_value(json!({"type": "version", "commands": ["version", "feed", "status", "card", "approve", "answer", "send", "paste-image", "mermaid", "pictures", "helper", "queue", "phone", "commands", "working", "model", "usage", "favicon", "panel", "keys", "suggestion", "agent-images"], "release": update::release()}));

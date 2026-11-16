@@ -122,6 +122,7 @@ fn installs_exactly_the_files_in_the_repo() {
     let r = s.run(&["--home", s.app_s()]);
     assert_eq!(r.status.code(), Some(0), "{}", both(&r));
     let marker: Value = serde_json::from_str(&read(s.app.join("herdr-contr/install.json"))).unwrap();
+    assert_eq!(marker["build"], env!("HERDR_CONTR_BUILD"), "install.json carries the build stamp");
     let files = marker["files"].as_object().unwrap();
     let mut want = vec!["layouts/herdr-contr.json".to_string(), "layouts/herdr-contr-own.json".to_string()];
     for e in fs::read_dir(mod_dir().join("themes")).unwrap() {

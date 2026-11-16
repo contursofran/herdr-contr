@@ -21,7 +21,7 @@ fn run(sock: &str, args: &[&str]) -> Vec<Value> {
 #[test]
 fn protocol_lines() {
     let v = run("/nonexistent.sock", &["version"]);
-    assert_eq!(v[0], serde_json::json!({"type":"header","protocol":1,"sidecar":"0.1.0","cmd":"version"}));
+    assert_eq!(v[0], serde_json::json!({"type":"header","protocol":1,"sidecar":"0.1.0","build":env!("HERDR_CONTR_BUILD"),"cmd":"version"}));
     assert_eq!(v[1]["commands"], serde_json::json!(["version", "feed", "status", "card", "approve", "answer", "send", "paste-image", "mermaid", "pictures", "helper", "queue", "phone", "commands", "working", "model", "usage", "favicon", "panel", "keys", "suggestion", "agent-images"]));
     assert_eq!(v.last().unwrap()["type"], "end");
     assert_eq!(v.last().unwrap()["ok"], true);
@@ -214,4 +214,13 @@ fn agent_images_copies_under_the_dir() {
         assert_eq!((e[1]["type"].as_str(), e[1]["code"].as_str()), (Some("error"), Some("usage")));
     }
     let _ = std::fs::remove_dir_all(&d);
+}
+
+#[test]
+fn version_flag_prints_the_build_stamp() {
+    let out = Command::new(env!("CARGO_BIN_EXE_herdr-contr-feed")).arg("--version").env_clear().output().unwrap();
+    assert!(out.status.success());
+    let stamp = env!("HERDR_CONTR_BUILD");
+    assert_ne!(stamp, "", "build.rs sets the stamp");
+    assert_eq!(String::from_utf8(out.stdout).unwrap(), format!("herdr-contr-feed 0.1.0 ({stamp})\n"));
 }

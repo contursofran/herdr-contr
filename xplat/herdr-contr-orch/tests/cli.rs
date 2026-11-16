@@ -14,6 +14,9 @@ fn help_and_unknown_arguments() {
     assert_eq!((r.code, r.out.as_str(), r.err.as_str()), (0, USAGE, ""));
     let r = call(&[], &[], &Fake::default());
     assert_eq!((r.code, r.out.as_str(), r.err.as_str()), (2, "", USAGE));
+    let r = call(&["--version"], &[], &Fake::default());
+    assert_eq!((r.code, r.out.clone(), r.err.as_str()), (0, format!("herdr-contr-orch 0.1.0 ({})\n", env!("HERDR_CONTR_BUILD")), ""));
+    assert_ne!(env!("HERDR_CONTR_BUILD"), "unknown", "a build in a git checkout says its sha");
     let r = call(&["window"], &[], &Fake::default());
     assert_eq!(r.code, 2);
     assert!(r.err.starts_with("herdr-contr-orch: unknown argument window\n"));

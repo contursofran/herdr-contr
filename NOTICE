@@ -10,7 +10,8 @@ See LICENSE.
 
 The mods in herdr-app/mods/herdr-contr-spaces and herdr-app/mods/herdr-contr-tabs
 are adapted from the spaces and tabs mods that ship with the Herdr app, licensed
-under the Apache License, Version 2.0. The agent rows of herdr-contr-spaces come
+under the Apache License, Version 2.0 (see LICENSE-APACHE and
+THIRD_PARTY_NOTICES.md). The agent rows of herdr-contr-spaces come
 from the agents mod of the Herdr app, under the same license. The changes: the
 working mark is a braille loader, and the space icon is the project's favicon.
 Each changed file says so at its top.
