@@ -1,4 +1,4 @@
-//! The command line: `agents flow | config | set | spawn | ls | title | send | interrupt | stop | rm | read | prompt`, and
+//! The command line: `agents flow | config | set | spawn | resume | ls | title | send | interrupt | stop | rm | read | prompt`, and
 //! `owner ask | answer | done | open`. Ported from contr's `contr agents` and `contr owner`. `agents watch` is not
 //! ported: no part of the kit or of this repository calls it.
 use std::io::{BufRead, Write};
@@ -37,6 +37,10 @@ pub const AGENTS_USAGE: &str = "Usage:
                                                    once, or the project's open_prs for a new
                                                    issue, spawn refuses; --fix-pr marks a fix
                                                    round on an open PR
+  herdr-contr-orch agents resume <name>            start a worker again after a crash: claude
+                                                   --resume with its recorded session, in its
+                                                   worktree, and \"Continue from your last step\";
+                                                   ls shows such a worker as gone
   herdr-contr-orch agents title <name> <title…>    change the title of a worker
   herdr-contr-orch agents send <name> <text…>      type text and press Enter
   herdr-contr-orch agents interrupt <name>         press the stop key
@@ -200,7 +204,7 @@ fn run_agents(args: &[String], env: &dyn Fn(&str) -> String, out: &mut dyn Write
         }
         return 0;
     }
-    if ["ls", "spawn", "title", "send", "interrupt", "stop", "rm", "read", "prompt"].contains(&sub.as_str()) {
+    if ["ls", "spawn", "resume", "title", "send", "interrupt", "stop", "rm", "read", "prompt"].contains(&sub.as_str()) {
         return run_worker_command(sub, &args[1..], env, out, err, core);
     }
     if sub == "config" || sub == "set" {
@@ -328,7 +332,7 @@ fn run_worker_command(sub: &str, rest: &[String], env: &dyn Fn(&str) -> String, 
     }
     // Only spawn needs the profiles, so a broken file does not block the rest. Send reads the flow's limit.
     let mut cfg = if sub == "send" { Config::load(&config_path(env)).unwrap_or_default() } else { Config::default() };
-    if sub == "spawn" {
+    if sub == "spawn" || sub == "resume" {
         cfg = match Config::load(&config_path(env)) {
             Ok(c) => c,
             Err(e) => {
@@ -348,14 +352,16 @@ fn run_worker_command(sub: &str, rest: &[String], env: &dyn Fn(&str) -> String, 
             text = if flags.on("json") { serde_json::to_string_pretty(&w).map_err(|e| e.to_string())? + "\n" } else { format!("{} {}\n", w.name, w.address) };
             Ok(())
         }),
-        "ls" => m.list(flags.on("all")).and_then(|ws| {
+        "resume" => crate::resume::resume(core, &cfg, env, &pos[0]).map(|w| text = format!("{} {}\n", w.name, w.address)),
+        "ls" => m.list(flags.on("all")).and_then(|mut ws| {
+            crate::resume::mark_gone(env, m.caller(), &mut ws);
             text = if flags.on("json") { serde_json::to_string_pretty(&ws).map_err(|e| e.to_string())? + "\n" } else { workers::table(&ws) };
             Ok(())
         }),
         "send" => crate::limit::check_message(&m, &cfg, &pos[0]).and_then(|_| m.send(&pos[0], &pos[1..].join(" "))),
         "title" => m.set_title(&pos[0], &pos[1..].join(" ")),
         "interrupt" => m.interrupt(&pos[0]).map(|o| text = o + "\n"),
-        "stop" => m.stop(&pos[0], flags.on("keep")),
+        "stop" => m.stop(&pos[0], flags.on("keep")).map(|_| crate::resume::forget(env, &pos[0])),
         "rm" if !flags.on("ended") => m.remove(&pos[0]),
         "prompt" => pending_prompt(&m, &pos[0]).map(|t| text = t + "\n"),
         "rm" => {
