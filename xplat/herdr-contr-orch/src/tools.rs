@@ -116,9 +116,15 @@ pub fn agent_tools<'a>(core: &'a dyn Core, env: Env<'a>) -> Vec<Tool<'a>> {
                     worktree = review_worktree(if worktree.is_empty() { "." } else { &worktree }, a.review_pr)?;
                 }
                 crate::limit::check_prs(&cfg, env, &worktree, a.fix_pr || a.review_pr != 0)?;
-                let spec = Spec { name: a.name, profile: a.profile, task, issue: a.issue, worktree, role: a.role, project: a.project, title: a.title, parent: env("HC_TERMINAL_ID") };
+                let spec = Spec { name: a.name, profile: a.profile, task, issue: a.issue, worktree, role: a.role, project: a.project, title: a.title, parent: env("HC_TERMINAL_ID"), ..Spec::default() };
                 pretty(&spawn(core, &cfg, env, spec)?)
             }),
+        },
+        Tool {
+            name: "resume",
+            description: "Start a worker again after a crash or a closed terminal: claude --resume with its recorded session id, the same profile and worktree, and the message \"Continue from your last step\". list shows such a worker as gone. It counts against the flow's workers at once.",
+            schema: schema(&["name"], &[name]),
+            run: run(core, env, move |_, a| pretty(&crate::resume::resume(core, &load_config(env)?, env, &a.name)?)),
         },
         Tool {
             name: "set_title",
@@ -157,7 +163,11 @@ pub fn agent_tools<'a>(core: &'a dyn Core, env: Env<'a>) -> Vec<Tool<'a>> {
             name: "stop",
             description: "End a worker's program and remove its terminal from hc. Its context is lost. Read its RESULT.md first.",
             schema: schema(&["name"], &[name, ("keep", "boolean", "Keep the finished terminal so it can still be read. Default false.")]),
-            run: run(core, env, |m, a| m.stop(&a.name, a.keep).map(|_| "stopped".into())),
+            run: run(core, env, move |m, a| {
+                m.stop(&a.name, a.keep)?;
+                crate::resume::forget(env, &a.name);
+                Ok("stopped".into())
+            }),
         },
         Tool {
             name: "read",
@@ -173,9 +183,13 @@ pub fn agent_tools<'a>(core: &'a dyn Core, env: Env<'a>) -> Vec<Tool<'a>> {
         },
         Tool {
             name: "list",
-            description: "List the workers with their role, issue, state and worktree.",
+            description: "List the workers with their role, issue, state and worktree. A worker that ended without a stop has the status gone: start it again with resume.",
             schema: schema(&[], &[("all", "boolean", "Include finished workers.")]),
-            run: run(core, env, |m, a| pretty(&m.list(a.all)?)),
+            run: run(core, env, move |m, a| {
+                let mut ws = m.list(a.all)?;
+                crate::resume::mark_gone(env, m.caller(), &mut ws);
+                pretty(&ws)
+            }),
         },
         Tool {
             name: "clear_ended",
@@ -204,6 +218,7 @@ struct OwnerArgs {
     from: String,
     text: String,
     kind: String,
+    due: String,
     ids: Vec<String>,
     answer: String,
     by: String,
@@ -258,9 +273,9 @@ pub fn owner_tools<'a>(store: &'a Store, project: &'a str, coordinator: &'a str)
         },
         Tool {
             name: "pin_for_owner",
-            description: "Pin one line for the owner: something to do (kind do: test a build, merge a PR that waits for them) or to know (kind know). Returns its id (T1, T2, …).",
-            schema: schema(&["text"], &[("text", "string", "One short line with all it takes to act."), ("kind", "string", "do (the default) or know."), ("from", "string", "The worker, issue or PR it is about.")]),
-            run: run(move |a| Ok(store.pin(Todo { project: project.into(), coordinator: coordinator.into(), from: a.from, kind: a.kind, text: a.text, ..Todo::default() })?.id)),
+            description: "Pin one line for the owner: something to do (kind do: test a build, merge a PR that waits for them) or to know (kind know). Returns its id (T1, T2, …). With due, contr gives you `contr: due today: <ID> <text>` one time on that day; use it also for a step of your own that must happen on a date (check a deploy, remove a flag).",
+            schema: schema(&["text"], &[("text", "string", "One short line with all it takes to act."), ("kind", "string", "do (the default) or know."), ("from", "string", "The worker, issue or PR it is about."), ("due", "string", "The day it is due, YYYY-MM-DD.")]),
+            run: run(move |a| Ok(store.pin(Todo { project: project.into(), coordinator: coordinator.into(), from: a.from, kind: a.kind, text: a.text, due: a.due, ..Todo::default() })?.id)),
         },
         Tool {
             name: "unpin_for_owner",

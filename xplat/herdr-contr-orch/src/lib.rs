@@ -4,6 +4,7 @@
 //! The files and their places are the same as contr's, so both tools read the same state during the port.
 pub mod cli;
 pub mod config;
+pub mod due;
 pub mod flowseen;
 pub mod batch;
 pub mod held;
@@ -14,6 +15,7 @@ pub mod limit;
 pub mod mcp;
 pub mod owner;
 pub mod prompt;
+pub mod resume;
 pub mod settings;
 pub mod spawn;
 pub mod tools;

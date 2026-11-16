@@ -52,7 +52,7 @@ fn spawn_starts_the_profile_with_its_labels_and_parent() {
     let wt = path(tmp.path());
     let cfg = config(tmp.path(), json!({}));
     let core = run_reply("b-158");
-    let vars = [("HC_TERMINAL_ID", "t1"), ("CONTR_AGENTS_CONFIG", cfg.as_str()), ("PATH", "/usr/bin:/bin:/usr/bin"), ("HOME", "/home/o")];
+    let vars = [("HC_TERMINAL_ID", "t1"), ("CONTR_AGENTS_CONFIG", cfg.as_str()), ("PATH", "/usr/bin:/bin:/usr/bin"), ("HOME", "/home/o"), ("CONTR_STATE_DIR", path(tmp.path()))];
     let r = call(&["agents", "spawn", "--name", "b-158", "--profile", "builder", "--issue", "158", "--worktree", wt, "read", "TASK.md"], &vars, &core);
     assert_eq!((r.code, r.out.as_str(), r.err.as_str()), (0, "b-158 t4\n", ""));
     let (method, p) = ran(&core).clone();
@@ -190,7 +190,11 @@ fn a_claude_profile_loads_the_kit_and_its_agent() {
         let core = run_reply("w");
         let r = call(&["agents", "spawn", "--name", "w", "--profile", profile, "--any-profile", "go"], vars, &core);
         assert_eq!(r.code, 0, "{}", r.err);
-        let (full, env) = (argv(&ran(&core).1), ran(&core).1.get("env").cloned());
+        let (mut full, env) = (argv(&ran(&core).1), ran(&core).1.get("env").cloned());
+        // The session id is new at each spawn; the resume tests check it.
+        if let Some(i) = full.iter().position(|a| a == "--session-id") {
+            full.drain(i..i + 2);
+        }
         (program(&full).to_vec(), full.len(), env)
     };
     // CONTR_KIT replaces the kit of the file. The agent of the profile picks the kit's definition.
