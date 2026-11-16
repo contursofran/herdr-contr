@@ -86,7 +86,8 @@ For shell use (`herdr-contr-orch agents …`), put the tool on the PATH.
 
 In an hc terminal (`HC_TERMINAL_ID` set), the UserPromptSubmit hook
 (`herdr-contr-orch hook prompt`) asks Claude to add each request of the
-owner to its todos, starting with `[you] `. Prompts that start with
-`<hc from=` are skipped, and workers (`CONTR_COORDINATOR` set) get nothing.
+owner to its todos, starting with `[you] `. A prompt with only task
+notifications, system reminders and hc notes (`<hc …>…</hc>`) gets no such
+line, and workers (`CONTR_COORDINATOR` set) get nothing.
 In a coordinator it also adds the flow when the flow changed. The hook logs
 errors to stderr and always exits 0, so it never blocks Claude Code.
