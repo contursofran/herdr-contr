@@ -130,7 +130,7 @@ impl Flow {
             plan.to_string(),
             review.to_string(),
             format!("Debugger: spawn debugger after {} failed fix rounds.", self.debugger_after),
-            format!("Workers at once: at most {}, reviewers included.", self.workers),
+            format!("Workers at once: at most {}, reviewers included. Spawn and a message to a settled worker refuse past it.", self.workers),
             merge.to_string(),
             format!("Profiles: {}. Spawn each role with its profile only.", roles.join(", ")),
         ]
@@ -152,6 +152,9 @@ pub struct Config {
     pub profiles: BTreeMap<String, Profile>,
     pub kit: String,
     pub setup: BTreeMap<String, String>,
+    /// The most open pull requests of a project, by its main checkout (as in `setup`). At or over it, spawn
+    /// refuses a worker for a new issue. A project that is not here has no limit.
+    pub open_prs: BTreeMap<String, i64>,
     pub flow: Flow,
     /// Where the profiles come from: the file that `load` read, with "(not found)" after it when it is missing.
     pub source: String,
@@ -165,6 +168,7 @@ struct FileConfig {
     profiles: Option<BTreeMap<String, Profile>>,
     kit: Option<String>,
     setup: Option<BTreeMap<String, String>>,
+    open_prs: Option<BTreeMap<String, i64>>,
     flow: Option<Flow>,
 }
 
@@ -187,6 +191,7 @@ impl Default for Config {
             profiles: profiles.into_iter().map(|(n, p)| (n.to_string(), p)).collect(),
             kit: String::new(),
             setup: BTreeMap::new(),
+            open_prs: BTreeMap::new(),
             flow: Flow::default(),
             source: String::new(),
             notice: String::new(),
@@ -217,6 +222,10 @@ impl Config {
             cfg.kit = kit;
         }
         cfg.setup = file.setup.unwrap_or_default();
+        cfg.open_prs = file.open_prs.unwrap_or_default();
+        if let Some((k, n)) = cfg.open_prs.iter().find(|(_, n)| **n < FLOW_MIN) {
+            return Err(format!("agents: {}: open_prs {k:?}: {n} is less than {FLOW_MIN}", path.display()));
+        }
         let flow = file.flow.unwrap_or_default();
         flow.validate().map_err(|e| format!("agents: {}: {e}", path.display()))?;
         cfg.flow = flow;
@@ -300,6 +309,7 @@ impl Config {
         set("profiles", Value::Object(profiles), no_profiles);
         set("kit", Value::String(self.kit.clone()), self.kit.is_empty());
         set("setup", serde_json::to_value(&self.setup).map_err(|e| e.to_string())?, self.setup.is_empty());
+        set("open_prs", serde_json::to_value(&self.open_prs).map_err(|e| e.to_string())?, self.open_prs.is_empty());
         set("flow", serde_json::to_value(&self.flow).map_err(|e| e.to_string())?, false);
         let mut out = serde_json::to_vec_pretty(&raw).map_err(|e| e.to_string())?;
         out.push(b'\n');
@@ -381,7 +391,7 @@ mod tests {
             "The flow:\n- Plan first: never. Spawn builder directly; the builder plans in its PR body.\n\
              - Review: none. Spawn no reviewer; read the diff yourself.\n\
              - Debugger: spawn debugger after 2 failed fix rounds.\n\
-             - Workers at once: at most 4, reviewers included.\n\
+             - Workers at once: at most 4, reviewers included. Spawn and a message to a settled worker refuse past it.\n\
              - Merge: merge yourself when CI and review pass.\n\
              - Profiles: builder: builder-medium, planner: planner, reviewer: reviewer, debugger: debugger, explorer: explorer. Spawn each role with its profile only.\n"
         );

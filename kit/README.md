@@ -53,6 +53,12 @@ For shell use (`herdr-contr-orch agents …`), put the tool on the PATH.
    shell command: `"setup": {"~/code/app": "cp -R \"$CONTR_MAIN/.husky/_\"
    .husky/ && pnpm install --frozen-lockfile --offline"}`. Spawn runs it
    in the worktree before the agent starts.
+   Spawn refuses past the flow's `workers`: it counts the coordinator's live
+   workers that are `working`, and a `message` to a settled worker counts as
+   a start. To limit a project's open PRs, add its main checkout and a number:
+   `"open_prs": {"~/code/app": 4}`. At or over it, spawn refuses a new issue
+   (one `gh pr list` call). A fix round goes through: the worktree's branch
+   has an open PR, or `--fix-pr` (`fix_pr: true` in the tool).
 2. Start the coordinator in an hc terminal with the plugin:
    `claude --plugin-dir <kit> --model opus --effort medium`, then
    `/contr:orchestrate <goal>`.

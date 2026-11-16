@@ -250,6 +250,11 @@ impl<'a> Manager<'a> {
         Manager { core, caller: caller.into() }
     }
 
+    /// The hc terminal this tool runs in, or "".
+    pub fn caller(&self) -> &str {
+        &self.caller
+    }
+
     /// The params of a call that looks at, acts on or sends to a terminal. Inside hc they name this terminal as
     /// the caller. When it is the worker's parent, hc counts the worker's news as seen and types no note about
     /// it into the parent: a coordinator that stops a worker gets no exit note. On a send between two agents,

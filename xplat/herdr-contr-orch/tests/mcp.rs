@@ -143,7 +143,8 @@ fn the_worker_tools_call_hc() {
     assert_eq!(text(&got[8]), ("titled", false));
     assert_eq!(text(&got[9]), ("set_title: agents: no title to set", true));
 
-    let calls = core.calls();
+    // The limit checks list and get workers first; leave them out here.
+    let calls: Vec<(String, Value)> = core.calls().into_iter().filter(|(m, _)| m != "terminal.list" && m != "terminal.get").collect();
     let (method, run) = &calls[0];
     assert_eq!(method, "terminal.run");
     assert_eq!((&run["parent"], &run["name"], &run["cwd"]), (&json!("t1"), &json!("b-158"), &json!(wt)));
@@ -176,7 +177,7 @@ fn spawn_reads_the_profiles_again_each_time_and_follows_the_flow() {
     let e = spawn("builder", false);
     assert!(text(&e).1 && text(&e).0.contains("no role with profile \"builder\""), "{e}");
     assert!(!text(&spawn("builder", true)).1);
-    assert_eq!(core.methods(), ["terminal.run", "terminal.run"]);
+    assert_eq!(core.methods().iter().filter(|m| *m != "terminal.list").collect::<Vec<_>>(), ["terminal.run", "terminal.run"]);
 }
 
 #[test]
@@ -252,4 +253,19 @@ fn a_broken_profiles_file_stops_the_server_at_its_start() {
     assert!(r.err.starts_with("herdr-contr-orch mcp: "), "{}", r.err);
     let r = call_with(&["mcp", "more"], &vars, &Fake::default(), "");
     assert_eq!(r.code, 2, "{}", r.err);
+}
+
+#[test]
+fn the_spawn_and_message_tools_refuse_past_the_flows_workers() {
+    let dir = tempfile::tempdir().unwrap();
+    let (own, _) = files(dir.path());
+    let cfg = dir.path().join("agents.json");
+    fs::write(&cfg, json!({"flow": {"workers": 1}}).to_string()).unwrap();
+    let vars = [("CONTR_OWNER_FILE", own.as_str()), ("CONTR_AGENTS_CONFIG", path(&cfg)), ("HC_TERMINAL_ID", "t1")];
+    let w = |name: &str, status: &str| json!({"name": name, "parent": "t1", "state": "live", "status": {"state": status}, "labels": {"contr": "agent"}});
+    let core = Fake::default().reply("terminal.list", json!({"terminals": [w("b-1", "working")]})).reply("terminal.get", w("b-2", "idle"));
+    let got = talk(&[tool(1, "spawn", json!({"name": "w", "profile": "builder", "task": "go"})), tool(2, "message", json!({"name": "b-2", "text": "go on"}))], &vars, &core);
+    assert_eq!(text(&got[0]), ("spawn: agents: 1 workers at once is the flow's limit; working now: b-1. Wait for a report.", true));
+    assert_eq!(text(&got[1]), ("message: agents: 1 workers at once is the flow's limit; working now: b-1. Wait for a report.", true));
+    assert!(!core.methods().iter().any(|m| m == "terminal.run" || m == "terminal.send"));
 }

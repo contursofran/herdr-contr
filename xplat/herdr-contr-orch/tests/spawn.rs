@@ -15,6 +15,11 @@ fn run_reply(name: &str) -> Fake {
     Fake::default().reply("terminal.run", json!({"address": "t4", "name": name, "state": "live", "labels": {"contr": "agent", "role": "builder"}}))
 }
 
+/// The first call that is not a list of the workers (the limit check).
+fn ran(core: &Fake) -> (String, Value) {
+    core.calls().into_iter().find(|(m, _)| m != "terminal.list").expect("a call")
+}
+
 fn argv(params: &Value) -> Vec<String> {
     params["argv"].as_array().unwrap().iter().map(|a| a.as_str().unwrap().to_string()).collect()
 }
@@ -50,7 +55,7 @@ fn spawn_starts_the_profile_with_its_labels_and_parent() {
     let vars = [("HC_TERMINAL_ID", "t1"), ("CONTR_AGENTS_CONFIG", cfg.as_str()), ("PATH", "/usr/bin:/bin:/usr/bin"), ("HOME", "/home/o")];
     let r = call(&["agents", "spawn", "--name", "b-158", "--profile", "builder", "--issue", "158", "--worktree", wt, "read", "TASK.md"], &vars, &core);
     assert_eq!((r.code, r.out.as_str(), r.err.as_str()), (0, "b-158 t4\n", ""));
-    let (method, p) = core.calls()[0].clone();
+    let (method, p) = ran(&core).clone();
     assert_eq!(method, "terminal.run");
     let full = argv(&p);
     // A Claude worker starts through the clean wrapper, with the task as the last word.
@@ -66,20 +71,20 @@ fn spawn_starts_the_profile_with_its_labels_and_parent() {
     let core = run_reply("b-159");
     let r = call(&["agents", "spawn", "--name", "b-159", "--profile", "builder", "--title", " Agent images in the chat ", "go"], &vars, &core);
     assert_eq!(r.code, 0, "{}", r.err);
-    assert_eq!(core.calls()[0].1["labels"]["title"], "Agent images in the chat");
+    assert_eq!(ran(&core).1["labels"]["title"], "Agent images in the chat");
 
     // --role and --project are labels; without hc there is no parent and no variable for it.
     let core = run_reply("o");
     let r = call(&["agents", "spawn", "--name", "o", "--profile", "builder", "--role", "orchestrator", "--project", "contr"], &[("CONTR_AGENTS_CONFIG", &cfg)], &core);
     assert_eq!(r.code, 0, "{}", r.err);
-    let p = &core.calls()[0].1;
+    let p = &ran(&core).1;
     assert_eq!(p["labels"], json!({"contr": "agent", "role": "orchestrator", "profile": "builder", "worktree": "", "project": "contr"}));
     assert_eq!((&p["no_parent"], p.get("env"), p.get("cwd"), p.get("parent")), (&json!(true), None, None, None));
 
     let core = run_reply("x");
     let r = call(&["agents", "spawn", "--no-parent", "--name", "x", "--profile", "builder"], &vars, &core);
-    assert_eq!((r.code, &core.calls()[0].1["no_parent"]), (0, &json!(true)));
-    assert!(core.calls()[0].1["env"].get("CONTR_COORDINATOR").is_none());
+    assert_eq!((r.code, &ran(&core).1["no_parent"]), (0, &json!(true)));
+    assert!(ran(&core).1["env"].get("CONTR_COORDINATOR").is_none());
 }
 
 #[test]
@@ -90,11 +95,11 @@ fn spawn_takes_flags_after_the_task_and_words_after_a_double_dash() {
     let r = call(&["agents", "spawn", "--name", "b", "fix", "it", "--profile", "builder", "--json"], &vars, &core);
     assert_eq!(r.code, 0, "{}", r.err);
     assert!(r.out.contains("\"address\": \"t4\""), "{}", r.out);
-    assert_eq!(argv(&core.calls()[0].1).last().unwrap(), "fix it");
+    assert_eq!(argv(&ran(&core).1).last().unwrap(), "fix it");
 
     let core = run_reply("b");
     assert_eq!(call(&["agents", "spawn", "--name", "b", "--profile", "builder", "--", "run", "--all", "tests"], &vars, &core).code, 0);
-    assert_eq!(argv(&core.calls()[0].1).last().unwrap(), "run --all tests");
+    assert_eq!(argv(&ran(&core).1).last().unwrap(), "run --all tests");
 }
 
 #[test]
@@ -116,7 +121,7 @@ fn spawn_refuses_a_bad_profile_name_project_or_worktree() {
     fails(&["--name", "x", "--profile", "builder", "--title", "a\nb"], "the title has a control character");
     fails(&["--name", "x", "--profile", "builder", "--worktree", &format!("{}/missing", path(tmp.path()))], "agents: worktree ");
     fails(&["--name", "x", "--profile", "builder", "--worktree", &cfg], "is not a folder");
-    assert!(core.calls().is_empty());
+    assert!(!core.methods().contains(&"terminal.run".to_string()));
 
     assert_eq!(call(&["agents", "spawn", "--name", "x", "--profile", "orchestrator", "--any-profile"], &vars, &core).code, 0);
     let r = call(&["agents", "spawn", "--name", "x", "--profile", "builder"], &vars, &Fake::default().err("terminal.run", "hc: name in use (conflict)"));
@@ -141,7 +146,7 @@ fn a_broken_profiles_file_blocks_only_spawn() {
     let r = call(&["agents", "spawn", "--name", "x", "--profile", "builder"], &vars, &core);
     assert_eq!(r.code, 1);
     assert!(r.err.starts_with("herdr-contr-orch agents: agents: "), "{}", r.err);
-    assert!(core.calls().is_empty());
+    assert!(!core.methods().contains(&"terminal.run".to_string()));
     assert_eq!(call(&["agents", "ls"], &vars, &core).code, 0);
 }
 
@@ -155,7 +160,7 @@ fn spawn_reads_the_task_from_a_file() {
     let core = run_reply("b");
     let r = call(&["agents", "spawn", "--name", "b", "--profile", "builder", "--task-file", path(&brief)], &vars, &core);
     assert_eq!(r.code, 0, "{}", r.err);
-    assert_eq!(argv(&core.calls()[0].1).last().unwrap(), "Fix \"it\"\nthen $HOME\n");
+    assert_eq!(argv(&ran(&core).1).last().unwrap(), "Fix \"it\"\nthen $HOME\n");
 
     let core = run_reply("b");
     let r = call(&["agents", "spawn", "--name", "b", "--profile", "builder", "--task-file", path(&brief), "and", "this"], &vars, &core);
@@ -165,7 +170,7 @@ fn spawn_reads_the_task_from_a_file() {
     assert!(r.code == 1 && r.err.ends_with("brief.md is empty\n"), "{}", r.err);
     let r = call(&["agents", "spawn", "--name", "b", "--profile", "builder", "--task-file", "/no/such/brief.md"], &vars, &core);
     assert!(r.code == 1 && r.err.contains("task file: /no/such/brief.md: "), "{}", r.err);
-    assert!(core.calls().is_empty());
+    assert!(!core.methods().contains(&"terminal.run".to_string()));
 }
 
 #[test]
@@ -185,7 +190,7 @@ fn a_claude_profile_loads_the_kit_and_its_agent() {
         let core = run_reply("w");
         let r = call(&["agents", "spawn", "--name", "w", "--profile", profile, "--any-profile", "go"], vars, &core);
         assert_eq!(r.code, 0, "{}", r.err);
-        let (full, env) = (argv(&core.calls()[0].1), core.calls()[0].1.get("env").cloned());
+        let (full, env) = (argv(&ran(&core).1), ran(&core).1.get("env").cloned());
         (program(&full).to_vec(), full.len(), env)
     };
     // CONTR_KIT replaces the kit of the file. The agent of the profile picks the kit's definition.
@@ -216,7 +221,7 @@ fn spawn_runs_the_project_setup_in_a_new_worktree_only() {
     let core = run_reply("w");
     let r = call(&["agents", "spawn", "--name", "w", "--profile", "builder", "--worktree", path(&wt), "go"], &vars, &core);
     assert_eq!(r.code, 0, "{}", r.err);
-    let p = &core.calls()[0].1;
+    let p = &ran(&core).1;
     let full = argv(p);
     assert_eq!(full[..5], ["/bin/sh", "-c", SETUP_WRAPPER, "contr-setup", setup]);
     assert_eq!((full[8].as_str(), program(&full)[0].as_str(), full.last().unwrap().as_str()), ("contr-clean-env", "claude", "go"));
@@ -226,7 +231,7 @@ fn spawn_runs_the_project_setup_in_a_new_worktree_only() {
     for dir in [&main, &other] {
         let core = run_reply("w");
         assert_eq!(call(&["agents", "spawn", "--name", "w", "--profile", "builder", "--worktree", path(dir)], &vars, &core).code, 0);
-        let p = &core.calls()[0].1;
+        let p = &ran(&core).1;
         assert_eq!((argv(p)[3].as_str(), &p["env"]), ("contr-clean-env", &json!({"CONTR_COORDINATOR": "t0"})));
     }
 }
@@ -284,12 +289,12 @@ fn review_worktree_is_at_the_head_of_the_pull_request() {
     let core = run_reply("r-7");
     let r = call(&["agents", "spawn", "--name", "r-7", "--profile", "reviewer", "--review-pr", "7", "--worktree", path(&main)], &[("CONTR_AGENTS_CONFIG", &cfg)], &core);
     assert_eq!(r.code, 0, "{}", r.err);
-    assert_eq!((&core.calls()[0].1["cwd"], &core.calls()[0].1["labels"]["worktree"]), (&json!(dir), &json!(dir)));
+    assert_eq!((&ran(&core).1["cwd"], &ran(&core).1["labels"]["worktree"]), (&json!(dir), &json!(dir)));
 
     // Outside a repository git's own message comes back, and no worker starts.
     let outside = tempfile::tempdir().unwrap();
     let core = run_reply("r");
     let r = call(&["agents", "spawn", "--name", "r", "--profile", "reviewer", "--review-pr", "3", "--worktree", path(outside.path())], &[("CONTR_AGENTS_CONFIG", &cfg)], &core);
     assert!(r.code == 1 && r.err.contains("git rev-parse: fatal: not a git repository"), "{}", r.err);
-    assert!(core.calls().is_empty());
+    assert!(!core.methods().contains(&"terminal.run".to_string()));
 }
