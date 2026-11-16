@@ -7,13 +7,14 @@ use serde_json::Value;
 use crate::config::Config;
 use crate::workers::Manager;
 
-/// Refuses when the caller's live workers that are `working` (reviewers included) are at the flow's limit. The
-/// error names them. Outside hc (no caller) it checks nothing.
+/// Refuses when the caller's live workers that are `working` (reviewers included) are at the flow's limit. A worker
+/// with no status yet (just spawned, before its first hook) counts as working, so a quick run of spawns cannot pass
+/// the limit. The error names them. Outside hc (no caller) it checks nothing.
 pub fn check_workers(m: &Manager, cfg: &Config) -> Result<(), String> {
     if m.caller().is_empty() {
         return Ok(());
     }
-    let busy: Vec<String> = m.list(false)?.into_iter().filter(|w| w.live && w.status == "working" && w.parent == m.caller()).map(|w| w.name).collect();
+    let busy: Vec<String> = m.list(false)?.into_iter().filter(|w| w.live && (w.status == "working" || w.status.is_empty()) && w.parent == m.caller()).map(|w| w.name).collect();
     if (busy.len() as i64) < cfg.flow.workers {
         return Ok(());
     }

@@ -61,6 +61,20 @@ fn spawn_refuses_past_the_flows_workers_and_names_them() {
 }
 
 #[test]
+fn a_worker_with_no_status_yet_counts_as_working() {
+    // Just spawned: hc has no status for it until its first hook, so a quick run of spawns cannot pass the limit.
+    let tmp = tempfile::tempdir().unwrap();
+    let cfg = config(tmp.path(), json!({"flow": {"workers": 2}}));
+    let vars = [("CONTR_AGENTS_CONFIG", cfg.as_str()), ("HC_TERMINAL_ID", "t1")];
+    let fresh = json!({"name": "b-6", "address": "b-6", "parent": "t1", "state": "live", "labels": {"contr": "agent"}});
+    let c = core(vec![worker("b-1", "t1", "live", "working"), fresh]);
+    let r = call(&["agents", "spawn", "--name", "w", "--profile", "builder", "go"], &vars, &c);
+    assert_eq!(r.code, 1);
+    assert!(r.err.contains("working now: b-1, b-6."), "{}", r.err);
+    assert!(!ran(&c));
+}
+
+#[test]
 fn a_message_to_a_settled_worker_counts_as_a_start() {
     let tmp = tempfile::tempdir().unwrap();
     let cfg = config(tmp.path(), json!({"flow": {"workers": 2}}));
