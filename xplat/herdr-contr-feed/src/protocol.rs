@@ -1,5 +1,5 @@
 //! Swift: `Protocol.swift`. The sidecar's output: JSON Lines (one object per line). The first line is a `header`
-//! with the protocol version; the last is an `end`. The contract is the mod's docs/protocol.md.
+//! with the protocol version; the last is an `end`. The contract is docs/protocol.md.
 
 use serde::Serialize;
 use serde_json::Value;

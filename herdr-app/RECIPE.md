@@ -462,7 +462,7 @@ drawn by Herdr's `frames`; every loader of the mod is this one); done is a check
     `~/.pi/agent/sessions/`, `~/.gemini/antigravity-cli/`) and talks to herdr-core (`hc`) to read
     screens and send keys and text. Commands: `feed`, `status`, `card`, `approve`, `answer`,
     `send`, `paste-image`, `pictures`, `helper`, `panel`, `keys`, one per `exec`, JSON Lines back
-    (`herdr-app/docs/protocol.md` in that repo). Every call ends with `--home <herdr-app home>`, so
+    (`docs/protocol.md` in that repo). Every call ends with `--home <herdr-app home>`, so
     the helper follows the same config.json. It keeps `<herdr-app home>/herdr-contr/cache.json`, `answered/` beside it, and pastes in
     `<herdr-app home>/herdr-contr/paste/`.
   - `osascript`, for the file dialog (macOS only; the + button shows only when `window().platform` is `macos`).
