@@ -1,8 +1,9 @@
 //! `model`: the agent's model and effort, for the sidebar's agent rows. Read only; nothing goes to the agent.
 //!
-//! The model: the newest one the session log names (`tail::model`).
+//! The model: the newest one the session log names, a reply or a `/model` switch (`tail::model`).
 //! The effort, the first source that has it:
-//! - Claude Code: herdr-contr's status line record (when on; it follows `/effort`), then `--effort <level>` on the
+//! - Claude Code: herdr-contr's status line record (when on; it follows `/effort`), then the effort of a `/model`
+//!   switch newer than the last reply, then `--effort <level>` on the
 //!   agent's command line (contr profiles pass it), then Claude Code's settings: `.claude/settings.local.json`, then
 //!   `.claude/settings.json` in the agent's cwd, then the user's `settings.json`. In each file,
 //!   `modelSettings.<model>.effortLevel` for the log's model, then a top-level `effortLevel`.
@@ -45,7 +46,7 @@ pub fn read(kind: &str, s: &Sources, now: SystemTime) -> ModelInfo {
     let model = tail::model(&lines);
     let args = || s.procs.iter().find_map(|p| effort_in_args(kind, &p.line));
     let effort = match kind {
-        "claude" => statusline_effort(s.log, s.claude_settings, now).or_else(args).or_else(|| claude_settings_effort(s, model.as_deref())),
+        "claude" => statusline_effort(s.log, s.claude_settings, now).or_else(|| tail::switch_effort(&lines)).or_else(args).or_else(|| claude_settings_effort(s, model.as_deref())),
         "codex" => codex_log_effort(&lines).or_else(args).or_else(|| codex_config_effort(s.codex_config)),
         _ => None,
     };

@@ -523,8 +523,10 @@ any other key: `failed`, nothing sent. No panel on screen: `changed`, nothing se
 ```
 
 - The agent's model and effort, for the sidebar's agent rows. Read only. A part that is not known is `null`.
-- `model`: the newest model that the session log names.
-- `effort`, the first source that has it. Claude Code: herdr-contr's status line record, then `--effort <level>`
+- `model`: the newest model that the session log names: an assistant reply's model, or a `/model` switch
+  (`Set model to Opus 5.5` local command output, mapped to the id `claude-opus-5-5`), whichever is later.
+- `effort`, the first source that has it. Claude Code: herdr-contr's status line record, then the effort of a `/model` switch newer than the last reply
+  (`… with high effort`), then `--effort <level>`
   on the agent's command line (the pane's processes and their children), then Claude Code's settings:
   `.claude/settings.local.json`, then `.claude/settings.json` in the pane's cwd, then the user's `settings.json`.
   In each file, `modelSettings.<model>.effortLevel` for the log's model, then a top-level `effortLevel`. Codex: the newest `turn_context` in the rollout, then `-c model_reasoning_effort=<level>` on the

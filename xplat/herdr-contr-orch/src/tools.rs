@@ -143,14 +143,14 @@ pub fn agent_tools<'a>(core: &'a dyn Core, env: Env<'a>) -> Vec<Tool<'a>> {
         },
         Tool {
             name: "report",
-            description: "A worker's report to its coordinator (CONTR_COORDINATOR): use it instead of hc send. When the coordinator's prompt is busy (such as with a dialog), contr keeps the report and gives it to the coordinator when its prompt is free. Returns sent or held.",
+            description: "A worker's report to its coordinator (CONTR_COORDINATOR): use it instead of hc send. When the coordinator's prompt is busy (such as with a dialog), contr keeps the report and gives it to the coordinator when its prompt is free. A report that is not urgent (not blocked, failed, error, a question, failed CI, merged or closed) waits for a batch. Returns sent, held or batched.",
             schema: schema(&["text"], &[("text", "string", "The report: <your name>: <status>, <one line>; RESULT.md in <worktree>.")]),
             run: run(core, env, move |_, a| {
                 let to = env(ENV_COORDINATOR);
                 if to.is_empty() {
                     return Err("no coordinator: CONTR_COORDINATOR is not set".into());
                 }
-                crate::held::report(core, env, &to, &a.text)
+                crate::batch::report(core, env, &to, &a.text, crate::batch::now(), &crate::batch::arm_timer)
             }),
         },
         Tool {
