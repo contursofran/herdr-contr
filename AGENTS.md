@@ -47,24 +47,29 @@ stay ours. The top bar is our copy of Herdr's `tabs` mod.
 
 ## Layout
 
-| Path | Holds |
-|---|---|
-| `herdr-app/layouts`, `herdr-app/themes`, `herdr-app/keys.json` | the layouts (`herdr-contr` with Herdr's sidebar, and `herdr-contr-own` with the mod's own sidebar), the themes and the keys that the mod installs |
-| `herdr-app/mods/herdr-contr` | the mod: one file for each screen or part |
-| `herdr-app/mods/herdr-contr-spaces` | the sidebar's Projects list (#96): a copy of Herdr's `spaces` mod that also draws each project's agents and their workers, with the hover controls and the model tooltip (#98); also the sidebar's head with the machine switch (#97) |
-| `herdr-app/mods/herdr-contr-tabs` | a copy of Herdr's `tabs` mod, with the braille loader (the agents copy went in #98) |
-| `herdr-app/test` | the mod's tests, with a stub of Herdr's UI in `test/stub` |
-| `herdr-app/RECIPE.md` | each part of the mod in words: sizes, colors, behavior |
-| `herdr-app/docs/protocol.md` | the contract between the mod and the helper (JSON Lines) |
-| `herdr-app/install.sh`, `herdr-app/install-isolated.sh` | the install into a Herdr home, and into a test home |
-| `xplat/herdr-contr-feed` | the helper (Rust): reads the agents' session logs and talks to hc |
-| `xplat/herdr-core` | the helper's hc client |
-| `xplat/herdr-contr-orch` | the orchestration tool (Rust), ported from contr slice by slice (#160); its parts are in the list below the table |
-| `kit` | the Claude Code plugin of a coordinator and its workers: the agent definitions, the playbook (`commands/orchestrate.md`), the chat-writing skill, the hooks and the MCP server, which run `herdr-contr-orch`; `.claude-plugin/marketplace.json` at the root names it for Claude Code |
-| `xplat/fixtures` | the session logs and hub answers that the helper's tests read |
-| `xplat/herdr-contr-feed/web` | the phone page that the helper embeds (built output; do not edit) |
-| `web`, `scripts/web-build.mjs`, `scripts/sw-test.mjs` | the phone page's source, its build into `xplat/herdr-contr-feed/web`, and its service worker test |
-| `docs/design`, `docs/research` | the notes on the phone page's protocol and on the question keys, that the helper's code names |
+| Path | Side | Holds |
+|---|---|---|
+| `herdr-app/layouts`, `herdr-app/themes`, `herdr-app/keys.json` | mod | the layouts (`herdr-contr` with Herdr's sidebar, and `herdr-contr-own` with the mod's own sidebar), the themes and the keys that the mod installs |
+| `herdr-app/mods/herdr-contr` | mod | the mod: one file for each screen or part |
+| `herdr-app/mods/herdr-contr-spaces` | mod | the sidebar's Projects list (#96): a copy of Herdr's `spaces` mod that also draws each project's agents and their workers, with the hover controls and the model tooltip (#98); also the sidebar's head with the machine switch (#97) |
+| `herdr-app/mods/herdr-contr-tabs` | mod | a copy of Herdr's `tabs` mod, with the braille loader (the agents copy went in #98) |
+| `herdr-app/test` | mod | the mod's tests, with a stub of Herdr's UI in `test/stub` |
+| `herdr-app/RECIPE.md`, `herdr-app/README.md`, `herdr-app/preview*.png` | mod | each part of the mod in words: sizes, colors, behavior; the mod's readme and its pictures |
+| `herdr-app/install.sh`, `herdr-app/install-isolated.sh` | mod | the install into a Herdr home, and into a test home; `install.sh` is also the release zip's installer |
+| `scripts/sync-copies.mjs` | mod | writes the functions that one mod copies from another |
+| `docs/protocol.md` | backend | the contract of the helper, which the mod and contr-desktop use (JSON Lines) |
+| `xplat/herdr-contr-feed` | backend | the helper (Rust): reads the agents' session logs and talks to hc; its `install`, `build.rs` and `health` also hold mod parts |
+| `xplat/herdr-core` | backend | the helper's hc client, its parsers and `places` |
+| `xplat/herdr-contr-orch` | backend | the orchestration tool (Rust), ported from contr slice by slice (#160); its parts are in the list below the table |
+| `kit`, `.claude-plugin/marketplace.json` | backend | the Claude Code plugin of a coordinator and its workers: the agent definitions, the playbook (`commands/orchestrate.md`), the chat-writing skill, the hooks and the MCP server, which run `herdr-contr-orch`; `.claude-plugin/marketplace.json` at the root names it for Claude Code |
+| `xplat/fixtures` | backend | the session logs and hub answers that the helper's tests read |
+| `xplat/build-stamp.rs` | backend | the build stamp of the helper and the tool |
+| `xplat/herdr-contr-feed/web` | backend | the phone page that the helper embeds (built output; do not edit) |
+| `web`, `scripts/web-build.mjs`, `scripts/sw-test.mjs` | backend | the phone page's source, its build into `xplat/herdr-contr-feed/web`, and its service worker test |
+| `docs/design`, `docs/research` | backend | the notes on the phone page's protocol and on the question keys, that the helper's code names |
+| `.github/workflows/ci.yml`, `.github/workflows/release.yml`, `scripts/land.sh` | both | the CI, the release and the landing of a PR: one job and one zip for both sides |
+
+A backend part does not read a file of `herdr-app/` at build time or at run time.
 
 The parts of `xplat/herdr-contr-orch`:
 
@@ -182,5 +187,5 @@ and `gpui-kit.d.ts`. Read them there. Do not copy them into this repository.
   `LICENSE`.
 - Temporary files go in `tmp/`, which git ignores.
 - When a change makes a doc wrong (`herdr-app/RECIPE.md`,
-  `herdr-app/docs/protocol.md`, this file), update it in the same PR.
+  `docs/protocol.md`, this file), update it in the same PR.
 - Report the PR number, the head SHA, the check status and any deviation.

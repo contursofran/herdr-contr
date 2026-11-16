@@ -1,5 +1,5 @@
 // herdr-contr-feed: the herdr-app mod's sidecar. One command per run; the answer is JSON Lines on stdout
-// (contract: docs/protocol.md in the mod folder). Picks the herdr-core session as the app does (HC_SESSION, HC_SOCKET).
+// (contract: docs/protocol.md). Picks the herdr-core session as the app does (HC_SESSION, HC_SOCKET).
 fn main() {
     let argv: Vec<String> = std::env::args().skip(1).collect();
     if matches!(argv.first().map(String::as_str), Some("--version" | "-V")) {

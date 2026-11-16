@@ -10,8 +10,8 @@ use serde_json::Value;
 /// The docs that the repository rules say to keep current. A boundary allows them unless it has `no-docs`.
 pub const DOCS: &[&str] = &[
     "AGENTS.md",
+    "docs/protocol.md",
     "herdr-app/RECIPE.md",
-    "herdr-app/docs/protocol.md",
     "kit/README.md",
 ];
 
@@ -262,5 +262,10 @@ mod tests {
             outside(&["kit".into(), "no-docs".into()], &files),
             ["AGENTS.md", "herdr-app/mods/x.js"]
         );
+    }
+
+    #[test]
+    fn boundary_allows_the_protocol_doc() {
+        assert!(outside(&["kit".into()], &["docs/protocol.md".into()]).is_empty());
     }
 }

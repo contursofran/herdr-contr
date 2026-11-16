@@ -24,7 +24,7 @@ version comes close or leaves the feature out.
 
 The chat view reads conversations through a sidecar, `herdr-contr-feed`, built from this repo
 (Rust: `cd xplat && cargo build --release -p herdr-contr-feed`). The mod finds it at
-`<herdr-app home>/herdr-contr/bin/herdr-contr-feed`. Its protocol is in `docs/protocol.md`.
+`<herdr-app home>/herdr-contr/bin/herdr-contr-feed`. Its protocol is in `docs/protocol.md` at the root of this repo.
 
 The layout and the mod work only together: the layout names the mod's views, and the mod expects
 the layout's ids (`sidebar`, `screen`, `chat`, `tab`). The mod alone draws nothing (`place` is
