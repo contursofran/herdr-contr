@@ -43,6 +43,13 @@ test("the top bar is Herdr's tabs block, with Herdr's Files and Changes panel be
   assert.ok(!JSON.stringify(layout).includes('"view":"top"'));
 });
 
+// A window_drag block moves the window on any left press that no element stops, and a text selection does not
+// stop it (#201). So only the bars have window_drag here: the sidebar's head and the tabs block.
+test("only the bars move the window: the chat, Needs you and Overview blocks have no window_drag", () => {
+  const drags = (n, out = []) => { if (n.window_drag) out.push(n.id); (n.children || []).forEach((c) => drags(c, out)); return out; };
+  assert.deepEqual(drags(layout), ["brand", "tabs"]);
+});
+
 test("with Herdr's tab bar the screens draw no bar and leave no room for one", () => {
   fake.layout = layout;
   assert.equal(herdrTabBar(), true);
