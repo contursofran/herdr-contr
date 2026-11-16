@@ -109,8 +109,11 @@ pub struct Config {
     pub read_only: bool,
     /// The name the page shows.
     pub hub: String,
-    /// The herdr-app home whose herdr-contr settings apply (`remote_helper: never`); passed to every command.
+    /// `--home` of serve: the herdr-app home whose herdr-contr settings apply (`remote_helper: never`); passed to
+    /// every command. None: each command finds the backend root itself (`config::dir`).
     pub home: Option<String>,
+    /// The backend root (`config::dir`): the page's uploads go to its `uploads`. None: no images.
+    pub root: Option<std::path::PathBuf>,
 }
 
 /// One command of the sidecar, run in this process: its lines after `header`, without `end`.
@@ -755,11 +758,11 @@ impl Session {
     /// log path and offset go to `feed --before`; the page's values are only compared.
     /// `attach`: one part of an image for the next `send` (`upload::attach`).
     fn attach(&self, m: &Value, id: &str) -> Vec<Value> {
-        let Some(home) = &self.cfg.home else { return vec![fail(id, "failed", "This helper takes no images: it has no herdr-app home.")] };
+        let Some(root) = &self.cfg.root else { return vec![fail(id, "failed", "This helper takes no images: it has no backend root.")] };
         let (Some(name), Some(part), Some(parts), Some(data)) = (m["upload"].as_str(), m["part"].as_u64(), m["parts"].as_u64(), m["data"].as_str()) else {
             return vec![fail(id, "badRequest", "attach needs upload, part, parts and data.")];
         };
-        let dir = super::upload::folder(std::path::Path::new(home));
+        let dir = super::upload::folder(root);
         match super::upload::attach(&dir, name, part as usize, parts as usize, data, std::time::Instant::now(), std::time::SystemTime::now()) {
             Ok(Some(attached)) => vec![attached, ok(id)],
             Ok(None) => vec![ok(id)],
@@ -1039,7 +1042,7 @@ mod tests {
         // hello loads a snapshot: never from the herdr-core this machine runs.
         std::env::set_var("HC_SOCKET", "/nonexistent/herdr-contr-test/hc.sock");
         std::env::remove_var("HERDR_DESK_HC_SOCKET");
-        let mut s = Session::new(Config { cache: None, read_only: false, hub: "test".into(), home: None });
+        let mut s = Session::new(Config { cache: None, read_only: false, hub: "test".into(), home: None, root: None });
         s.welcomed = true;
         for t in KEYS {
             let r = s.receive(&json!({"v": 1, "id": "c1", "type": t, "pane": "hc:t1", "prompt": "x", "allow": true, "text": "x"}).to_string());
@@ -1049,7 +1052,7 @@ mod tests {
         // Missing fields are null, never a panic.
         assert_eq!(s.receive(r#"{"v":1,"id":"c5","type":"unwatch"}"#), vec![ok("c5")]);
         assert_eq!(s.post(r#"{"v":1,"id":"c6","type":"send"}"#)[0]["re"], "c6");
-        let mut ro = Session::new(Config { cache: None, read_only: true, hub: "test".into(), home: None });
+        let mut ro = Session::new(Config { cache: None, read_only: true, hub: "test".into(), home: None, root: None });
         assert_eq!(ro.post(r#"{"v":1,"id":"c3","type":"send","pane":"hc:t1","text":"x"}"#)[0]["error"]["code"], "readOnly");
         assert_eq!(ro.post(r#"{"v":1,"id":"c4","type":"watch","pane":"hc:t1"}"#)[0]["error"]["code"], "badRequest");
     }
@@ -1066,7 +1069,7 @@ mod tests {
         let fcm = "https://fcm.googleapis.com/fcm/send/x";
         let sub = |id: &str, e: &str| json!({"v": 1, "id": id, "type": "pushSubscribe", "endpoint": e, "p256dh": p256dh, "auth": auth}).to_string();
         let welcome = |s: &mut Session| s.receive(r#"{"v":1,"id":"h","type":"hello"}"#)[0].clone();
-        let mut s = Session::new(Config { cache: None, read_only: true, hub: "test".into(), home: None });
+        let mut s = Session::new(Config { cache: None, read_only: true, hub: "test".into(), home: None, root: None });
         assert_eq!(s.receive(&sub("p0", fcm))[0]["error"]["code"], "unauthorized");
         welcome(&mut s);
         assert_eq!(s.receive(&sub("p1", fcm))[0]["error"]["code"], "failed", "push off: nothing kept");

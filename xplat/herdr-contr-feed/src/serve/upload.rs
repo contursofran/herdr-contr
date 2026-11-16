@@ -2,7 +2,7 @@
 //! Unlike the Mac hub, nothing is re-encoded: PNG, JPEG and WebP are kept, by their first bytes, never by a name or
 //! MIME type, without their metadata (`strip`: a JPEG keeps only its Orientation). HEIC (an iPhone's own type) cannot be read here: the page is told to pick JPEG or PNG.
 //!
-//! The files go to `<herdr-app home>/herdr-contr/uploads` (mode 700), each mode 600 with a name made here
+//! The files go to `uploads` of the backend root (`<herdr-app home>/herdr-contr` by default) (mode 700), each mode 600 with a name made here
 //! (`phone-YYYYMMDD-HHMMSS-xxxxxx.<ext>`). `send` takes only names this helper holds and types their paths. Only
 //! files with such names are ever removed: after `KEEP`, or past `MAX_FILES` / `MAX_FOLDER_BYTES`, oldest first.
 //!
@@ -56,9 +56,9 @@ fn state() -> std::sync::MutexGuard<'static, Uploads> {
     UPLOADS.lock().unwrap_or_else(|e| e.into_inner())
 }
 
-/// The folder for `home` (the herdr-app home).
-pub fn folder(home: &Path) -> PathBuf {
-    home.join("herdr-contr").join("uploads")
+/// The folder in the backend root `root`.
+pub fn folder(root: &Path) -> PathBuf {
+    root.join("uploads")
 }
 
 /// An upload name from the page: 1-32 letters, digits, `_` or `-`.

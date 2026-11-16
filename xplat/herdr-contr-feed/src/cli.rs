@@ -23,7 +23,9 @@
 //!   herdr-contr-feed update install   (downloads the newest build, checks it, installs it; after the user's press)
 //!
 //! Every command takes `--home <herdr-app home>` (the mod passes it): its herdr-contr/config.json has the
-//! settings the helper follows. Without it, the folder this helper is in when that is <home>/herdr-contr/bin.
+//! settings the helper follows. Without it, the backend root of `config::dir`: CONTR_HOME, else
+//! HERDR_APP_HOME/herdr-contr, else the folder this helper is in when that is <home>/herdr-contr/bin, else
+//! ~/.config/herdr-app/herdr-contr.
 //!
 //! A terminal `m/tN` on another machine: the command runs there, in the helper there (`remote`). Rust only.
 
@@ -196,7 +198,8 @@ pub fn run(argv: &[String]) -> String {
                     let now = SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).map(|d| d.as_secs()).unwrap_or(0);
                     crate::release::check(&gh, &dir, now, has("--force")).map(|l| vec![l])
                 }
-                Some("install") => match dir.parent() {
+                // The install writes a Herdr home: only a root that is `<herdr-app home>/herdr-contr` has one.
+                Some("install") => match dir.parent().filter(|_| dir.file_name().is_some_and(|n| n == herdr_core::places::FOLDER)) {
                     Some(h) => crate::release::install(&gh, h, &std::env::temp_dir()),
                     None => return r.fail("usage", "update install needs --home <herdr-app home>"),
                 },
