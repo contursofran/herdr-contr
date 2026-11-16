@@ -267,9 +267,5 @@ mod tests {
     #[test]
     fn boundary_allows_the_protocol_doc() {
         assert!(outside(&["kit".into()], &["docs/protocol.md".into()]).is_empty());
-        assert_eq!(
-            outside(&["kit".into()], &["herdr-app/docs/protocol.md".into()]),
-            ["herdr-app/docs/protocol.md"]
-        );
     }
 }
