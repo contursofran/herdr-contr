@@ -85,27 +85,28 @@ pub(super) struct Backend<'a> {
 }
 
 impl Backend<'_> {
-    /// The plan lines of the backend part.
-    pub(super) fn plan(&self, home: &Path) {
+    /// The plan lines of the backend part. `base`: the folder that the lines are relative to; `at`: the root
+    /// relative to it (`herdr-contr/` in a Herdr home, empty for the backend install).
+    pub(super) fn plan(&self, base: &Path, at: &str) {
         if let Some(h) = self.helper {
-            println!("  herdr-contr/bin/herdr-contr-feed (from {h})");
+            println!("  {at}bin/herdr-contr-feed (from {h})");
         }
-        println!("  herdr-contr/kit/... ({} files)", KIT.len());
-        println!("  herdr-contr/.claude-plugin/marketplace.json");
+        println!("  {at}kit/... ({} files)", KIT.len());
+        println!("  {at}.claude-plugin/marketplace.json");
         for (to, from) in &self.moved {
-            println!("  {} (a copy of {}; the old file stays)", rel_of(to, home), from.display());
+            println!("  {} (a copy of {}; the old file stays)", rel_of(to, base), from.display());
         }
         for p in &self.kit_old {
-            println!("    {}: not in this version, removed", rel_of(p, home));
+            println!("    {}: not in this version, removed", rel_of(p, base));
         }
         if let Some(o) = self.orch {
-            println!("  herdr-contr/bin/herdr-contr-orch (from {o})");
+            println!("  {at}bin/herdr-contr-orch (from {o})");
         }
         if let Some((list, _)) = &self.remote {
             for r in list {
-                println!("  herdr-contr/remote/{}/herdr-contr-feed", r.target);
+                println!("  {at}remote/{}/herdr-contr-feed", r.target);
             }
-            println!("  herdr-contr/remote/SHA256SUMS");
+            println!("  {at}remote/SHA256SUMS");
         }
     }
 

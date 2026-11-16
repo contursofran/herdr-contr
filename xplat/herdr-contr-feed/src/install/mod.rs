@@ -27,6 +27,8 @@ const HELP: &str = "\
 Installs the herdr-contr layout, mod, themes, keys and helper into a herdr-app home.
 Usage: herdr-contr-feed install [--home <herdr-app home>] [--helper <herdr-contr-feed>] [--orch <herdr-contr-orch>]
                                 [--remote <folder>] [--dry-run]
+       herdr-contr-feed install --backend [--home <herdr-app home>] [--helper <herdr-contr-feed>]
+                                [--orch <herdr-contr-orch>] [--remote <folder>] [--dry-run]
  - The home is --home, else $HERDR_APP_HOME, else ~/.config/herdr-app. With no HOME, give --home.
  - A keys.json, layout or theme that is a symlink stays one; the file it points to is written.
  - It never overwrites what you have: if a layout, mod or theme with the same name is there and
@@ -47,6 +49,12 @@ Usage: herdr-contr-feed install [--home <herdr-app home>] [--helper <herdr-contr
  - After copying it runs `herdr-app check` on the mod. --dry-run prints the plan and writes nothing.
  - What it installed (with hashes) is kept in <home>/herdr-contr/install.json, so a later install
    can update its own files.
+ - --backend installs only the backend, for a machine with no Herdr app. It writes into the backend root
+   only: kit/ (a file there that this version does not have is removed), .claude-plugin/marketplace.json,
+   bin/herdr-contr-feed (with --helper), bin/herdr-contr-orch (with --orch), remote/ (with --remote), and
+   \"build\" in install.json (the record of an install of the mod stays). It never writes a layout, a theme,
+   a mod or keys.json, and never runs `herdr-app check`. The root is <home>/herdr-contr with --home, else
+   $CONTR_HOME, else $HERDR_APP_HOME/herdr-contr, else ~/.config/herdr-app/herdr-contr.
 ";
 
 pub fn run(args: &[String]) -> i32 {
@@ -55,6 +63,7 @@ pub fn run(args: &[String]) -> i32 {
     let mut orch: Option<String> = None;
     let mut remote: Option<String> = None;
     let mut dry = false;
+    let mut backend_only = false;
     let mut i = 0;
     while i < args.len() {
         let a = args[i].as_str();
@@ -86,6 +95,11 @@ pub fn run(args: &[String]) -> i32 {
                 i += 1;
                 continue;
             }
+            "--backend" => {
+                backend_only = true;
+                i += 1;
+                continue;
+            }
             "-h" | "--help" => {
                 print!("{HELP}");
                 return 0;
@@ -99,6 +113,12 @@ pub fn run(args: &[String]) -> i32 {
     }
     let nonempty = |k: &str| std::env::var(k).ok().filter(|v| !v.is_empty());
     let env = |k: &str| std::env::var(k).unwrap_or_default();
+    if backend_only {
+        let Some(root) = places::root(home.as_deref(), None, &env) else {
+            return stop(&["STOP: no backend root is known: CONTR_HOME, HERDR_APP_HOME and HOME are not set. Name the folder with CONTR_HOME=<folder> or --home <herdr-app home>. Nothing was written.".into()]);
+        };
+        return install_backend(&Places::at(root), helper.as_deref(), orch.as_deref(), remote.as_deref(), dry);
+    }
     let Some(home) = places::home(home.as_deref(), None, &env) else {
         return stop(&["STOP: HOME is not set, so there is no ~/.config/herdr-app. Name the folder with --home <herdr-app home>. Nothing was written.".into()]);
     };
@@ -169,7 +189,7 @@ pub fn run(args: &[String]) -> i32 {
     for (section, key, theirs, cmd) in &kept {
         println!("    kept your {section} {key} = {} (herdr-contr uses it for {})", show(theirs), show(cmd));
     }
-    backend.plan(&home);
+    backend.plan(&home, "herdr-contr/");
     if dry {
         println!("Dry run: nothing was written; herdr-app check did not run.");
         return 0;
@@ -223,4 +243,64 @@ pub fn run(args: &[String]) -> i32 {
 
     let _ = std::io::stdout().flush();
     herdr::check(&home)
+}
+
+/// `install --backend`: the kit, the marketplace file, the programs given and `remote/`, into the backend root
+/// only, and `"build"` in its install.json (an existing `"files"` stays). No mod file and no `herdr-app check`.
+fn install_backend(places: &Places, helper: Option<&str>, orch: Option<&str>, remote: Option<&str>, dry: bool) -> i32 {
+    let root = places.folder();
+    if let Some(h) = helper {
+        if !Path::new(h).is_file() {
+            return stop(&[format!("STOP: no helper at {h}")]);
+        }
+    }
+    if let Some(o) = orch {
+        if !Path::new(o).is_file() {
+            return stop(&[format!("STOP: no orchestration tool at {o}")]);
+        }
+    }
+    let remote = match remote {
+        None => None,
+        Some(dir) => match read_remote(Path::new(dir)) {
+            Ok(r) => Some(r),
+            Err(e) => return stop(&[e, "Nothing was written.".into()]),
+        },
+    };
+    let kit_dest = places.kit();
+    let mut kit_old = Vec::new();
+    walk_files(&kit_dest, &mut kit_old);
+    kit_old.retain(|p| !KIT.iter().any(|(rel, _)| kit_dest.join(rel) == *p));
+    let backend = Backend { helper, orch, remote, moved: Vec::new(), kit_old };
+    println!("{}{}", if dry { "Dry run: would install the backend into " } else { "Installing the backend into " }, root.display());
+    backend.plan(&root, "");
+    println!("  install.json (\"build\")");
+    if dry {
+        println!("Dry run: nothing was written.");
+        return 0;
+    }
+    let marker_path = places.install_record();
+    let written = (|| -> std::io::Result<()> {
+        backend.write(places)?;
+        // The record of an install of the mod ("files") stays; only "build" changes.
+        let mut record = fs::read(&marker_path)
+            .ok()
+            .and_then(|b| serde_json::from_slice::<Value>(&b).ok())
+            .and_then(|v| v.as_object().cloned())
+            .unwrap_or_default();
+        record.insert("build".into(), Value::from(crate::protocol::BUILD));
+        put(&marker_path, (serde_json::to_string_pretty(&record).unwrap() + "\n").as_bytes(), false)
+    })();
+    if let Err(e) = written {
+        return stop(&[format!("STOP: writing into {} failed: {e}", root.display())]);
+    }
+    // The phone page runs this helper as a service: restart it, or it keeps the old one.
+    if helper.is_some() {
+        let bin = places.feed();
+        let path = bin.canonicalize().unwrap_or(bin);
+        if let Some(m) = crate::phone::restart_after_install(&crate::phone::Env::from_process(), &path) {
+            println!("{m}");
+        }
+    }
+    println!("Done.");
+    0
 }

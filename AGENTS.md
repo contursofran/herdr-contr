@@ -152,6 +152,8 @@ and `gpui-kit.d.ts`. Read them there. Do not copy them into this repository.
   <file> --orch <file>`. After it, `herdr-app do
   layout.switch` and `herdr-app shot` are allowed, to look at the result.
   Do not install a branch that is not merged.
+  On a machine with no Herdr app, `install --backend` is the form: it
+  writes only the kit and the programs into the backend root.
 - Tests use fakes and fixtures. No test reads the owner's session logs
   (`~/.claude`, `~/.codex` and the others), and no test starts the real
   `claude` program.
