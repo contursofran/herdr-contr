@@ -39,9 +39,13 @@ SHA=$(gh pr view "$N" --json headRefOid --jq .headRefOid) || fail "cannot read t
 while gh pr checks "$N" 2>&1 | grep -qE "pending|no checks reported"; do sleep 20; done
 gh pr checks "$N" >/dev/null 2>&1 || { gh pr checks "$N"; fail "the checks of $N did not pass"; }
 
-# Files outside the brief's boundary go back to the worker. No kept boundary, or no tool: the check is skipped.
-if command -v herdr-contr-orch >/dev/null 2>&1; then
-  herdr-contr-orch pr check-boundary "$N" || fail "pull request $N does not pass the boundary check; send the files above back to the worker"
+# Files outside the brief's boundary go back to the worker. The installed tool holds the boundaries that spawn
+# kept, so it runs that one. Exit 1: files outside. Other errors (no tool, an older tool, gh): a warning only.
+ORCH=${HERDR_CONTR_ORCH:-${HERDR_APP_HOME:-$HOME/.config/herdr-app}/herdr-contr/bin/herdr-contr-orch}
+if [ -x "$ORCH" ]; then
+  "$ORCH" pr check-boundary "$N"; rc=$?
+  [ "$rc" = 1 ] && fail "pull request $N does not pass the boundary check; send the files above back to the worker"
+  [ "$rc" = 0 ] || echo "land: boundary check skipped (exit $rc)" >&2
 fi
 
 gh pr merge "$N" --squash --match-head-commit "$SHA" || fail "the merge of $N failed"
