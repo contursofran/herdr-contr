@@ -364,6 +364,13 @@ export class Composer {
     return true;
   }
 
+  // Puts the keyboard in the box (#204). The chat decides when. False when the input can not take it.
+  focus() {
+    if (typeof this.input?.focus !== "function") return false;
+    this.input.focus();
+    return true;
+  }
+
   // The suggested prompt to show for `agent` now, or "": the box is empty and one is known for it.
   suggestion(agent) {
     const s = this.suggest;

@@ -109,7 +109,13 @@ Left to right:
      - Separators and footers in 11.5 px dim text.
      - A round 34 px ↓ button at the bottom center while you read older messages.
      - "Loading earlier messages" in a small capsule under the bar while older rows load.
-   - **Reply box** under the chat, at most 800 px wide (#99). Above the box, 8 px over it, one status line (gap
+   - **Reply box** under the chat, at most 800 px wide (#99). It takes the keyboard when the chat shows (#204):
+     another agent's chat (sidebar, tabs, ⌘⌥↑/↓, `agent.focus`), the chat screen shown again (⌘J, the Chat |
+     Terminal switch, back from Overview), and the window made active (`window().active` goes true) with the chat
+     shown. The chat's 400 ms tick sees these changes, so the focus comes up to 400 ms late. It does not take the
+     keyboard while a card of the shown agent has it (question, approval, own-answer box, terminal panel, the
+     coordinator's question), while the picture viewer is open, or for 10 s after a left press in the chat that
+     has no release yet (a text selection); never on a redraw or a new message. Above the box, 8 px over it, one status line (gap
      8, 4 px side padding): while the agent works, a 14 px braille loader in `foreground`, the working verb (13 px,
      `foreground`) and its detail with no parentheses (Menlo 11 px, `muted`: "26s · ↓1.5k tokens"); then Claude
      Code's background note ("1 shell still running", Menlo 11 px `muted`, also while the agent is idle, with its own
