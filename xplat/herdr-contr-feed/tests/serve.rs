@@ -800,3 +800,20 @@ fn pictures_go_up_with_post_and_out_with_send() {
     assert_eq!(fake.calls("terminal.send").len(), 1);
     assert!(files[0].exists(), "the agent reads it later; the purge removes it");
 }
+
+/// Without `--home`, the page's uploads go to `uploads` in CONTR_HOME, the backend root itself.
+#[test]
+fn uploads_go_to_contr_home() {
+    use base64::Engine;
+    let dir = tempfile::tempdir().unwrap();
+    let root = dir.path().join("backend");
+    let fake = FakeHc::start();
+    let srv = start_env(&fake.path, &[], &[("CONTR_HOME", root.to_str().unwrap())]);
+    let chunk = |ty: &[u8], d: &[u8]| [&(d.len() as u32).to_be_bytes()[..], ty, d, &[0, 0, 0, 0]].concat();
+    let png = [b"\x89PNG\r\n\x1a\n".to_vec(), chunk(b"IHDR", &[0, 0, 0, 3, 0, 0, 0, 4, 8, 6, 0, 0, 0]), chunk(b"IEND", &[])].concat();
+    let data = base64::engine::general_purpose::STANDARD.encode(&png);
+    let r: Value = serde_json::from_str(&api(srv.port, &[], &json!({"v": 1, "id": "a", "type": "attach", "upload": "img-1", "part": 0, "parts": 1, "data": data})).1).unwrap();
+    assert_eq!(r[0]["type"], "attached", "{r}");
+    assert_eq!(std::fs::read_dir(root.join("uploads")).unwrap().count(), 1);
+    assert!(!dir.path().join("herdr-contr").exists());
+}
