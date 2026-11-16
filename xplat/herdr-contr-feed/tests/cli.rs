@@ -22,7 +22,7 @@ fn run(sock: &str, args: &[&str]) -> Vec<Value> {
 fn protocol_lines() {
     let v = run("/nonexistent.sock", &["version"]);
     assert_eq!(v[0], serde_json::json!({"type":"header","protocol":1,"sidecar":"0.1.0","build":env!("HERDR_CONTR_BUILD"),"cmd":"version"}));
-    assert_eq!(v[1]["commands"], serde_json::json!(["version", "feed", "status", "card", "approve", "answer", "send", "paste-image", "mermaid", "pictures", "helper", "queue", "phone", "commands", "working", "model", "usage", "favicon", "panel", "keys", "suggestion", "agent-images", "update"]));
+    assert_eq!(v[1]["commands"], serde_json::json!(["version", "feed", "status", "card", "approve", "answer", "send", "paste-image", "mermaid", "pictures", "helper", "queue", "phone", "commands", "working", "model", "usage", "favicon", "panel", "keys", "suggestion", "agent-images", "update", "health"]));
     assert_eq!(v.last().unwrap()["type"], "end");
     assert_eq!(v.last().unwrap()["ok"], true);
 
@@ -223,4 +223,19 @@ fn version_flag_prints_the_build_stamp() {
     let stamp = env!("HERDR_CONTR_BUILD");
     assert_ne!(stamp, "", "build.rs sets the stamp");
     assert_eq!(String::from_utf8(out.stdout).unwrap(), format!("herdr-contr-feed 0.1.0 ({stamp})\n"));
+}
+
+#[test]
+fn health_gives_a_check_line_for_each_check() {
+    let home = tempfile::tempdir().unwrap();
+    let h = home.path().to_str().unwrap();
+    let v = run("/nonexistent.sock", &["health", "--layout", "main", "--herdr", "0.1.16", "--home", h]);
+    let ids: Vec<&str> = v.iter().filter(|l| l["type"] == "check").map(|l| l["id"].as_str().unwrap()).collect();
+    assert_eq!(ids, ["mods", "layout", "collisions", "orch", "hc", "kit", "herdr"]);
+    let state = |id: &str| v.iter().find(|l| l["id"] == id).unwrap()["state"].as_str().unwrap().to_string();
+    assert_eq!(state("mods"), "fail", "an empty home has no install");
+    assert_eq!(state("hc"), "fail", "no socket");
+    assert_eq!(state("layout"), "warn");
+    assert_eq!(state("herdr"), "ok");
+    assert_eq!(v.last().unwrap()["ok"], true);
 }
