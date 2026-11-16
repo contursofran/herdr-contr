@@ -13,6 +13,7 @@ pub mod limit;
 pub mod mcp;
 pub mod owner;
 pub mod prompt;
+pub mod resume;
 pub mod settings;
 pub mod spawn;
 pub mod tools;
