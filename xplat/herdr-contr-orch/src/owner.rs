@@ -77,6 +77,12 @@ pub struct Todo {
     pub pinned: Option<String>,
     #[serde(deserialize_with = "time", skip_serializing_if = "Option::is_none")]
     pub done: Option<String>,
+    /// The day (YYYY-MM-DD) on which the to-do comes back to its coordinator.
+    #[serde(skip_serializing_if = "String::is_empty")]
+    pub due: String,
+    /// True when the coordinator got the `due today` note.
+    #[serde(skip_serializing_if = "std::ops::Not::not")]
+    pub due_told: bool,
 }
 
 /// The whole file.
@@ -142,7 +148,7 @@ impl Store {
     }
 
     /// Runs `f` on the state under the lock and writes the result. An error from `f` writes nothing.
-    fn update(&self, f: impl FnOnce(&mut State) -> Result<(), String>) -> Result<(), String> {
+    pub(crate) fn update(&self, f: impl FnOnce(&mut State) -> Result<(), String>) -> Result<(), String> {
         let io_err = |e: io::Error| format!("owner: {}: {e}", self.path.display());
         if let Some(dir) = self.path.parent().filter(|d| !d.as_os_str().is_empty()) {
             make_private_dir(dir).map_err(io_err)?;
@@ -191,11 +197,13 @@ impl Store {
         if t.kind != "do" && t.kind != "know" {
             return Err(format!("owner: kind {:?} is not do or know", t.kind));
         }
+        crate::due::check(&t.due)?;
         self.update(|st| {
             t.id = format!("T{}", st.next_todo);
             st.next_todo += 1;
             t.pinned = Some(self.now());
             t.done = None;
+            t.due_told = false;
             st.todos.push(t.clone());
             Ok(())
         })?;
