@@ -23,6 +23,7 @@ pub mod rows;
 pub mod serve;
 pub mod suggestion;
 pub mod status;
+pub mod statusline;
 pub mod tail;
 pub mod framed;
 pub mod health;

@@ -18,6 +18,7 @@
 //!   herdr-contr-feed send   --terminal <addr> --text <s> [--file <path>]... [--expect-kind <k>] [--expect-path <log>]
 //!   herdr-contr-feed helper install --machine <m> --sha256 <hex>   (the helper on another machine; after the user's yes)
 //!   herdr-contr-feed helper remove --machine <m>
+//!   herdr-contr-feed statusline on|off|status [--settings <file>]   (herdr-contr's status line wrapper in Claude Code)
 //!   herdr-contr-feed update check [--force]   (the installed and the newest release build; read only)
 //!   herdr-contr-feed update install   (downloads the newest build, checks it, installs it; after the user's press)
 //!
@@ -27,7 +28,7 @@
 //! A terminal `m/tN` on another machine: the command runs there, in the helper there (`remote`). Rust only.
 
 use crate::protocol::{JsonLines, PROTOCOL_VERSION, SIDECAR_VERSION};
-use crate::{agentmodel, health, cards, config, feed, locate, mermaid, panel, paste, phone, queue, remote, status, suggestion, update, usage, working};
+use crate::{agentmodel, health, cards, config, feed, locate, mermaid, panel, paste, phone, statusline, queue, remote, status, suggestion, update, usage, working};
 use herdr_core::hc::{HcClient, HcSession};
 use herdr_core::PaneScreen;
 use herdr_core::resolver::SessionResolver;
@@ -66,7 +67,7 @@ pub fn run(argv: &[String]) -> String {
     r.out.emit_value(json!({"type": "header", "protocol": PROTOCOL_VERSION, "sidecar": SIDECAR_VERSION, "build": crate::protocol::BUILD, "cmd": cmd}));
     match cmd.as_str() {
         "version" => {
-            r.out.emit_value(json!({"type": "version", "commands": ["version", "feed", "status", "card", "approve", "answer", "send", "paste-image", "mermaid", "pictures", "helper", "queue", "phone", "commands", "working", "model", "usage", "favicon", "panel", "keys", "suggestion", "agent-images", "update", "health"], "release": update::release()}));
+            r.out.emit_value(json!({"type": "version", "commands": ["version", "feed", "status", "card", "approve", "answer", "send", "paste-image", "mermaid", "pictures", "helper", "queue", "phone", "commands", "working", "model", "usage", "favicon", "panel", "keys", "suggestion", "agent-images", "update", "health", "statusline"], "release": update::release()}));
             r.finish(true)
         }
         "health" => {
@@ -209,6 +210,33 @@ pub fn run(argv: &[String]) -> String {
                     r.finish(true)
                 }
                 Err((code, message)) => r.fail(code, &message),
+            }
+        }
+        "statusline" => {
+            let env: std::collections::HashMap<String, String> = std::env::vars().collect();
+            let settings = opt("--settings").map(PathBuf::from).unwrap_or_else(|| status::default_settings(&env));
+            let exe = std::env::current_exe().unwrap_or_else(|_| PathBuf::from("herdr-contr-feed"));
+            let done = match args.first().map(String::as_str) {
+                Some("status") => Ok(()),
+                Some("on") => {
+                    let get = |k: &str| env.get(k).cloned().unwrap_or_default();
+                    match herdr_core::places::home(home().as_deref(), herdr_core::places::installed_home(&exe).as_deref(), &get) {
+                        Some(h) => statusline::on(&settings, &exe, &statusline::dir(&h)),
+                        None => return r.fail("usage", "statusline on needs --home <herdr-app home>"),
+                    }
+                }
+                Some("off") => statusline::off(&settings),
+                _ => return r.fail("usage", "statusline needs status, on or off"),
+            };
+            if let Err(e) = done {
+                return r.fail("settings", &e);
+            }
+            match statusline::state(&settings) {
+                Ok(s) => {
+                    r.out.emit_value(json!({"type": "statusline", "on": s.on, "own": s.own, "settings": settings}));
+                    r.finish(true)
+                }
+                Err(e) => r.fail("settings", &e),
             }
         }
         "phone" => {

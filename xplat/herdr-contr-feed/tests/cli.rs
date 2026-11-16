@@ -22,7 +22,7 @@ fn run(sock: &str, args: &[&str]) -> Vec<Value> {
 fn protocol_lines() {
     let v = run("/nonexistent.sock", &["version"]);
     assert_eq!(v[0], serde_json::json!({"type":"header","protocol":1,"sidecar":"0.1.0","build":env!("HERDR_CONTR_BUILD"),"cmd":"version"}));
-    assert_eq!(v[1]["commands"], serde_json::json!(["version", "feed", "status", "card", "approve", "answer", "send", "paste-image", "mermaid", "pictures", "helper", "queue", "phone", "commands", "working", "model", "usage", "favicon", "panel", "keys", "suggestion", "agent-images", "update", "health"]));
+    assert_eq!(v[1]["commands"], serde_json::json!(["version", "feed", "status", "card", "approve", "answer", "send", "paste-image", "mermaid", "pictures", "helper", "queue", "phone", "commands", "working", "model", "usage", "favicon", "panel", "keys", "suggestion", "agent-images", "update", "health", "statusline"]));
     assert_eq!(v.last().unwrap()["type"], "end");
     assert_eq!(v.last().unwrap()["ok"], true);
 
@@ -238,4 +238,28 @@ fn health_gives_a_check_line_for_each_check() {
     assert_eq!(state("layout"), "warn");
     assert_eq!(state("herdr"), "ok");
     assert_eq!(v.last().unwrap()["ok"], true);
+}
+
+#[test]
+fn statusline_switch_and_wrapper_end_to_end() {
+    let t = tempfile::tempdir().unwrap();
+    let s = t.path().join("settings.json");
+    std::fs::write(&s, "{\"statusLine\": {\"type\": \"command\", \"command\": \"echo mine\"}}\n").unwrap();
+    let (sp, home) = (s.to_str().unwrap(), t.path().join("home"));
+    let v = run("/nonexistent.sock", &["statusline", "on", "--settings", sp, "--home", home.to_str().unwrap()]);
+    assert_eq!(v[1]["type"], "statusline");
+    assert_eq!((v[1]["on"].clone(), v[1]["own"].clone()), (serde_json::json!(true), serde_json::json!("echo mine")));
+    let cfg: Value = serde_json::from_str(&std::fs::read_to_string(&s).unwrap()).unwrap();
+    let cmd = cfg["statusLine"]["command"].as_str().unwrap();
+    let out = Command::new("/bin/sh").arg("-c").arg(cmd).stdin(std::fs::File::open(concat!(env!("CARGO_MANIFEST_DIR"), "/../fixtures/statusline-fable.json")).unwrap()).output().unwrap();
+    assert_eq!(out.stdout, b"mine\n");
+    assert!(home.join("herdr-contr/statusline/fable-1.json").exists());
+    let v = run("/nonexistent.sock", &["statusline", "off", "--settings", sp]);
+    assert_eq!(v[1]["on"], false);
+    assert_eq!(std::fs::read_to_string(&s).unwrap(), "{\"statusLine\": {\"type\": \"command\", \"command\": \"echo mine\"}}\n");
+    std::fs::write(&s, "nope").unwrap();
+    let v = run("/nonexistent.sock", &["statusline", "status", "--settings", sp]);
+    assert_eq!((v[1]["type"].clone(), v[1]["code"].clone()), (serde_json::json!("error"), serde_json::json!("settings")));
+    let v = run("/nonexistent.sock", &["statusline", "toggle", "--settings", sp]);
+    assert_eq!(v[1]["code"], "usage");
 }

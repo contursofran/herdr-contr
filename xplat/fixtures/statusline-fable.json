@@ -1,0 +1,17 @@
+{
+  "session_id": "fable-1",
+  "transcript_path": "/tmp/herdr-contr-test/fable-1.jsonl",
+  "cwd": "/tmp/herdr-contr-test",
+  "model": { "id": "claude-fable-5-2", "display_name": "Fable 5.2" },
+  "workspace": { "current_dir": "/tmp/herdr-contr-test", "project_dir": "/tmp/herdr-contr-test" },
+  "version": "2.1.288",
+  "cost": { "total_cost_usd": 0.12, "total_duration_ms": 24505 },
+  "context_window": {
+    "total_input_tokens": 41000,
+    "total_output_tokens": 900,
+    "context_window_size": 200000,
+    "current_usage": { "input_tokens": 12, "cache_creation_input_tokens": 11376, "cache_read_input_tokens": 23491 },
+    "used_percentage": 17,
+    "remaining_percentage": 83
+  }
+}

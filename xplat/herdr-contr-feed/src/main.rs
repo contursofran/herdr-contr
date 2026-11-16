@@ -10,6 +10,15 @@ fn main() {
     if argv.first().map(String::as_str) == Some("install") {
         std::process::exit(modfeedkit::install::run(&argv[1..]));
     }
+    // Claude Code's status line command: the owner's line as raw text, never an error of its own.
+    if argv.first().map(String::as_str) == Some(modfeedkit::statusline::WORD) {
+        use std::io::{Read, Write};
+        let mut input = vec![];
+        let _ = std::io::stdin().take(1 << 20).read_to_end(&mut input);
+        let out = modfeedkit::statusline::wrap(&argv[1..], &input, std::time::SystemTime::now());
+        let _ = std::io::stdout().write_all(&out);
+        std::process::exit(0);
+    }
     // `serve` keeps running (the phone page); every other command answers once and exits.
     if argv.first().map(String::as_str) == Some("serve") {
         std::process::exit(modfeedkit::serve::main(&argv[1..]));
