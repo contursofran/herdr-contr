@@ -158,7 +158,9 @@ jobs:
               echo "If macOS blocks them, run \`xattr -d com.apple.quarantine bin/* remote/*/herdr-contr-feed\` in the folder."
             fi
           } > notes.md
-          gh release create "$TAG" "$ZIP" --target "$SHA" --title "$TAG" --notes-file notes.md
+          # A test run from a branch other than main is a prerelease, so it is never the newest build.
+          pre=""; if [ "$GITHUB_EVENT_NAME" = workflow_dispatch ] && [ "$GITHUB_REF_NAME" != main ]; then pre="--prerelease"; fi
+          gh release create "$TAG" "$ZIP" --target "$SHA" --title "$TAG" --notes-file notes.md $pre
       - name: Keep the last 10 builds
         run: |
           gh release list --limit 200 --json tagName,createdAt --jq '[.[] | select(.tagName | startswith("build-"))] | sort_by(.createdAt) | reverse | .[10:] | .[].tagName' |
