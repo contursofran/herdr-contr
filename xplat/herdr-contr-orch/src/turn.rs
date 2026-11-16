@@ -15,6 +15,9 @@ pub struct Turn {
     pub reported: bool,
     /// The last text of the assistant in the turn.
     pub said: String,
+    /// A background task that the session started (a Bash call with `run_in_background`) still runs at the
+    /// end of the transcript: it has no task notification and no stop call yet. Its end wakes the session.
+    pub waiting: bool,
 }
 
 /// Calls `f` with each line of `r` that is JSON.
@@ -50,13 +53,36 @@ fn reports(block: &Value) -> bool {
     name.ends_with("contr__report") || name.ends_with("contr__message")
 }
 
+/// The id of a background task in the result of its Bash call: Claude Code puts it in `toolUseResult`, and
+/// older versions only in the text "Command running in background with ID: <id>.".
+fn task_id(entry: &Value, block: &Value) -> Option<String> {
+    if let Some(id) = entry["toolUseResult"]["backgroundTaskId"].as_str() {
+        return Some(id.to_string());
+    }
+    let text = match &block["content"] {
+        Value::String(s) => s.clone(),
+        Value::Array(parts) => parts.iter().filter_map(|p| p["text"].as_str()).collect::<Vec<_>>().join("\n"),
+        _ => String::new(),
+    };
+    let rest = text.split("with ID: ").nth(1)?;
+    let id: String = rest.chars().take_while(|c| c.is_alphanumeric() || *c == '_' || *c == '-').collect();
+    (!id.is_empty()).then_some(id)
+}
+
 /// The last turn of the transcript in `r`.
 pub fn last_turn(r: impl Read) -> io::Result<Turn> {
     let mut t = Turn::default();
     // The ids of the report calls of the turn that have no result yet.
     let mut calls: Vec<String> = Vec::new();
+    // The Bash calls with run_in_background that have no result yet, and the background tasks that still run.
+    let (mut started, mut tasks): (Vec<String>, Vec<String>) = (Vec::new(), Vec::new());
     each_entry(r, |e| {
         let content = &e["message"]["content"];
+        if e["type"] != "assistant" && !tasks.is_empty() {
+            // A task notification (a user message or a queued attachment) ends its task.
+            let raw = e.to_string();
+            tasks.retain(|id| !raw.contains(&format!("<task-id>{id}</task-id>")));
+        }
         match e["type"].as_str() {
             Some("user") if e["isMeta"] != true && is_prompt(content) => {
                 t = Turn::default();
@@ -67,6 +93,12 @@ pub fn last_turn(r: impl Read) -> io::Result<Turn> {
                     let id = b["tool_use_id"].as_str().unwrap_or_default();
                     if b["type"] == "tool_result" && b["is_error"] != true && calls.iter().any(|c| c == id) {
                         t.reported = true;
+                    }
+                    if b["type"] == "tool_result" && started.iter().any(|c| c == id) {
+                        started.retain(|c| c != id);
+                        if b["is_error"] != true {
+                            tasks.extend(task_id(&e, b));
+                        }
                     }
                 }
             }
@@ -80,6 +112,14 @@ pub fn last_turn(r: impl Read) -> io::Result<Turn> {
                             }
                         }
                         Some("tool_use") if reports(b) => calls.extend(b["id"].as_str().map(str::to_string)),
+                        Some("tool_use") if b["name"] == "Bash" && b["input"]["run_in_background"] == true => {
+                            started.extend(b["id"].as_str().map(str::to_string))
+                        }
+                        Some("tool_use") if matches!(b["name"].as_str(), Some("KillShell" | "TaskStop")) => {
+                            let input = &b["input"];
+                            let id = input["shell_id"].as_str().or(input["task_id"].as_str()).unwrap_or_default();
+                            tasks.retain(|t| t != id);
+                        }
                         _ => {}
                     }
                 }
@@ -87,6 +127,7 @@ pub fn last_turn(r: impl Read) -> io::Result<Turn> {
             _ => {}
         }
     })?;
+    t.waiting = !tasks.is_empty();
     Ok(t)
 }
 
@@ -160,7 +201,7 @@ mod tests {
     const SUMMARY: &str = r#"{"type":"summary","summary":"x"}"#;
 
     fn turn(reported: bool, said: &str) -> Turn {
-        Turn { reported, said: said.into() }
+        Turn { reported, said: said.into(), ..Default::default() }
     }
 
     #[test]
@@ -181,6 +222,23 @@ mod tests {
         for (name, lines, want) in cases {
             assert_eq!(last_turn(lines.join("\n").as_bytes()).unwrap(), want, "{name}");
         }
+    }
+
+    #[test]
+    fn a_background_task_waits_until_its_notification_or_stop() {
+        let start = r#"{"type":"assistant","message":{"content":[{"type":"tool_use","id":"b1","name":"Bash","input":{"command":"sleep 99","run_in_background":true}}]}}"#;
+        let ok = r#"{"type":"user","message":{"content":[{"type":"tool_result","tool_use_id":"b1","content":"Command running in background with ID: bash_7. Output is being written to: x"}]}}"#;
+        let bad = r#"{"type":"user","message":{"content":[{"type":"tool_result","tool_use_id":"b1","content":"denied","is_error":true}]}}"#;
+        let queued = r#"{"type":"attachment","attachment":{"type":"queued_command","prompt":"<task-notification>\n<task-id>bash_7</task-id>\n<status>failed</status>\n</task-notification>"}}"#;
+        let kill = r#"{"type":"assistant","message":{"content":[{"type":"tool_use","id":"k1","name":"KillShell","input":{"shell_id":"bash_7"}}]}}"#;
+        let other = r#"{"type":"attachment","attachment":{"type":"queued_command","prompt":"<task-notification>\n<task-id>bash_8</task-id>\n</task-notification>"}}"#;
+        let waits = |lines: &[&str]| last_turn(lines.join("\n").as_bytes()).unwrap().waiting;
+        assert!(waits(&[start, ok]));
+        assert!(waits(&[start, ok, other]));
+        assert!(!waits(&[start, ok, queued]));
+        assert!(!waits(&[start, ok, kill]));
+        assert!(!waits(&[start, bad]));
+        assert!(!waits(&[start]));
     }
 
     fn transcript(dir: &Path, lines: &[&str]) -> std::path::PathBuf {

@@ -19,7 +19,7 @@ Pre-check before you report (these are what reviews most often send back):
 
 Add a short "Pre-check" section to the PR body with one line per item; for item 1, name each test you saw fail with the change undone.
 
-While you work, run only the tests you touched. Run the repo's full check once, at the end, before you push. Never wait inside a command for CI: push, report, and end your turn.
+While you work, run only the tests you touched. Run the repo's full check once, at the end, before you push. Never wait inside a command for CI: push, report, and end your turn. A worker that waits on its own background task ends its turn without a message; the task's end wakes it.
 
 Write the PR body to a file in your worktree, never to a shared path. A fix round starts you fresh in the PR's worktree with the PR and the review's blockers: read the PR (`gh pr view`, `gh pr diff`) and the plan it names, fix the listed blockers, run the pre-check again, push, and report the new head commit and, for each blocker, how you checked that it is fixed.
 
