@@ -62,6 +62,7 @@ struct AgentArgs {
     keep: bool,
     review_pr: i64,
     any_profile: bool,
+    fix_pr: bool,
 }
 
 /// The full name of the report tool in a session with the kit: Claude Code's prefix for the plugin's server.
@@ -81,7 +82,7 @@ pub fn agent_tools<'a>(core: &'a dyn Core, env: Env<'a>) -> Vec<Tool<'a>> {
     vec![
         Tool {
             name: "spawn",
-            description: "Start a worker agent in a new hc terminal, in its worktree. It reports back with the report tool when its turn ends.",
+            description: "Start a worker agent in a new hc terminal, in its worktree. It reports back with the report tool when its turn ends. It refuses past the flow's workers at once (working workers), and a new issue at the project's open PR limit.",
             schema: schema(
                 &["name", "profile"],
                 &[
@@ -94,13 +95,15 @@ pub fn agent_tools<'a>(core: &'a dyn Core, env: Env<'a>) -> Vec<Tool<'a>> {
                     ("worktree", "string", "The worker's working folder (its git worktree)."),
                     ("role", "string", "Role label; the profile name by default."),
                     ("project", "string", "Project name; groups the worker with its project's questions."),
+                    ("fix_pr", "boolean", "This is a fix round on an open PR: the project's open PR limit does not apply."),
                     ("any_profile", "boolean", "Allow a profile that the flow does not name for a role. Use only when the owner asks."),
                     ("review_pr", "integer", "A pull request number: start the worker in a detached worktree at the PR's head, <main checkout>-wt/review-<N>, of the repository at worktree (default: the coordinator's folder)."),
                 ],
             ),
             // The profiles are read again for each spawn, so a profile added while the session runs works at once.
-            run: run(core, env, move |_, a| {
+            run: run(core, env, move |m, a| {
                 let cfg = load_config(env)?;
+                crate::limit::check_workers(m, &cfg)?;
                 if !a.any_profile {
                     cfg.check_profile(&a.profile)?;
                 }
@@ -112,6 +115,7 @@ pub fn agent_tools<'a>(core: &'a dyn Core, env: Env<'a>) -> Vec<Tool<'a>> {
                 if a.review_pr != 0 {
                     worktree = review_worktree(if worktree.is_empty() { "." } else { &worktree }, a.review_pr)?;
                 }
+                crate::limit::check_prs(&cfg, env, &worktree, a.fix_pr || a.review_pr != 0)?;
                 let spec = Spec { name: a.name, profile: a.profile, task, issue: a.issue, worktree, role: a.role, project: a.project, title: a.title, parent: env("HC_TERMINAL_ID") };
                 pretty(&spawn(core, &cfg, env, spec)?)
             }),
@@ -124,9 +128,12 @@ pub fn agent_tools<'a>(core: &'a dyn Core, env: Env<'a>) -> Vec<Tool<'a>> {
         },
         Tool {
             name: "message",
-            description: "Type a message into a worker and press Enter. It keeps the worker's context.",
+            description: "Type a message into a worker and press Enter. It keeps the worker's context. A message to a settled worker starts it, so it counts against the flow's workers at once.",
             schema: schema(&["name", "text"], &[name, ("text", "string", "The message.")]),
-            run: run(core, env, |m, a| m.send(&a.name, &a.text).map(|_| "sent".into())),
+            run: run(core, env, move |m, a| {
+                crate::limit::check_message(m, &load_config(env).unwrap_or_default(), &a.name)?;
+                m.send(&a.name, &a.text).map(|_| "sent".into())
+            }),
         },
         Tool {
             name: "report",

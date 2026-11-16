@@ -9,6 +9,7 @@ pub mod held;
 pub mod home;
 pub mod hook;
 pub mod jsonfile;
+pub mod limit;
 pub mod mcp;
 pub mod owner;
 pub mod prompt;

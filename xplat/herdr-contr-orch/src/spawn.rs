@@ -55,7 +55,7 @@ fn words(list: &[&str]) -> Vec<String> {
 
 /// Runs git in a folder and gives its trimmed standard output. -C, not the folder of the process, so a missing
 /// folder gives git's own message.
-fn git(dir: &str, args: &[&str]) -> Result<String, String> {
+pub(crate) fn git(dir: &str, args: &[&str]) -> Result<String, String> {
     let out = Command::new("git").arg("-C").arg(dir).args(args).output().map_err(|e| format!("git {}: {e}", args[0]))?;
     if !out.status.success() {
         let stderr = String::from_utf8_lossy(&out.stderr).trim().to_string();
@@ -75,7 +75,7 @@ fn worktree_dir(dir: &str) -> Result<String, String> {
 }
 
 /// The main checkout of the git worktree `dir`.
-fn main_checkout(dir: &str) -> Result<String, String> {
+pub(crate) fn main_checkout(dir: &str) -> Result<String, String> {
     let common = PathBuf::from(git(dir, &["rev-parse", "--path-format=absolute", "--git-common-dir"])?);
     match common.parent() {
         Some(main) if common.file_name().is_some_and(|n| n == ".git") => Ok(main.display().to_string()),
@@ -84,7 +84,7 @@ fn main_checkout(dir: &str) -> Result<String, String> {
 }
 
 /// Tells if a and b name the same folder, after symbolic links.
-fn same_path(a: &str, b: &str) -> bool {
+pub(crate) fn same_path(a: &str, b: &str) -> bool {
     let real = |p: &str| fs::canonicalize(p).unwrap_or_else(|_| PathBuf::from(p));
     real(a) == real(b)
 }

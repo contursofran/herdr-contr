@@ -21,7 +21,7 @@ pub const AGENTS_USAGE: &str = "Usage:
   herdr-contr-orch agents ls [--all] [--json]      list the workers
   herdr-contr-orch agents spawn --name N --profile P [--issue I] [--title T] [--worktree DIR]
                      [--project P] [--role R] [--review-pr PR] [--no-parent] [--json]
-                     [--any-profile] [--task-file F | [--] task…]
+                     [--any-profile] [--fix-pr] [--task-file F | [--] task…]
                                                    start a worker; --title is a few words of
                                                    what it does, that the sidebar shows;
                                                    --task-file reads the task from a file;
@@ -31,7 +31,10 @@ pub const AGENTS_USAGE: &str = "Usage:
                                                    repository at --worktree (default: here)
                                                    and starts the worker there; a profile
                                                    that the flow names for no role needs
-                                                   --any-profile
+                                                   --any-profile; past the flow's workers at
+                                                   once, or the project's open_prs for a new
+                                                   issue, spawn refuses; --fix-pr marks a fix
+                                                   round on an open PR
   herdr-contr-orch agents title <name> <title…>    change the title of a worker
   herdr-contr-orch agents send <name> <text…>      type text and press Enter
   herdr-contr-orch agents interrupt <name>         press the stop key
@@ -209,7 +212,7 @@ fn run_agents(args: &[String], env: &dyn Fn(&str) -> String, out: &mut dyn Write
 
 /// The flags that take a value; the others are true or false.
 const VALUE_FLAGS: [&str; 10] = ["lines", "name", "profile", "issue", "title", "worktree", "project", "role", "task-file", "review-pr"];
-const BOOL_FLAGS: [&str; 6] = ["all", "json", "keep", "ended", "no-parent", "any-profile"];
+const BOOL_FLAGS: [&str; 7] = ["all", "json", "keep", "ended", "no-parent", "any-profile", "fix-pr"];
 
 /// The flags of the worker commands that the command line gave, in order, each with its value.
 #[derive(Default)]
@@ -283,7 +286,7 @@ fn run_worker_command(sub: &str, rest: &[String], env: &dyn Fn(&str) -> String, 
     };
     let allowed: &[&str] = match sub {
         "ls" => &["all", "json"],
-        "spawn" => &["name", "profile", "issue", "title", "worktree", "project", "role", "no-parent", "json", "task-file", "review-pr", "any-profile"],
+        "spawn" => &["name", "profile", "issue", "title", "worktree", "project", "role", "no-parent", "json", "task-file", "review-pr", "any-profile", "fix-pr"],
         "read" => &["lines"],
         "stop" => &["keep"],
         "rm" => &["ended"],
@@ -307,8 +310,8 @@ fn run_worker_command(sub: &str, rest: &[String], env: &dyn Fn(&str) -> String, 
         let _ = write!(err, "herdr-contr-orch agents rm: give one name, or --ended\n{AGENTS_USAGE}");
         return 2;
     }
-    // Only spawn needs the profiles, so a broken file does not block the rest.
-    let mut cfg = Config::default();
+    // Only spawn needs the profiles, so a broken file does not block the rest. Send reads the flow's limit.
+    let mut cfg = if sub == "send" { Config::load(&config_path(env)).unwrap_or_default() } else { Config::default() };
     if sub == "spawn" {
         cfg = match Config::load(&config_path(env)) {
             Ok(c) => c,
@@ -333,7 +336,7 @@ fn run_worker_command(sub: &str, rest: &[String], env: &dyn Fn(&str) -> String, 
             text = if flags.on("json") { serde_json::to_string_pretty(&ws).map_err(|e| e.to_string())? + "\n" } else { workers::table(&ws) };
             Ok(())
         }),
-        "send" => m.send(&pos[0], &pos[1..].join(" ")),
+        "send" => crate::limit::check_message(&m, &cfg, &pos[0]).and_then(|_| m.send(&pos[0], &pos[1..].join(" "))),
         "title" => m.set_title(&pos[0], &pos[1..].join(" ")),
         "interrupt" => m.interrupt(&pos[0]).map(|o| text = o + "\n"),
         "stop" => m.stop(&pos[0], flags.on("keep")),
@@ -383,7 +386,9 @@ fn spawn_worker(flags: &Flags, pos: &[String], cfg: &Config, env: &dyn Fn(&str) 
     }
     if !flags.on("no-parent") {
         spec.parent = env("HC_TERMINAL_ID");
+        crate::limit::check_workers(&Manager::new(core, spec.parent.clone()), cfg)?;
     }
+    crate::limit::check_prs(cfg, env, &spec.worktree, flags.on("fix-pr") || pr != 0)?;
     spawn(core, cfg, env, spec)
 }
 

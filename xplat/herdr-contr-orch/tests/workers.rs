@@ -64,6 +64,8 @@ fn send_interrupt_and_read() {
     assert_eq!(
         core.calls(),
         [
+            // The limit check: is w1 a settled worker of t1?
+            ("terminal.get".to_string(), json!({"terminal": "w1", "caller": "t1"})),
             ("terminal.send".to_string(), json!({"terminal": "w1", "caller": "t1", "text": "fix the test"})),
             ("terminal.interrupt".to_string(), json!({"terminal": "w1"})),
             ("terminal.read".to_string(), json!({"terminal": "w1", "lines": 5})),
