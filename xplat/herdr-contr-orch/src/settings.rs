@@ -204,7 +204,7 @@ pub fn set(path: &Path, pairs: &[(String, String)]) -> Result<(), String> {
 }
 
 /// The open items, with the fields that their cards show: the questions that have no answer
-/// (`kind` "question"), then the to-dos that are not done (`kind` "todo"; `todo_kind` is do or know).
+/// (`kind` "question"), then the to-dos that are not done (`kind` "todo"; `todo_kind` is do or know; `due` is YYYY-MM-DD or empty).
 /// Each group is oldest first.
 pub fn open_items(store: &Store) -> Result<Value, String> {
     let (qs, ts) = store.read()?.open("");
@@ -213,7 +213,7 @@ pub fn open_items(store: &Store) -> Result<Value, String> {
                "options": q.options, "impacts": q.impacts, "recommended": q.recommended, "refs": q.refs})
     });
     let ts = ts.into_iter().map(|t| {
-        json!({"kind": "todo", "id": t.id, "coordinator": t.coordinator, "from": t.from, "todo_kind": t.kind, "text": t.text})
+        json!({"kind": "todo", "id": t.id, "coordinator": t.coordinator, "from": t.from, "todo_kind": t.kind, "text": t.text, "due": t.due})
     });
     Ok(Value::Array(qs.chain(ts).collect()))
 }
