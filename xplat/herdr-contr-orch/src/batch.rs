@@ -86,6 +86,18 @@ fn deliver(m: &Manager, env: &dyn Fn(&str) -> String, to: &str, now: u64, text: 
     Ok(Some(sent))
 }
 
+/// True when another worker of `to` (not this one) still works, so a report from this one can wait. When this
+/// worker is not in hc's list (hc did not answer, or not a worker), it says true: the batch rules apply as before.
+/// The last worker that works gives its report at once, so the coordinator does not wait for the timer with
+/// nothing else to do.
+fn others_work(m: &Manager, to: &str) -> bool {
+    let Ok(ws) = m.list(false) else { return true };
+    if !ws.iter().any(|w| w.address == m.caller()) {
+        return true;
+    }
+    ws.iter().any(|w| w.address != m.caller() && w.parent == to && w.live && (w.status == "working" || w.status.is_empty()))
+}
+
 /// Sends a report from this terminal to `to`, or holds it for the batch. `arm(to, seconds)` starts the timer
 /// that gives the batch later. The result: "sent", "held: …" (hc refused it), or "batched: …".
 pub fn report(core: &dyn Core, env: &dyn Fn(&str) -> String, to: &str, text: &str, now: u64, arm: &dyn Fn(&str, u64)) -> Result<String, String> {
@@ -98,7 +110,7 @@ pub fn report(core: &dyn Core, env: &dyn Fn(&str) -> String, to: &str, text: &st
     }
     let m = Manager::new(core, env("HC_TERMINAL_ID"));
     let last = read_time(env, to, "last");
-    let Some(last) = last.filter(|l| !urgent(text) && now < l + every) else {
+    let Some(last) = last.filter(|l| !urgent(text) && now < l + every && others_work(&m, to)) else {
         return match deliver(&m, env, to, now, text)? {
             Some(Sent::Refused(reason)) => Ok(format!("held: {to} did not take it now ({reason}); contr gives it to {to} when its prompt is free")),
             _ => Ok("sent".into()),

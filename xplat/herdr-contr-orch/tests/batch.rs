@@ -124,3 +124,26 @@ fn the_flush_command() {
     let r = call(&["batch", "flush", "t1"], &vars, &Fake::default());
     assert_eq!((r.code, r.out.as_str()), (0, "no batch\n"));
 }
+
+fn worker(name: &str, address: &str, parent: &str, status: &str) -> serde_json::Value {
+    json!({"name": name, "address": address, "parent": parent, "state": "live", "status": {"state": status}, "labels": {"contr": "agent"}})
+}
+
+#[test]
+fn the_last_working_worker_reports_at_once() {
+    let e = Env::new(None);
+    let env = |k: &str| e.get(k);
+    let arm = |_: &str, _: u64| {};
+    // t7 (this worker) and t8 both work for t1: the second report in 10 minutes waits.
+    let busy = Fake::default().reply("terminal.list", json!({"terminals": [worker("b1", "t7", "t1", "working"), worker("b2", "t8", "t1", "working")]}));
+    assert_eq!(batch::report(&busy, &env, "t1", "b1: done, PR #5", 1000, &arm).unwrap(), "sent");
+    assert!(batch::report(&busy, &env, "t1", "b1: done, PR #6", 1060, &arm).unwrap().starts_with("batched"));
+
+    // t8 is idle now, and another coordinator's worker works: t7 is the last of t1's, so it goes at once,
+    // with the held report.
+    let last = Fake::default().reply("terminal.list", json!({"terminals": [worker("b1", "t7", "t1", "working"), worker("b2", "t8", "t1", "idle"), worker("x", "t9", "t5", "working")]}));
+    assert_eq!(batch::report(&last, &env, "t1", "b1: done, PR #7", 1120, &arm).unwrap(), "sent");
+    let sent = texts(&last);
+    assert_eq!(sent.len(), 1);
+    assert!(sent[0].contains("PR #6") && sent[0].contains("PR #7"), "{sent:?}");
+}
