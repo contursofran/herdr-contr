@@ -1,6 +1,6 @@
 //! Swift: `Status.swift`. `status`: the tags over the composer (model, effort, ctx, cost, and the owner's own status
 //! line parts). Claude Code's facts come from herdr-contr's status line wrapper, when the owner turned it on; otherwise
-//! the model named in the log is the only tag.
+//! the model named in the log, and the context from the log's usage against the auto-compact limit.
 
 use crate::protocol::JsonLines;
 use crate::tail;

@@ -136,7 +136,7 @@ Left to right:
      arrow when empty or sending, else `accent`). The model comes from the helper's `model` (asked with the
      status, at most every 15 s), else the status line's tags; not known yet, the button shows the app's name
      alone. Its tooltip: "Opus 5.5 · medium effort · Claude Code" and the folder; the context's: "149k of 250k
-     tokens · auto-compact at 250k" (the limit is Claude Code's `autoCompactWindow`), else "37% of the model's
+     tokens · auto-compact at 250k" (the limit is Claude Code's `autoCompactWindow`, for the model or for all), else "37% of the model's
      context window". A press on the model button opens the model menu above it (#112; a gpui-base `Popover`, anchored
      `bottom_left`, 6 px over the button): a 280 px `raised` panel, 1 px `border`, 12 px corners, 4 px padding,
      rows of 15 px text with 8 px corners and a hover fill. Row 1: the current model's name alone (no line
