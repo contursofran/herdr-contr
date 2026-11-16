@@ -429,6 +429,16 @@ impl StatusTag {
             p >= StatusTag::WARN_PERCENT,
         ))
     }
+
+    /// The context tag for `used` tokens of the model's context `window`: "ctx 12%", its percent and its warning
+    /// against the window. None when the window is not positive.
+    pub fn context_of_window(used: i64, window: i64) -> Option<StatusTag> {
+        if window <= 0 {
+            return None;
+        }
+        let p = (used as f64 * 100.0 / window as f64).round().clamp(0.0, 100.0) as i64;
+        Some(StatusTag::plain(StatusTagKind::Context, &format!("ctx {p}%"), &format!("Context {p}% used"), Some(p), p >= StatusTag::WARN_PERCENT))
+    }
 }
 
 /// Tokens in thousands, rounded: 120000 -> "120k"; under 1000 as is.

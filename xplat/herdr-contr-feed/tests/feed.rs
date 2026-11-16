@@ -206,7 +206,7 @@ fn status_tags() {
         "sess-1",
     );
     let mut o6 = JsonLines::new();
-    status::run("claude", Some(&log), &settings, &mut o6, SystemTime::now());
+    status::run("claude", Some(&log), &settings, None, &mut o6, SystemTime::now());
     let st = &o6.lines[0];
     assert!(
         st.contains(r#""source":"statusline""#) && st.contains(r#""text":"Opus 9""#) && st.contains(r#""text":"ctx 84%""#) && st.contains(r#""warn":true"#),
@@ -215,28 +215,28 @@ fn status_tags() {
     // autoCompactWindow: tokens used against it; current_usage first, else the percent of the window.
     let cmd2 = serde_json::json!({"statusLine": {"type": "command", "command": cmd}, "autoCompactWindow": 250000});
     std::fs::write(&settings, cmd2.to_string()).unwrap();
-    assert_eq!(status::compact_limit(&settings), Some(250000), "modfeed status: autoCompactWindow from settings");
+    assert_eq!(status::compact_limit(&[settings.clone()], None), Some(250000), "modfeed status: autoCompactWindow from settings");
     StatusLineFolder::new(&sdir).save(
         br#"{"session_id":"sess-1","context_window":{"context_window_size":1000000,"used_percentage":12,"current_usage":{"input_tokens":2000,"cache_creation_input_tokens":8000,"cache_read_input_tokens":110000,"output_tokens":500}}}"#,
         b"",
         "sess-1",
     );
     let mut o8 = JsonLines::new();
-    status::run("claude", Some(&log), &settings, &mut o8, SystemTime::now());
+    status::run("claude", Some(&log), &settings, None, &mut o8, SystemTime::now());
     assert!(o8.lines[0].contains(r#""text":"ctx 120k / 250k""#) && o8.lines[0].contains(r#""percent":48"#) && o8.lines[0].contains(r#""warn":false"#), "modfeed status: ctx against the limit ({})", o8.lines[0]);
     StatusLineFolder::new(&sdir).save(br#"{"session_id":"sess-1","context_window":{"context_window_size":1000000,"used_percentage":21}}"#, b"", "sess-1");
     let mut o9 = JsonLines::new();
-    status::run("claude", Some(&log), &settings, &mut o9, SystemTime::now());
+    status::run("claude", Some(&log), &settings, None, &mut o9, SystemTime::now());
     assert!(o9.lines[0].contains(r#""text":"ctx 210k / 250k""#) && o9.lines[0].contains(r#""warn":true"#), "modfeed status: near the limit warns ({})", o9.lines[0]);
     StatusLineFolder::new(&sdir).save(br#"{"session_id":"sess-1","context_window":{"used_percentage":21}}"#, b"", "sess-1");
     let mut o10 = JsonLines::new();
-    status::run("claude", Some(&log), &settings, &mut o10, SystemTime::now());
+    status::run("claude", Some(&log), &settings, None, &mut o10, SystemTime::now());
     assert!(o10.lines[0].contains(r#""text":"ctx 21%""#), "modfeed status: tokens not known, percent as before ({})", o10.lines[0]);
     std::fs::write(&settings, "{}").unwrap();
-    assert_eq!(status::compact_limit(&settings), None, "modfeed status: no autoCompactWindow");
-    assert_eq!(status::compact_limit(&dir.path().join("missing.json")), None, "modfeed status: no settings file");
+    assert_eq!(status::compact_limit(&[settings.clone()], None), None, "modfeed status: no autoCompactWindow");
+    assert_eq!(status::compact_limit(&[dir.path().join("missing.json")], None), None, "modfeed status: no settings file");
     let mut o7 = JsonLines::new();
-    status::run("codex", Some(&log), &settings, &mut o7, SystemTime::now());
+    status::run("codex", Some(&log), &settings, None, &mut o7, SystemTime::now());
     assert!(o7.lines[0].contains(r#""source":"log""#) && o7.lines[0].contains("claude-test-1"), "modfeed status: model from the log otherwise");
 }
 
@@ -261,17 +261,131 @@ fn status_ctx_from_log() {
     assert_eq!(tail::context_used(&lines), Some(120_003), "modfeed tail: newest main-thread usage");
     assert_eq!(tail::context_used(&turn()), None, "modfeed tail: no usage");
     let mut o = JsonLines::new();
-    status::run("claude", Some(&log), &settings, &mut o, SystemTime::now());
+    status::run("claude", Some(&log), &settings, None, &mut o, SystemTime::now());
     let st = &o.lines[0];
     assert!(st.contains(r#""source":"log""#) && st.contains(r#""text":"claude-test-1""#) && st.contains(r#""text":"ctx 120k / 250k""#) && st.contains(r#""percent":48"#), "modfeed status: ctx from the log ({st})");
     std::fs::write(&settings, "{}").unwrap();
     let mut o2 = JsonLines::new();
-    status::run("claude", Some(&log), &settings, &mut o2, SystemTime::now());
+    status::run("claude", Some(&log), &settings, None, &mut o2, SystemTime::now());
     assert!(!o2.lines[0].contains("ctx"), "modfeed status: no limit, no window, no ctx tag ({})", o2.lines[0]);
     std::fs::write(&settings, r#"{"autoCompactWindow":250000}"#).unwrap();
     let mut o3 = JsonLines::new();
-    status::run("codex", Some(&log), &settings, &mut o3, SystemTime::now());
+    status::run("codex", Some(&log), &settings, None, &mut o3, SystemTime::now());
     assert!(!o3.lines[0].contains("ctx"), "modfeed status: ctx from the log for claude only ({})", o3.lines[0]);
+}
+
+/// A Claude Code log whose newest main-thread reply used 120,003 tokens, from `model`.
+fn usage_log(path: &std::path::Path, model: &str) {
+    let mut lines = turn();
+    lines.push(
+        serde_json::json!({"type": "assistant", "uuid": "m1", "isSidechain": false, "sessionId": "sess-3", "timestamp": "2026-11-16T10:00:00Z",
+            "message": {"id": "m1", "role": "assistant", "model": model, "content": [{"type": "text", "text": "ok"}],
+                "usage": {"input_tokens": 3, "cache_creation_input_tokens": 2000, "cache_read_input_tokens": 118_000, "output_tokens": 50}}})
+        .to_string(),
+    );
+    std::fs::write(path, lines.join("\n") + "\n").unwrap();
+}
+
+fn ctx_text(log: &std::path::Path, settings: &std::path::Path, cwd: Option<&std::path::Path>) -> String {
+    let mut o = JsonLines::new();
+    status::run("claude", Some(log), settings, cwd, &mut o, SystemTime::now());
+    let v: serde_json::Value = serde_json::from_str(&o.lines[0]).unwrap();
+    v["tags"].as_array().unwrap().iter().find(|t| t["kind"] == "context").map(|t| t["text"].as_str().unwrap().to_string()).unwrap_or_default()
+}
+
+#[test]
+fn status_ctx_limit_per_model() {
+    let dir = tempfile::tempdir().unwrap();
+    let (settings, log) = (dir.path().join("settings.json"), dir.path().join("sess-3.jsonl"));
+    usage_log(&log, "claude-opus-5-5");
+    let put = |v: serde_json::Value| std::fs::write(&settings, v.to_string()).unwrap();
+    put(serde_json::json!({"modelSettings": {"claude-opus-5-5": {"effortLevel": "high", "autoCompactWindow": 300000}}}));
+    assert_eq!(ctx_text(&log, &settings, None), "ctx 120k / 300k", "per-model value");
+    put(serde_json::json!({"autoCompactWindow": 250000, "modelSettings": {"claude-sonnet-5-5": {"autoCompactWindow": 400000}}}));
+    assert_eq!(ctx_text(&log, &settings, None), "ctx 120k / 250k", "top-level value; another model's value does not count");
+    put(serde_json::json!({"autoCompactWindow": 250000, "modelSettings": {"claude-opus-5-5": {"autoCompactWindow": 300000}}}));
+    assert_eq!(ctx_text(&log, &settings, None), "ctx 120k / 300k", "both: the per-model value wins");
+    put(serde_json::json!({"modelSettings": {"claude-opus-5-5": {"effortLevel": "high"}}}));
+    assert_eq!(ctx_text(&log, &settings, None), "", "none: no limit, window not known, no ctx tag");
+    for bad in [serde_json::json!("300000"), serde_json::json!(0), serde_json::json!(-5), serde_json::json!(true), serde_json::json!({"n": 1})] {
+        put(serde_json::json!({"autoCompactWindow": 250000, "modelSettings": {"claude-opus-5-5": {"autoCompactWindow": bad}}}));
+        assert_eq!(ctx_text(&log, &settings, None), "ctx 120k / 250k", "a bad per-model value ({bad}) does not count");
+        put(serde_json::json!({"autoCompactWindow": bad}));
+        assert_eq!(ctx_text(&log, &settings, None), "", "a bad top-level value ({bad}) does not count");
+    }
+    std::fs::write(&settings, "{not json").unwrap();
+    assert_eq!(ctx_text(&log, &settings, None), "", "a settings file that is not JSON");
+}
+
+#[test]
+fn status_ctx_limit_model_forms() {
+    let dir = tempfile::tempdir().unwrap();
+    let settings = dir.path().join("settings.json");
+    let files = [settings.clone()];
+    let put = |v: serde_json::Value| std::fs::write(&settings, v.to_string()).unwrap();
+    put(serde_json::json!({"modelSettings": {"claude-opus-5-5": {"autoCompactWindow": 300000}}}));
+    for m in ["claude-opus-5-5", "claude-opus-5-5-20261101", "claude-opus-5-5[1m]", "Claude-Opus-5-5"] {
+        assert_eq!(status::compact_limit(&files, Some(m)), Some(300000), "log model {m} matches the plain key");
+    }
+    assert_eq!(status::compact_limit(&files, Some("claude-opus-5-6")), None, "another model does not match");
+    put(serde_json::json!({"modelSettings": {"claude-opus-5-5-20261101": {"autoCompactWindow": 310000}, "claude-sonnet-5-5[1m]": {"autoCompactWindow": 700000}}}));
+    assert_eq!(status::compact_limit(&files, Some("claude-opus-5-5")), Some(310000), "a dated key matches the plain id");
+    assert_eq!(status::compact_limit(&files, Some("claude-sonnet-5-5")), Some(700000), "a [1m] key matches the plain id");
+    put(serde_json::json!({"modelSettings": {"claude-opus-5-5": {"autoCompactWindow": 300000}, "claude-opus-5-5[1m]": {"autoCompactWindow": 800000}}}));
+    assert_eq!(status::compact_limit(&files, Some("claude-opus-5-5[1m]")), Some(800000), "the exact key first");
+    assert_eq!(status::compact_limit(&files, Some("claude-opus-5-5")), Some(300000), "the exact key first (plain)");
+    assert_eq!(status::base_model("claude-opus-5-5-20261101[1m]"), "claude-opus-5-5");
+    assert_eq!(status::base_model("claude-opus-5-5-2026"), "claude-opus-5-5-2026", "not a date");
+}
+
+#[test]
+fn status_ctx_limit_project_files() {
+    let dir = tempfile::tempdir().unwrap();
+    let (settings, log, cwd) = (dir.path().join("settings.json"), dir.path().join("sess-3.jsonl"), dir.path().join("proj"));
+    usage_log(&log, "claude-opus-5-5");
+    std::fs::create_dir_all(cwd.join(".claude")).unwrap();
+    std::fs::write(&settings, r#"{"autoCompactWindow":250000}"#).unwrap();
+    assert_eq!(ctx_text(&log, &settings, Some(&cwd)), "ctx 120k / 250k", "user file when the project has none");
+    std::fs::write(cwd.join(".claude/settings.json"), r#"{"autoCompactWindow":200000}"#).unwrap();
+    assert_eq!(ctx_text(&log, &settings, Some(&cwd)), "ctx 120k / 200k", "project file before the user file");
+    assert_eq!(ctx_text(&log, &settings, None), "ctx 120k / 250k", "cwd not known: user file only");
+    std::fs::write(cwd.join(".claude/settings.local.json"), r#"{"autoCompactWindow":150000}"#).unwrap();
+    assert_eq!(ctx_text(&log, &settings, Some(&cwd)), "ctx 120k / 150k", "local file first");
+    std::fs::write(&settings, r#"{"modelSettings":{"claude-opus-5-5":{"autoCompactWindow":300000}}}"#).unwrap();
+    assert_eq!(ctx_text(&log, &settings, Some(&cwd)), "ctx 120k / 300k", "a per-model value in any file wins over a top-level value");
+    assert_eq!(
+        status::settings_files(&settings, Some(&cwd)),
+        vec![cwd.join(".claude/settings.local.json"), cwd.join(".claude/settings.json"), settings.clone()],
+        "Claude Code's order"
+    );
+}
+
+#[test]
+fn status_ctx_window_without_limit() {
+    let dir = tempfile::tempdir().unwrap();
+    let (settings, log) = (dir.path().join("settings.json"), dir.path().join("sess-3.jsonl"));
+    std::fs::write(&settings, "{}").unwrap();
+    usage_log(&log, "claude-opus-5-5");
+    // A `/model` switch to the 1M window after the reply: the log's model is claude-opus-5-5[1m].
+    let switch = serde_json::json!({"type": "user", "uuid": "u9", "sessionId": "sess-3", "timestamp": "2026-11-16T10:01:00Z",
+        "message": {"role": "user", "content": "<local-command-stdout>Set model to Opus 5.5 (1M context)</local-command-stdout>"}});
+    std::fs::write(&log, std::fs::read_to_string(&log).unwrap() + &switch.to_string() + "\n").unwrap();
+    assert_eq!(ctx_text(&log, &settings, None), "ctx 12%", "no limit: percent of the 1M window");
+    std::fs::write(&settings, r#"{"autoCompactWindow":250000}"#).unwrap();
+    assert_eq!(ctx_text(&log, &settings, None), "ctx 120k / 250k", "a limit wins over the window");
+    assert_eq!(status::context_window("claude-opus-5-5[1m]"), Some(1_000_000));
+    assert_eq!(status::context_window("claude-opus-5-5"), None, "window not known");
+}
+
+#[test]
+fn status_statusline_limit_per_model() {
+    let dir = tempfile::tempdir().unwrap();
+    let (sdir, settings, log) = (dir.path().join("sl"), dir.path().join("settings.json"), dir.path().join("sess-3.jsonl"));
+    usage_log(&log, "claude-opus-5-5");
+    let cmd = format!("herdr-contr-statusline --dir '{}'", sdir.display());
+    std::fs::write(&settings, serde_json::json!({"statusLine": {"type": "command", "command": cmd}, "autoCompactWindow": 250000, "modelSettings": {"claude-opus-5-5": {"autoCompactWindow": 300000}}}).to_string()).unwrap();
+    StatusLineFolder::new(&sdir).save(br#"{"session_id":"sess-3","model":{"display_name":"Opus 5.5"},"context_window":{"context_window_size":1000000,"used_percentage":12}}"#, b"", "sess-3");
+    assert_eq!(ctx_text(&log, &settings, None), "ctx 120k / 300k", "status line source: the log's model picks the per-model value");
 }
 
 #[test]
