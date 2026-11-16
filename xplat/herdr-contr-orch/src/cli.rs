@@ -11,6 +11,7 @@ use crate::workers::{self, Core, Manager, Worker};
 
 pub const USAGE: &str = "Usage:
   herdr-contr-orch agents <command> [args…] list and control the workers (herdr-contr-orch agents help)
+  herdr-contr-orch batch flush <terminal>   give the batched reports to the terminal when they are due
   herdr-contr-orch hook <name>              the kit's hooks: stop, session-start and prompt (see hook help)
   herdr-contr-orch mcp                      serve the coordinator's tools over MCP on stdin and stdout
   herdr-contr-orch owner <command> [args…]  answer questions and mark to-dos done (herdr-contr-orch owner help)
@@ -134,6 +135,16 @@ pub fn run(args: &[String], env: &dyn Fn(&str) -> String, input: &mut dyn BufRea
     match args.first().map(String::as_str) {
         Some("mcp") if args.len() == 1 => run_mcp(env, input, out, err, core),
         Some("hook") => crate::hook::run(&args[1..], env, input, out, err, core),
+        Some("batch") if args.len() == 3 && args[1] == "flush" => match crate::batch::flush(core, env, &args[2], crate::batch::now()) {
+            Ok(r) => {
+                let _ = writeln!(out, "{r}");
+                0
+            }
+            Err(e) => {
+                let _ = writeln!(err, "batch: {e}");
+                1
+            }
+        },
         Some("agents") => run_agents(&args[1..], env, out, err, core),
         Some("owner") => run_owner(&args[1..], env, out, err, core),
         Some("--version" | "-V") if args.len() == 1 => {
