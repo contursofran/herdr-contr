@@ -2,6 +2,8 @@
 // and Update, which runs `update install` (docs/protocol.md, update). Nothing installs without a press.
 import { call } from "./sidecar.js";
 
+export const UPDATE_MS = 300000;
+
 let state = { line: null, error: null, busy: false, done: null };
 export const updateState = () => state;
 export const resetUpdate = () => { state = { line: null, error: null, busy: false, done: null }; };
@@ -16,7 +18,8 @@ export async function checkUpdate() {
 export async function runUpdate() {
   if (state.busy) return;
   state = { ...state, busy: true, done: null, error: null };
-  const r = await call("update", ["install"]);
+  // A download and an install take longer than exec's 30 s default: give it 5 minutes.
+  const r = await call("update", ["install"], { timeout: UPDATE_MS });
   const done = r.lines.find((l) => l.type === "update-done");
   state = { ...state, busy: false, error: r.error?.message ?? null, done: done ?? null,
     line: done && state.line ? { ...state.line, installed: done.installed, differs: false } : state.line };

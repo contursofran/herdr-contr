@@ -52,6 +52,9 @@ test("Update installs and says to restart Herdr", async () => {
   const row = await open();
   await press(row());
   assert.deepEqual(updates(), ["check", "install"]);
+  // The check keeps exec's default; the install gets 5 minutes, so a slow download is not cut off.
+  const opts = log.exec.filter(([, a]) => a[0] === "update").map(([, , o]) => o?.timeout);
+  assert.deepEqual(opts, [undefined, 300000]);
   assert.match(textOf(byId(row(), "set-update-result")), /Installed abc1234 2026-11-16\. Restart Herdr/);
   assert.match(textOf(row()), /herdr-contr abc1234 2026-11-16/);
   assert.equal(byId(row(), "set-update-go"), null);
