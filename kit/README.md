@@ -10,8 +10,10 @@ orchestration tool of this repository, `xplat/herdr-contr-orch`):
 - `hooks/hooks.json`: the Stop hook (a worker's turn that sent no report; the reports held for a busy
   coordinator; a coordinator's state before a compaction) and the SessionStart hook: in an hc terminal one line that names `contr:chat-writing`; at startup of an orchestrator and after a compaction, the playbook.
 - `.mcp.json`: starts `herdr-contr-orch mcp`, which gives the session the agent tools (spawn, set_title, message,
-  report, interrupt, stop, read, list, clear_ended). A worker reports with `report`. `stop` removes the
-  worker's terminal unless `keep` is set. See Install for where `herdr-contr-orch` is found.
+  report, interrupt, stop, resume, read, list, clear_ended). A worker reports with `report`. `stop` removes the
+  worker's terminal unless `keep` is set. Spawn keeps each Claude worker's session id in
+  `state/workers/<name>.json`; `list` shows a worker that ended without a `stop` as `gone`, and `resume`
+  starts it again from that session. See Install for where `herdr-contr-orch` is found.
 
 ## Install
 
@@ -69,7 +71,12 @@ For shell use (`herdr-contr-orch agents …`), put the tool on the PATH.
    coordinator's prompt is busy (a dialog), the tool keeps it in
    `held/<coordinator>` of the state folder. The coordinator's Stop hook
    gives the held reports when its turn ends (it keeps the turn going one
-   time), and its prompt hook gives them with the next prompt. When a
+   time), and its prompt hook gives them with the next prompt. Only an
+   urgent report (blocked, failed, error, a question, failed CI, a PR merged
+   or closed) wakes the coordinator at once. Another report within
+   `report_batch_minutes` (agents.json, default 10; 0 turns it off) of the
+   last one is held too, and goes with the next urgent report, or with the
+   timer (`herdr-contr-orch batch flush`) at the end of the interval. When a
    worker's turn ends without a report, or its report call failed (hc
    refused it, or auto mode blocked it), the kit's Stop hook (`hooks/hooks.json`, `herdr-contr-orch hook stop`)
    sends the coordinator "ended its turn without a report. Last words: …".

@@ -5,6 +5,7 @@
 pub mod cli;
 pub mod config;
 pub mod flowseen;
+pub mod batch;
 pub mod held;
 pub mod home;
 pub mod hook;
@@ -13,6 +14,7 @@ pub mod limit;
 pub mod mcp;
 pub mod owner;
 pub mod prompt;
+pub mod resume;
 pub mod settings;
 pub mod spawn;
 pub mod tools;

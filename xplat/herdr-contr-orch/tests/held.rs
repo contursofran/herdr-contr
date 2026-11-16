@@ -137,10 +137,10 @@ fn the_report_tool_sends_or_holds() {
     assert_eq!(sends(&free), [json!({"terminal": "t1", "caller": "t7", "text": "b1: done"})]);
     assert!(!state.path().join("held").exists());
 
-    let got = mcp(&[report("b1: done")], &worker, &busy());
+    let got = mcp(&[report("b1: blocked, no access")], &worker, &busy());
     assert_eq!(got, [("held: t1 did not take it now (blocked); contr gives it to t1 when its prompt is free".to_string(), false)]);
     let r = coordinator_stop(path(state.path()), tempfile::tempdir().unwrap().path(), &Fake::default());
-    assert!(r.out.contains(r#"<hc from=\"t7 b1\">b1: done</hc>"#), "{}", r.out);
+    assert!(r.out.contains(r#"<hc from=\"t7 b1\">b1: blocked, no access</hc>"#), "{}", r.out);
 }
 
 #[test]

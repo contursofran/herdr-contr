@@ -139,7 +139,6 @@ pub fn items_at(range: &Range) -> Vec<ConversationItem> {
     p.items()
 }
 
-/// The model named by the newest assistant line, for logs with no status line.
 /// The tokens in the context after the newest main-thread Claude assistant message: its usage's input, cache write and
 /// cache read tokens. None without one.
 pub fn context_used(lines: &[String]) -> Option<i64> {
@@ -160,10 +159,19 @@ pub fn context_used(lines: &[String]) -> Option<i64> {
     None
 }
 
+/// The model of the newest line that names one, for logs with no status line: an assistant line's
+/// `message.model`, a Codex `payload.model`, or a `/model` switch (`Set model to …` local command output, the label
+/// mapped back to its id; `Default` names no model and is skipped).
 pub fn model(lines: &[String]) -> Option<String> {
-    for l in lines.iter().rev().filter(|l| l.contains("\"model\"")) {
+    for l in lines.iter().rev().filter(|l| l.contains("\"model\"") || l.contains("Set model to")) {
         let Ok(o) = serde_json::from_str::<Value>(l) else { continue };
         if !o.is_object() {
+            continue;
+        }
+        if let Some((m, _)) = model_switch(&o) {
+            if m.is_some() {
+                return m;
+            }
             continue;
         }
         if let Some(m) = o.get("message").and_then(|m| m.get("model")).and_then(Value::as_str) {
@@ -178,4 +186,113 @@ pub fn model(lines: &[String]) -> Option<String> {
         }
     }
     None
+}
+
+/// The effort that the newest `/model` switch names (`… with high effort`), when no assistant line came after it.
+pub fn switch_effort(lines: &[String]) -> Option<String> {
+    for l in lines.iter().rev().filter(|l| l.contains("\"model\"") || l.contains("Set model to")) {
+        let Ok(o) = serde_json::from_str::<Value>(l) else { continue };
+        if let Some((_, e)) = model_switch(&o) {
+            return e;
+        }
+        if o.get("type").and_then(Value::as_str) == Some("assistant") && o.get("isSidechain").and_then(Value::as_bool) != Some(true) {
+            return None;
+        }
+    }
+    None
+}
+
+/// A `/model` switch row: `Some((model id, effort))`; None for any other line.
+fn model_switch(o: &Value) -> Option<(Option<String>, Option<String>)> {
+    let c = o.get("message")?.get("content")?.as_str()?;
+    let body = c.trim().strip_prefix("<local-command-stdout>")?.strip_suffix("</local-command-stdout>")?;
+    let text = strip_ansi(body).replace('`', "");
+    let rest = text.trim().strip_prefix("Set model to ")?;
+    let (label, effort) = match rest.rsplit_once(" with ") {
+        Some((l, e)) if e.trim().ends_with(" effort") => (l.trim(), Some(e.trim().trim_end_matches(" effort").trim().to_string())),
+        _ => (rest.trim(), None),
+    };
+    let label = label.trim_end_matches("(default)").trim();
+    Some((label_id(label), effort.filter(|e| !e.is_empty())))
+}
+
+/// `Opus 5.5` → `claude-opus-5-5`, `Sonnet 5.5 (1M context)` → `claude-sonnet-5-5[1m]`: `models::claude_label` in
+/// reverse. An id stays as it is. None for `Default` or text that is no model.
+fn label_id(label: &str) -> Option<String> {
+    if label.starts_with("claude-") && !label.contains(' ') {
+        return Some(label.into());
+    }
+    let (base, wide) = label.strip_suffix("(1M context)").map(|b| (b.trim(), true)).unwrap_or((label, false));
+    let (family, version) = base.split_once(' ')?;
+    if family.is_empty() || !family.chars().all(|c| c.is_ascii_alphabetic()) || family.eq_ignore_ascii_case("default") {
+        return None;
+    }
+    let parts: Vec<&str> = version.split('.').collect();
+    if parts.iter().any(|v| v.is_empty() || v.len() > 2 || !v.chars().all(|c| c.is_ascii_digit())) {
+        return None;
+    }
+    let id = format!("claude-{}-{}{}", family.to_lowercase(), parts.join("-"), if wide { "[1m]" } else { "" });
+    (crate::models::claude_label(&id) == label).then_some(id)
+}
+
+fn strip_ansi(s: &str) -> String {
+    let mut out = String::new();
+    let mut it = s.chars().peekable();
+    while let Some(c) = it.next() {
+        if c == '\u{1b}' {
+            if it.peek() == Some(&'[') {
+                it.next();
+                for d in it.by_ref() {
+                    if d.is_ascii_alphabetic() {
+                        break;
+                    }
+                }
+            }
+            continue;
+        }
+        out.push(c);
+    }
+    out
+}
+
+#[cfg(test)]
+mod model_tests {
+    use super::*;
+
+    fn fixture() -> Vec<String> {
+        include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/../fixtures/model-switch.jsonl")).lines().map(String::from).collect()
+    }
+
+    #[test]
+    fn a_switch_after_the_last_reply_gives_the_model_and_effort() {
+        let l = fixture();
+        assert_eq!(model(&l).as_deref(), Some("claude-opus-5-5"));
+        assert_eq!(switch_effort(&l).as_deref(), Some("high"));
+    }
+
+    #[test]
+    fn a_reply_after_the_switch_wins() {
+        let mut l = fixture();
+        l.push(r#"{"type":"assistant","uuid":"a2","message":{"role":"assistant","model":"claude-fable-5-1","content":[]}}"#.into());
+        assert_eq!(model(&l).as_deref(), Some("claude-fable-5-1"));
+        assert_eq!(switch_effort(&l), None);
+    }
+
+    #[test]
+    fn switch_text_shapes() {
+        let row = |t: &str| format!(r#"{{"type":"user","message":{{"role":"user","content":"<local-command-stdout>{t}</local-command-stdout>"}}}}"#);
+        let base = r#"{"type":"assistant","message":{"role":"assistant","model":"claude-sonnet-5-5","content":[]}}"#.to_string();
+        for (t, want, eff) in [
+            ("Set model to `Opus 5.5`", Some("claude-opus-5-5"), None),
+            ("Set model to Sonnet 5.5 (1M context)", Some("claude-sonnet-5-5[1m]"), None),
+            ("Set model to Opus 5.5 (default) with low effort", Some("claude-opus-5-5"), Some("low")),
+            ("Set model to claude-fable-5-1", Some("claude-fable-5-1"), None),
+            ("Set model to Default (recommended)", Some("claude-sonnet-5-5"), None),
+            ("Set effort to high", Some("claude-sonnet-5-5"), None),
+        ] {
+            let l = vec![base.clone(), row(t)];
+            assert_eq!(model(&l).as_deref(), want, "{t}");
+            assert_eq!(switch_effort(&l).as_deref(), eff, "{t}");
+        }
+    }
 }

@@ -13,7 +13,7 @@ use crate::flowseen::state_dir;
 use crate::workers::{Core, Manager, Sent};
 
 /// The first line of the text that gives the held reports to the coordinator.
-pub const HELD_LEAD: &str = "contr: these reports came while your prompt was busy, so hc did not type them:";
+pub const HELD_LEAD: &str = "contr: these reports waited for you (not urgent, or your prompt was busy):";
 
 /// One held report.
 #[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
