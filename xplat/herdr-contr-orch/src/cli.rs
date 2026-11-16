@@ -15,6 +15,10 @@ pub const USAGE: &str = "Usage:
   herdr-contr-orch hook <name>              the kit's hooks: stop, session-start and prompt (see hook help)
   herdr-contr-orch mcp                      serve the coordinator's tools over MCP on stdin and stdout
   herdr-contr-orch owner <command> [args…]  answer questions and mark to-dos done (herdr-contr-orch owner help)
+  herdr-contr-orch pr check-boundary <pr> [--brief <file>]
+                                            list the PR's changed files outside the brief's Boundary: part
+                                            (default: the boundary that spawn kept for the PR's branch);
+                                            exit 1 when there are some
   herdr-contr-orch --version, -V            print the version and the build stamp
   herdr-contr-orch --help, -h               print this text
 ";
@@ -151,6 +155,7 @@ pub fn run(args: &[String], env: &dyn Fn(&str) -> String, input: &mut dyn BufRea
         },
         Some("agents") => run_agents(&args[1..], env, out, err, core),
         Some("owner") => run_owner(&args[1..], env, out, err, core),
+        Some("pr") => crate::boundary::run(&args[1..], env, out, err),
         Some("--version" | "-V") if args.len() == 1 => {
             let _ = writeln!(out, "herdr-contr-orch {} ({})", env!("CARGO_PKG_VERSION"), env!("HERDR_CONTR_BUILD"));
             0

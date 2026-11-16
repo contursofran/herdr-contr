@@ -3,6 +3,7 @@
 #   scripts/land.sh <pr> [--after <pr>] [--shot <file>]
 # --after: first wait until that pull request is not open any more (land a queue with one job each).
 # --shot:  after the install, write a picture of the Herdr window to that file.
+# Before the merge it runs `herdr-contr-orch pr check-boundary`: a file outside the brief's Boundary: part stops it.
 # Run it from the main checkout. Each step that fails ends the script with status 1, and a line says which.
 set -u
 fail() { echo "land: $*" >&2; exit 1; }
@@ -37,6 +38,15 @@ SHA=$(gh pr view "$N" --json headRefOid --jq .headRefOid) || fail "cannot read t
 # Wait for the checks of that head. `gh pr checks` fails while one is pending or has failed.
 while gh pr checks "$N" 2>&1 | grep -qE "pending|no checks reported"; do sleep 20; done
 gh pr checks "$N" >/dev/null 2>&1 || { gh pr checks "$N"; fail "the checks of $N did not pass"; }
+
+# Files outside the brief's boundary go back to the worker. The installed tool holds the boundaries that spawn
+# kept, so it runs that one. Exit 1: files outside. Other errors (no tool, an older tool, gh): a warning only.
+ORCH=${HERDR_CONTR_ORCH:-${HERDR_APP_HOME:-$HOME/.config/herdr-app}/herdr-contr/bin/herdr-contr-orch}
+if [ -x "$ORCH" ]; then
+  "$ORCH" pr check-boundary "$N"; rc=$?
+  [ "$rc" = 1 ] && fail "pull request $N does not pass the boundary check; send the files above back to the worker"
+  [ "$rc" = 0 ] || echo "land: boundary check skipped (exit $rc)" >&2
+fi
 
 gh pr merge "$N" --squash --match-head-commit "$SHA" || fail "the merge of $N failed"
 [ "$(state "$N")" = MERGED ] || fail "pull request $N is not merged"

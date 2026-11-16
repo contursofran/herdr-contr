@@ -237,6 +237,7 @@ pub fn spawn(core: &dyn Core, cfg: &Config, env: &dyn Fn(&str) -> String, mut s:
         argv = [words(&["/bin/sh", "-c", SETUP_WRAPPER, SETUP_NAME, &setup]), argv].concat();
         vars.insert(ENV_MAIN.into(), json!(main));
     }
+    crate::boundary::keep(env, &s.worktree, &s.task)?;
     let mut params = Map::new();
     params.insert("argv".into(), json!(argv));
     params.insert("name".into(), json!(s.name));

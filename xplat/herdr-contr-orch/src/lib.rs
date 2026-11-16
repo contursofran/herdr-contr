@@ -2,6 +2,7 @@
 //! flow that a coordinator follows (`config`), the workers in hc terminals (`workers`) their start (`spawn`) and the menu that a blocked one shows (`prompt`), and the questions and
 //! to-dos that wait for the owner (`owner`).
 //! The files and their places are the same as contr's, so both tools read the same state during the port.
+pub mod boundary;
 pub mod cli;
 pub mod config;
 pub mod due;
