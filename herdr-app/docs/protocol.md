@@ -205,6 +205,31 @@ settings and restarts it. `off` stops it and removes that file, only when it has
 - `service.state`: `off` (no file), `running`, `stopped`, `error` (`message` says where its log is), or
   `by-hand` (a file without the marker; never changed).
 
+### `statusline` (`statusline on|off|status [--settings <file>]`)
+
+```json
+{"on":true,"own":"~/bin/my-line","settings":"/home/me/.claude/settings.json","type":"statusline"}
+```
+
+Claude Code gives the context window and its used percent only to its `statusLine` command. `statusline on`
+writes herdr-contr's wrapper there, in the user's Claude Code settings (`--settings`, else
+`$CLAUDE_CONFIG_DIR/settings.json`, else `~/.claude/settings.json`):
+
+```
+'<helper>' herdr-contr-statusline --dir '<home>/herdr-contr/statusline' --own <base64>
+```
+
+`--own` is the owner's `statusLine` value as it was in the file (JSON text, base64). The wrapper reads Claude Code's
+input on stdin, runs the owner's command with the same input through `/bin/sh -c` (stopped after 5 s), prints its
+output unchanged, and saves the input (`<session>.json`) and the output (`<session>.out`) in the folder. Records
+older than a day are removed. With no own command it prints nothing. On an error of its own (bad input, a folder it
+cannot write) it still prints the owner's output. `status` then reads the record (source `statusline`).
+
+`on` keeps the other fields of the owner's `statusLine` (`padding`) and all other bytes of the file; a second `on`
+writes nothing. `off` writes the owner's `statusLine` text back as it was, or removes the key when there was none.
+Writes go through a temp file and a rename. A missing file is made. `own`: the owner's command, or null. Errors:
+`settings` (the file is not a JSON object; nothing is written), `usage`.
+
 ### `update` (`update check`), `update-plan` and `update-done` (`update install`)
 
 ```json
