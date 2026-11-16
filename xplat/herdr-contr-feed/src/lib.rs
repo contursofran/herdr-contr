@@ -24,6 +24,7 @@ pub mod suggestion;
 pub mod status;
 pub mod tail;
 pub mod framed;
+pub mod health;
 pub mod vt;
 pub mod phone;
 pub mod pictures;

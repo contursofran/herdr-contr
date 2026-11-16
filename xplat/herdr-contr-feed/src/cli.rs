@@ -10,6 +10,7 @@
 //!   herdr-contr-feed queue  --terminal <addr> [--cache <file>]   (the agent's own queue: one `queued` line; read only)
 //!   herdr-contr-feed working --terminal <addr> [--cache <file>]   (the agent's working and background lines on screen; read only)
 //!   herdr-contr-feed model  --terminal <addr> [--cache <file>]   (the agent's model and effort; read only)
+//!   herdr-contr-feed health [--layout <name>] [--herdr <version>] [--hc <version>]   (checks the install; read only)
 //!   herdr-contr-feed usage   (the Claude and Codex plan usage; read only)
 //!   herdr-contr-feed paste-image --dir <folder>   (copied files, else the clipboard's image as a PNG there; path null when none)
 //!   herdr-contr-feed agent-images --log <log> --dir <folder> --srcs <json>   (copies of the images an agent links)
@@ -24,7 +25,7 @@
 //! A terminal `m/tN` on another machine: the command runs there, in the helper there (`remote`). Rust only.
 
 use crate::protocol::{JsonLines, PROTOCOL_VERSION, SIDECAR_VERSION};
-use crate::{agentmodel, cards, config, feed, locate, mermaid, panel, paste, phone, queue, remote, status, suggestion, update, usage, working};
+use crate::{agentmodel, health, cards, config, feed, locate, mermaid, panel, paste, phone, queue, remote, status, suggestion, update, usage, working};
 use herdr_core::hc::{HcClient, HcSession};
 use herdr_core::PaneScreen;
 use herdr_core::resolver::SessionResolver;
@@ -63,7 +64,28 @@ pub fn run(argv: &[String]) -> String {
     r.out.emit_value(json!({"type": "header", "protocol": PROTOCOL_VERSION, "sidecar": SIDECAR_VERSION, "build": crate::protocol::BUILD, "cmd": cmd}));
     match cmd.as_str() {
         "version" => {
-            r.out.emit_value(json!({"type": "version", "commands": ["version", "feed", "status", "card", "approve", "answer", "send", "paste-image", "mermaid", "pictures", "helper", "queue", "phone", "commands", "working", "model", "usage", "favicon", "panel", "keys", "suggestion", "agent-images"], "release": update::release()}));
+            r.out.emit_value(json!({"type": "version", "commands": ["version", "feed", "status", "card", "approve", "answer", "send", "paste-image", "mermaid", "pictures", "helper", "queue", "phone", "commands", "working", "model", "usage", "favicon", "panel", "keys", "suggestion", "agent-images", "health"], "release": update::release()}));
+            r.finish(true)
+        }
+        "health" => {
+            let env = |k: &str| std::env::var(k).ok().filter(|v| !v.is_empty());
+            let Some(h) = herdr_core::places::home(home().as_deref(), None, &|k| env(k).unwrap_or_default()) else {
+                return r.fail("usage", "health needs --home <herdr-app home>");
+            };
+            let session = HcSession::resolve_env();
+            let i = health::Inputs {
+                home: h,
+                build: crate::protocol::BUILD.into(),
+                layout: opt("--layout"),
+                herdr: opt("--herdr"),
+                hc_version: opt("--hc"),
+                hc_up: session.is_available(),
+                claude: health::claude_dir(&env),
+                orch_version: &health::run_orch_version,
+            };
+            for c in health::checks(&i) {
+                r.out.emit_value(c.line());
+            }
             r.finish(true)
         }
         "usage" => {
