@@ -100,7 +100,7 @@ export class ChatView {
     this.appear = new Appear();
     this.cards = new Cards(cx);
     this.panel = new PanelCard(cx);
-    this.owner = new OwnerCards(cx);   // the coordinator's questions for the owner (#131)
+    this.owner = new OwnerCards(cx);   // the coordinator's questions (#131) and to-dos (#195) for the owner
     this.helper = new HelperUI();
     this.viewer = new PictureViewer(cx);
     this.refresh = (cx) => { this.lastPoll = 0; return this.poll(cx); };
