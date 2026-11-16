@@ -47,6 +47,8 @@ pub struct Spec {
     pub project: String,
     /// A few words of what the worker does, or ""; no control characters.
     pub title: String,
+    /// A Claude Code session id to resume (`--resume`), or "" for a new session.
+    pub resume: String,
 }
 
 fn words(list: &[&str]) -> Vec<String> {
@@ -213,6 +215,13 @@ pub fn spawn(core: &dyn Core, cfg: &Config, env: &dyn Fn(&str) -> String, mut s:
     let kit = if cfg.kit.is_empty() { String::new() } else { std::path::absolute(&cfg.kit).map(|k| k.display().to_string()).unwrap_or_else(|_| cfg.kit.clone()) };
     let agent = if p.agent.is_empty() { &s.profile } else { &p.agent };
     let mut argv = agent_argv(&kit, agent, &p.argv);
+    // A Claude worker gets a known session id, kept so the worker can resume after a crash (#210).
+    let mut record = None;
+    if is_claude(&argv) {
+        let session = if s.resume.is_empty() { crate::resume::new_session_id()? } else { s.resume.clone() };
+        argv.extend(words(&[if s.resume.is_empty() { "--session-id" } else { "--resume" }, &session]));
+        record = Some(crate::resume::Record { name: s.name.clone(), session, profile: s.profile.clone(), role: s.role.clone(), worktree: s.worktree.clone(), issue: s.issue.clone(), project: s.project.clone(), title: s.title.clone(), parent: s.parent.clone() });
+    }
     if !s.task.is_empty() {
         argv.push(s.task.clone());
     }
@@ -247,7 +256,19 @@ pub fn spawn(core: &dyn Core, cfg: &Config, env: &dyn Fn(&str) -> String, mut s:
     if !vars.is_empty() {
         params.insert("env".into(), Value::Object(vars));
     }
-    Ok(Worker::from_terminal(&core.call("terminal.run", Value::Object(params))?))
+    // The record is kept before the start, so a running worker always has one.
+    if let Some(r) = &record {
+        crate::resume::save(env, r)?;
+    }
+    match core.call("terminal.run", Value::Object(params)) {
+        Ok(t) => Ok(Worker::from_terminal(&t)),
+        Err(e) => {
+            if record.is_some() && s.resume.is_empty() {
+                crate::resume::forget(env, &s.name);
+            }
+            Err(e)
+        }
+    }
 }
 
 /// The task of a spawn: the text, or the content of `file`. It refuses both at once, and a file that is missing
