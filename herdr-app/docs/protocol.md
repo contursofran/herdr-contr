@@ -60,6 +60,7 @@ does not download; `install-isolated.sh` copies the sidecar in.
 | `pictures` | `--path <log> --dir <folder> --pics <json>` (Rust sidecar only) | `picture` for each entry of `--pics` |
 | `favicon` | `--path <file> --dir <folder>` (Rust sidecar only) | `favicon` |
 | `agent-images` | `--log <log> --dir <folder> --srcs <json>` (Rust sidecar only) | `agent-image` for each entry of `--srcs` |
+| `health` | `[--layout <name>] [--herdr <version>] [--hc <version>]` (Rust sidecar only) | `check` for each check |
 | `helper install` | `--machine <m> --sha256 <hex> [--cache <file>]` | `installed` |
 | `helper remove` | `--machine <m> [--cache <file>]` | `removed` |
 | `phone status` / `on` / `off` | `--home <herdr-app home>` (Rust sidecar only) | `phone` |
@@ -172,7 +173,7 @@ Targets: `x86_64-unknown-linux-musl`, `aarch64-unknown-linux-musl`, `universal-a
 ### `version`
 
 ```json
-{"commands":["version","feed","status","card","approve","answer","send","paste-image","mermaid","pictures","helper","queue","phone","commands","working","model","usage","favicon","panel","keys","suggestion","agent-images"],"release":"0.9.0","type":"version"}
+{"commands":["version","feed","status","card","approve","answer","send","paste-image","mermaid","pictures","helper","queue","phone","commands","working","model","usage","favicon","panel","keys","suggestion","agent-images","health"],"release":"0.9.0","type":"version"}
 ```
 
 `commands`: the commands this sidecar has. The mod hides actions whose command is missing.
@@ -288,6 +289,26 @@ mod passes `<herdr-app home>/herdr-contr/images`. `width`, `height`: the size in
 SVG from the root's `width` and `height`, else its `viewBox`). `path: null`: a URL, a relative path with no cwd, no
 file, a file over 32 MB, another format, or content that does not match the extension. Copies not written or
 asked for in 7 days are removed from the folder; other files never. Errors: `usage`, `write`.
+
+### `check` (`health [--layout <name>] [--herdr <version>] [--hc <version>]`)
+
+```json
+{"fix":"Install again: unzip the latest release and run ./install.sh.","id":"orch","message":"herdr-contr-orch is from build 1a2b3c4 2026-11-01, the helper is from build 5d6e7f8 2026-11-16.","state":"fail","type":"check"}
+```
+
+The checks of the install in `--home`, in this order (#217). It writes nothing. `state`: `ok`, `warn` or
+`fail`; `fix` is empty for `ok`. The mod gives the layout in use (`shared("layout")`) and the versions of Herdr
+and hc (`updates()`); a missing one is "unknown".
+
+| `id` | Checks |
+|---|---|
+| `mods` | `herdr-contr/install.json` is there, the files of our mods match its hashes, and its `build` is the helper's build |
+| `layout` | the layout in use is `herdr-contr` or `herdr-contr-own`, and its file matches `install.json` |
+| `collisions` | no other mod has a name that starts with `herdr-contr` or the title of one of our mods, and each mod that our layouts name is in `mods/` |
+| `orch` | `herdr-contr/bin/herdr-contr-orch --version` runs and gives the helper's build |
+| `hc` | hc (herdr-core) answers on its socket |
+| `kit` | the kit is in `herdr-contr/kit`, and Claude Code's marketplace `contr` (`<CLAUDE_CONFIG_DIR or ~/.claude>/plugins/known_marketplaces.json`) is `herdr-contr` of this home |
+| `herdr` | Herdr is 0.1.16 or later |
 
 ### `favicon` (`favicon --path <file> --dir <folder>`)
 

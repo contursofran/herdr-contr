@@ -31,6 +31,14 @@ Each step is finished and in use before the next one starts.
 4. The inbox: the orchestrator's questions and to-dos in one list.
 5. The orchestrator's workers and its missed messages.
 
+**Frontend on hold (owner, 2026-11-16).** The owner tries contr as an
+Electron app (repository `contr-desktop`), which uses this repository's
+helper, orchestration tool and kit. Until the owner decides, do no new work
+in `herdr-app/mods`, `herdr-app/layouts` and `herdr-app/themes`: work only on
+the helper, `herdr-contr-orch`, `kit/` and the release. Issues for the mod
+have the label `frontend-hold`. A bug that stops the owner's daily work in
+the mod is still fixed.
+
 Not in scope: a files panel and a pull request reader. The sidebar is
 reworked after the owner's design (owner, 2026-11-13), in slices: #96 one
 Projects list (each project with its agents and their workers), #97 the head
