@@ -1,5 +1,8 @@
 # xplat
 
+> [!WARNING]
+> The backend moved. The helper, the orchestration tool and the kit are in the repository contr-core. Do not change `xplat/`, `kit/`, `web/` and the other paths of `scripts/backend-paths.txt` here. This repository will be archived.
+
 The helper and its library, in one Cargo workspace.
 
 | Crate | What it is |
