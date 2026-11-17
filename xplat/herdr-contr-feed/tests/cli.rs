@@ -174,6 +174,29 @@ fn usage_reads_the_fake_homes_only() {
 }
 
 #[test]
+fn usage_reads_the_status_line_records_in_contr_home() {
+    let d = tempfile::tempdir().unwrap();
+    std::fs::create_dir_all(d.path().join("state/usage")).unwrap();
+    std::fs::write(d.path().join("state/usage/claude.json"), r#"{"schema":1,"updated_at":7,"windows":[{"kind":"seven_day","used_percent":0,"resets_at":100}]}"#).unwrap();
+    std::fs::create_dir_all(d.path().join("root/statusline")).unwrap();
+    std::fs::write(d.path().join("root/statusline/sess-1.json"), r#"{"session_id":"sess-1","rate_limits":{"seven_day":{"used_percentage":17,"resets_at":1795453200}}}"#).unwrap();
+    let out = Command::new(env!("CARGO_BIN_EXE_herdr-contr-feed"))
+        .arg("usage")
+        .env_clear()
+        .env("HOME", d.path().join("home"))
+        .env("CONTR_HOME", d.path().join("root"))
+        .env("CONTR_STATE_DIR", d.path().join("state"))
+        .env("CODEX_HOME", d.path().join("codex"))
+        .env("SHELL", "/usr/bin/false")
+        .output()
+        .unwrap();
+    let v: Vec<Value> = String::from_utf8(out.stdout).unwrap().lines().map(|l| serde_json::from_str(l).unwrap()).collect();
+    let plan = &v[1]["plans"][0];
+    assert_eq!(plan["windows"], serde_json::json!([{"kind": "seven_day", "used_percent": 17.0, "resets_at": 1795453200}]));
+    assert!(plan["read_at"].as_u64().unwrap() > 7, "the record's file time");
+}
+
+#[test]
 fn favicon_copies_under_the_dir() {
     let d = std::env::temp_dir().join(format!("hcf-cli-favicon-{}", std::process::id()));
     let _ = std::fs::remove_dir_all(&d);
