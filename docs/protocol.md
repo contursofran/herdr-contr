@@ -76,7 +76,8 @@ owner presses a button, never on a timer. `keys` too: only on the owner's key or
 counts, so a `--text` that says `--home` is not taken for it. The sidecar reads the
 settings in `config.json` of the backend root: `<home>/herdr-contr` with `--home`; without it `$CONTR_HOME` (the root
 itself), else `$HERDR_APP_HOME/herdr-contr`, else the folder the sidecar is in when that is `<home>/herdr-contr/bin`,
-else `~/.config/herdr-app/herdr-contr`. An empty variable counts as unset. With `"remote_helper": "never"`, every command for a terminal on another machine, and
+else `~/.config/contr-backend` when it exists, else `~/.config/herdr-app/herdr-contr` when it exists, else
+`~/.config/contr-backend`. An empty variable counts as unset. With `"remote_helper": "never"`, every command for a terminal on another machine, and
 `helper install` and `remove`, stop with the error `remote-off` before anything runs there.
 
 ### Terminals on another machine (`m/t7`; Rust sidecar only)

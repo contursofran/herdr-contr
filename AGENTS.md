@@ -16,8 +16,10 @@ next. The Herdr app gives the window, the sidebar, the tabs and the terminal.
   (#160): `xplat/herdr-contr-orch` and `kit/`. The helper's `install` puts both in
   the Herdr home (`herdr-contr/kit`, `herdr-contr/bin`). The tool's files
   (`agents.json`, `owner.json`, `state/`) are in the backend root:
-  `CONTR_HOME`, else the Herdr home's `herdr-contr` folder (#255). The mod
-  reads and changes them only through the tool (#186).
+  `CONTR_HOME`, else the Herdr home's `herdr-contr` folder (#255). The
+  default root is the neutral folder `~/.config/contr-backend` when it
+  exists, else `~/.config/herdr-app/herdr-contr` when it exists (#264). The
+  mod reads and changes them only through the tool (#186).
 
 ## Goal: one thing at a time (owner, 2026-11-11)
 
@@ -140,8 +142,12 @@ and `gpui-kit.d.ts`. Read them there. Do not copy them into this repository.
 ## Safety
 
 - The owner's Herdr app and hc core are live. Do not edit files in the
-  owner's Herdr home (`~/.config/herdr-app`) by hand. Never send input to the
-  owner's Herdr app. Never stop, restart or send input to the owner's hc core.
+  owner's Herdr home (`~/.config/herdr-app`) or in the neutral backend root
+  (`~/.config/contr-backend`) by hand. Never send input to the owner's Herdr
+  app. Never stop, restart or send input to the owner's hc core.
+- No agent runs `herdr-contr-feed home move`, with or without `--dry-run`,
+  on the owner's files. The owner runs it (#264). Tests run it in a
+  temporary HOME.
 - Never start `herdr-app` (owner, 2026-11-12). It is one app per Mac: a
   second start, even with a test home and a scratch `HC_SESSION`, replaces
   the owner's window. Check the mod with `npm test`. The coordinator looks at

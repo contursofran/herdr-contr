@@ -49,7 +49,7 @@ Pictures in the conversation (ones you pasted, and screenshots a tool returned) 
 The helper reads each one back from the log when the page asks, and checks that it is still the same picture.
 
 Images you add in the composer (+) go to the helper with POST, part by part, then go out with your message as file
-paths, as on the Mac. The helper keeps them in `uploads` of the backend root (`<herdr-app home>/herdr-contr`, or `$CONTR_HOME`) (folder mode 700, files mode 600)
+paths, as on the Mac. The helper keeps them in `uploads` of the backend root (`<herdr-app home>/herdr-contr`, or `$CONTR_HOME`, or `~/.config/contr-backend`) (folder mode 700, files mode 600)
 under names it makes, and removes only its own files: after 7 days, or the oldest past 200 files or 512 MB.
 
 Notifications (the bell on the page) come from the helper itself, with the page open or closed: when an agent needs
@@ -127,7 +127,7 @@ Options:
 | `--cache <file>` | The sidecar's cache and its `answered/` claims (`~/.herdr-contr/serve/cache.json`). |
 | `--origin https://<host>` | An extra page origin to accept. Use it when a proxy changes `Host`. By default the `Origin` must name `Host` or `X-Forwarded-Host`. |
 | `--read-only` | The page only reads. Approve, answer and send are refused. |
-| `--home <folder>` | The herdr-app home whose herdr-contr settings apply (`Never` for other machines); the backend root is `<folder>/herdr-contr`. Default root: `$CONTR_HOME`, else `$HERDR_APP_HOME/herdr-contr`, else the root this helper is installed in, else `~/.config/herdr-app/herdr-contr`. |
+| `--home <folder>` | The herdr-app home whose herdr-contr settings apply (`Never` for other machines); the backend root is `<folder>/herdr-contr`. Default root: `$CONTR_HOME`, else `$HERDR_APP_HOME/herdr-contr`, else the root this helper is installed in, else `~/.config/contr-backend` when it exists, else `~/.config/herdr-app/herdr-contr` when it exists, else `~/.config/contr-backend`. |
 
 ## From the Herdr app mod (herdr-contr settings)
 

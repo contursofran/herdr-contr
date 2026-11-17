@@ -54,6 +54,21 @@ herdr-app do layout.switch '{"name": "herdr-contr"}'
 `herdr-contr` keeps Herdr's own sidebar. `herdr-contr-own` hides it. `ctrl-shift-l` switches back to
 your own layout. [herdr-app/README.md](herdr-app/README.md) has the details.
 
+The backend root (the kit, the programs and the orchestration tool's files) is `~/.config/contr-backend`
+when that folder exists, else `~/.config/herdr-app/herdr-contr` when that exists, else
+`~/.config/contr-backend`. `CONTR_HOME` and `HERDR_APP_HOME` come before this default. To move your
+files to the neutral folder, run the move yourself, with no worker live and the phone page off:
+
+```sh
+"$H" home move --dry-run
+"$H" home move
+```
+
+It moves `~/.config/herdr-app/herdr-contr` to `~/.config/contr-backend` and leaves a link at the old
+path, so the mod, `--home` and Claude Code's marketplace entry continue to work. When the move is not
+safe (the neutral folder has files, a lock is held, a worker is live, the phone service names the old
+path, or the two folders are on different file systems), it stops and writes nothing.
+
 ## Install into a test home
 
 Never install a branch that is not merged into your real Herdr home. For development, use a test home:
