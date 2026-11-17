@@ -58,7 +58,7 @@ stay ours. The top bar is our copy of Herdr's `tabs` mod.
 | `herdr-app/install.sh`, `herdr-app/install-isolated.sh` | mod | the install into a Herdr home, and into a test home; `install.sh` is also the release zip's installer |
 | `scripts/sync-copies.mjs` | mod | writes the functions that one mod copies from another |
 | `docs/protocol.md` | backend | the contract of the helper, which the mod and contr-desktop use (JSON Lines) |
-| `xplat/herdr-contr-feed` | backend | the helper (Rust): reads the agents' session logs and talks to hc; its `install`, `build.rs` and `health` also hold mod parts |
+| `xplat/herdr-contr-feed` | backend | the helper (Rust): reads the agents' session logs and talks to hc; its `install`, `build.rs` and `health` also hold mod parts, behind the Cargo feature `herdr-mod` (on by default) |
 | `xplat/herdr-core` | backend | the helper's hc client, its parsers and `places` |
 | `xplat/herdr-contr-orch` | backend | the orchestration tool (Rust), ported from contr slice by slice (#160); its parts are in the list below the table |
 | `kit`, `.claude-plugin/marketplace.json` | backend | the Claude Code plugin of a coordinator and its workers: the agent definitions, the playbook (`commands/orchestrate.md`), the chat-writing skill, the hooks and the MCP server, which run `herdr-contr-orch`; `.claude-plugin/marketplace.json` at the root names it for Claude Code |
@@ -70,6 +70,7 @@ stay ours. The top bar is our copy of Herdr's `tabs` mod.
 | `.github/workflows/ci.yml`, `.github/workflows/release.yml`, `scripts/land.sh` | both | the CI, the release and the landing of a PR: one job and one zip for both sides |
 
 A backend part does not read a file of `herdr-app/` at build time or at run time.
+The CI job `backend` checks it.
 
 The parts of `xplat/herdr-contr-orch`:
 
@@ -90,7 +91,10 @@ and `gpui-kit.d.ts`. Read them there. Do not copy them into this repository.
 
 - Mod: `cd herdr-app && npm test`.
 - Helper: `cargo test --locked --manifest-path xplat/Cargo.toml -p herdr-contr-feed -p herdr-core -p herdr-contr-orch`.
-- Both must pass, and the `CI` check on the PR, before you report done.
+- Backend without the mod (the CI job `backend`, which first removes `herdr-app/`):
+  `cargo test --locked --no-default-features --manifest-path xplat/Cargo.toml -p herdr-contr-feed -p herdr-core -p herdr-contr-orch`.
+  The Cargo feature `herdr-mod` of `herdr-contr-feed` (on by default) holds the mod's parts of the helper.
+- All must pass, and the `CI` check on the PR, before you report done.
 
 ## Design rules (lessons from contr)
 

@@ -226,6 +226,7 @@ fn version_flag_prints_the_build_stamp() {
 }
 
 #[test]
+#[cfg(feature = "herdr-mod")]
 fn health_gives_a_check_line_for_each_check() {
     let home = tempfile::tempdir().unwrap();
     let h = home.path().to_str().unwrap();
@@ -238,6 +239,38 @@ fn health_gives_a_check_line_for_each_check() {
     assert_eq!(state("layout"), "warn");
     assert_eq!(state("herdr"), "ok");
     assert_eq!(v.last().unwrap()["ok"], true);
+}
+
+/// `health` with no --home reads the checks orch and kit in CONTR_HOME, not in HERDR_APP_HOME's herdr-contr.
+#[test]
+fn health_reads_orch_and_kit_in_contr_home() {
+    use std::os::unix::fs::PermissionsExt;
+    let t = tempfile::tempdir().unwrap();
+    let (r, h, claude) = (t.path().join("r"), t.path().join("h"), t.path().join("claude"));
+    for d in [r.join("kit/.claude-plugin"), r.join(".claude-plugin"), r.join("bin"), h.clone(), claude.join("plugins")] {
+        std::fs::create_dir_all(d).unwrap();
+    }
+    std::fs::write(r.join("kit/.claude-plugin/plugin.json"), "{}").unwrap();
+    std::fs::write(r.join(".claude-plugin/marketplace.json"), "{}").unwrap();
+    let orch = r.join("bin/herdr-contr-orch");
+    std::fs::write(&orch, format!("#!/bin/sh\necho 'herdr-contr-orch 0.1.0 ({})'\n", env!("HERDR_CONTR_BUILD"))).unwrap();
+    std::fs::set_permissions(&orch, std::fs::Permissions::from_mode(0o755)).unwrap();
+    let known = serde_json::json!({"contr": {"source": {"path": r.display().to_string()}}});
+    std::fs::write(claude.join("plugins/known_marketplaces.json"), known.to_string()).unwrap();
+    let out = Command::new(env!("CARGO_BIN_EXE_herdr-contr-feed"))
+        .arg("health")
+        .env_clear()
+        .env("HC_SOCKET", "/nonexistent.sock")
+        .env("HOME", "/nonexistent-home")
+        .env("CONTR_HOME", &r)
+        .env("HERDR_APP_HOME", &h)
+        .env("CLAUDE_CONFIG_DIR", &claude)
+        .output()
+        .unwrap();
+    let v: Vec<Value> = String::from_utf8(out.stdout).unwrap().lines().map(|l| serde_json::from_str(l).unwrap()).collect();
+    let check = |id: &str| v.iter().find(|l| l["id"] == id).unwrap_or_else(|| panic!("no {id}: {v:?}")).clone();
+    assert_eq!(check("orch")["state"], "ok", "{:?}", check("orch"));
+    assert_eq!(check("kit")["state"], "ok", "{:?}", check("kit"));
 }
 
 #[test]

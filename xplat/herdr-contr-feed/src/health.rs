@@ -1,19 +1,24 @@
 //! `herdr-contr-feed health`: checks the install in one Herdr home (#217). One `check` line for each check:
 //! `{id, state: ok|warn|fail, message, fix}`. It reads files and runs `herdr-contr-orch --version`; it writes nothing.
 //! The mod gives what only Herdr knows: the layout in use, Herdr's version and hc's version.
+//! The checks `orch` and `kit` read the backend root. Without the feature herdr-mod, they are the only checks.
 
 use herdr_core::places::Places;
 use serde_json::{json, Value};
+#[cfg(any(feature = "herdr-mod", test))]
 use sha2::{Digest, Sha256};
 use std::fs;
 use std::path::{Path, PathBuf};
 
+#[cfg(feature = "herdr-mod")]
 use crate::install::MODS;
 
 /// The oldest Herdr that this mod works with.
+#[cfg(feature = "herdr-mod")]
 pub const MIN_HERDR: &str = "0.1.16";
 
 /// The layouts that the install puts in the Herdr home.
+#[cfg(feature = "herdr-mod")]
 pub const LAYOUTS: [&str; 2] = ["herdr-contr", "herdr-contr-own"];
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -35,13 +40,21 @@ impl Check {
 
 /// What the checks read. Tests give fakes.
 pub struct Inputs<'a> {
+    /// The Herdr home, for the mod's checks.
+    #[cfg(feature = "herdr-mod")]
     pub home: PathBuf,
+    /// The backend root (`config::dir`), for the checks `orch` and `kit`.
+    pub root: PathBuf,
     /// This helper's build stamp.
     pub build: String,
     /// The layout in use, from the mod.
+    #[cfg(feature = "herdr-mod")]
     pub layout: Option<String>,
+    #[cfg(feature = "herdr-mod")]
     pub herdr: Option<String>,
+    #[cfg(feature = "herdr-mod")]
     pub hc_version: Option<String>,
+    #[cfg(feature = "herdr-mod")]
     pub hc_up: bool,
     /// The Claude Code folder (`~/.claude`, or CLAUDE_CONFIG_DIR).
     pub claude: Option<PathBuf>,
@@ -51,16 +64,26 @@ pub struct Inputs<'a> {
 
 const REINSTALL: &str = "Install again: unzip the latest release and run ./install.sh.";
 
+#[cfg(feature = "herdr-mod")]
 pub fn checks(i: &Inputs) -> Vec<Check> {
-    let p = Places::new(&i.home);
-    let record: Option<Value> = fs::read(p.install_record()).ok().and_then(|b| serde_json::from_slice(&b).ok());
+    let p = Places::at(i.root.clone());
+    let record: Option<Value> = fs::read(Places::new(&i.home).install_record()).ok().and_then(|b| serde_json::from_slice(&b).ok());
     vec![mods(i, &record), layout(i, &record), collisions(i), orch(i, &p), hc(i), kit(i, &p), herdr(i)]
 }
 
+/// Without the mod: only the backend's checks.
+#[cfg(not(feature = "herdr-mod"))]
+pub fn checks(i: &Inputs) -> Vec<Check> {
+    let p = Places::at(i.root.clone());
+    vec![orch(i, &p), kit(i, &p)]
+}
+
+#[cfg(any(feature = "herdr-mod", test))]
 fn sha_file(p: &Path) -> Option<String> {
     fs::read(p).ok().map(|b| format!("{:x}", Sha256::digest(&b)))
 }
 
+#[cfg(feature = "herdr-mod")]
 /// The files of the record whose path starts with `prefix`, and those that are missing or changed.
 fn differ(home: &Path, record: &Value, prefix: &str) -> (usize, Vec<String>, Vec<String>) {
     let (mut n, mut missing, mut changed) = (0, vec![], vec![]);
@@ -78,6 +101,7 @@ fn differ(home: &Path, record: &Value, prefix: &str) -> (usize, Vec<String>, Vec
     (n, missing, changed)
 }
 
+#[cfg(feature = "herdr-mod")]
 fn mods(i: &Inputs, record: &Option<Value>) -> Check {
     let Some(r) = record else {
         return Check::new("mods", "fail", "There is no herdr-contr/install.json: the mod was not installed with the helper.", REINSTALL);
@@ -97,6 +121,7 @@ fn mods(i: &Inputs, record: &Option<Value>) -> Check {
     Check::new("mods", "ok", format!("{} are installed, build {built}.", MODS.join(", ")), "")
 }
 
+#[cfg(feature = "herdr-mod")]
 fn layout(i: &Inputs, record: &Option<Value>) -> Check {
     let name = i.layout.as_deref().unwrap_or("");
     if !LAYOUTS.contains(&name) {
@@ -112,6 +137,7 @@ fn layout(i: &Inputs, record: &Option<Value>) -> Check {
     Check::new("layout", "ok", format!("The layout in use is {name}."), "")
 }
 
+#[cfg(feature = "herdr-mod")]
 /// Another mod with one of our names or titles, and a mod in our layouts that is not there.
 fn collisions(i: &Inputs) -> Check {
     let mods_dir = i.home.join("mods");
@@ -152,6 +178,7 @@ fn collisions(i: &Inputs) -> Check {
     }
 }
 
+#[cfg(feature = "herdr-mod")]
 fn mods_in(v: &Value, out: &mut Vec<String>) {
     match v {
         Value::Object(o) => {
@@ -184,6 +211,7 @@ fn orch(i: &Inputs, p: &Places) -> Check {
     }
 }
 
+#[cfg(feature = "herdr-mod")]
 fn hc(i: &Inputs) -> Check {
     let v = i.hc_version.as_deref().unwrap_or("unknown");
     if i.hc_up {
@@ -208,10 +236,12 @@ fn kit(i: &Inputs, p: &Places) -> Check {
     }
 }
 
+#[cfg(feature = "herdr-mod")]
 fn parse(v: &str) -> Vec<u64> {
     v.trim().trim_start_matches('v').split(['.', '-', ' ']).map_while(|x| x.parse().ok()).collect()
 }
 
+#[cfg(feature = "herdr-mod")]
 fn herdr(i: &Inputs) -> Check {
     match i.herdr.as_deref() {
         None => Check::new("herdr", "warn", "Herdr's version is not known.", ""),
@@ -278,11 +308,17 @@ mod tests {
 
     fn inputs<'a>(h: &Path, orch: &'a dyn Fn(&Path) -> Result<String, String>) -> Inputs<'a> {
         Inputs {
+            #[cfg(feature = "herdr-mod")]
             home: h.into(),
+            root: h.join("herdr-contr"),
             build: B.into(),
+            #[cfg(feature = "herdr-mod")]
             layout: Some("herdr-contr".into()),
+            #[cfg(feature = "herdr-mod")]
             herdr: Some("0.1.16".into()),
+            #[cfg(feature = "herdr-mod")]
             hc_version: Some("0.5.0".into()),
+            #[cfg(feature = "herdr-mod")]
             hc_up: true,
             claude: Some(h.join("claude")),
             orch_version: orch,
@@ -295,6 +331,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "herdr-mod")]
     fn a_good_install_is_all_ok() {
         let d = good();
         let c = checks(&inputs(d.path(), &ok_orch));
@@ -306,6 +343,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "herdr-mod")]
     fn mods_missing_changed_or_from_another_build() {
         let d = good();
         let h = d.path();
@@ -322,6 +360,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "herdr-mod")]
     fn another_layout_or_a_changed_one_warns() {
         let d = good();
         let mut i = inputs(d.path(), &ok_orch);
@@ -332,6 +371,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "herdr-mod")]
     fn a_mod_with_our_name_or_title_collides() {
         let d = good();
         put(d.path(), "mods/flock/mod.json", r#"{"title":"herdr-contr"}"#);
@@ -342,10 +382,37 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "herdr-mod")]
     fn our_layout_naming_a_missing_mod_fails() {
         let d = good();
         fs::remove_dir_all(d.path().join("mods/pane")).unwrap();
         assert!(state(&checks(&inputs(d.path(), &ok_orch)), "collisions").1.contains("layouts/herdr-contr.json: pane"));
+    }
+
+    #[test]
+    #[cfg(not(feature = "herdr-mod"))]
+    fn backend_health_has_only_orch_and_kit() {
+        let d = good();
+        let c = checks(&inputs(d.path(), &ok_orch));
+        assert_eq!(c.iter().map(|x| x.id).collect::<Vec<_>>(), ["orch", "kit"]);
+        for x in &c {
+            assert_eq!(x.state, "ok", "{x:?}");
+        }
+    }
+
+    /// The checks `orch` and `kit` read the backend root, not `<home>/herdr-contr`.
+    #[test]
+    fn orch_and_kit_read_the_backend_root() {
+        let d = good();
+        let h = d.path();
+        let r = h.join("root");
+        fs::rename(h.join("herdr-contr"), &r).unwrap();
+        put(h, "claude/plugins/known_marketplaces.json", &json!({"contr": {"source": {"path": r.display().to_string()}}}).to_string());
+        let mut i = inputs(h, &ok_orch);
+        i.root = r;
+        let c = checks(&i);
+        assert_eq!(state(&c, "orch").0, "ok");
+        assert_eq!(state(&c, "kit").0, "ok");
     }
 
     #[test]
@@ -360,6 +427,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "herdr-mod")]
     fn hc_down_fails() {
         let d = good();
         let mut i = inputs(d.path(), &ok_orch);
@@ -380,6 +448,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "herdr-mod")]
     fn herdr_too_old_fails() {
         let d = good();
         let mut i = inputs(d.path(), &ok_orch);

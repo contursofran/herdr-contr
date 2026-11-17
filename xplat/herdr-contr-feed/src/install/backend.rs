@@ -55,6 +55,7 @@ pub(super) fn read_remote(dir: &Path) -> Result<(Vec<Remote>, Vec<u8>), String> 
     Ok((out, sums))
 }
 
+#[cfg(feature = "herdr-mod")]
 /// The files of the orchestration tool that the contr app kept in the user config folder (macOS:
 /// ~/Library/Application Support/contr; else $XDG_CONFIG_HOME/contr or ~/.config/contr) and that have no copy
 /// in the Herdr home yet, as (the new place, the old file). The tool reads them in <home>/herdr-contr now (#160).

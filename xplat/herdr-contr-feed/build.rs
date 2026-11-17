@@ -1,5 +1,6 @@
-// Embeds the herdr-app mods (layout, themes, mods/herdr-contr*, keys.json) for `herdr-contr-feed install`, so
-// the helper alone can install the mod. The files are the repo's herdr-app/ folder at build time.
+// Embeds the kit, and with the feature herdr-mod the herdr-app mods (layout, themes, mods/herdr-contr*,
+// keys.json), for `herdr-contr-feed install`, so the helper alone can install them. The files are the repo's
+// kit/ and herdr-app/ folders at build time. Without the feature, no file of herdr-app/ is read.
 use std::fs;
 use std::path::{Path, PathBuf};
 
@@ -27,6 +28,28 @@ include!("../build-stamp.rs");
 
 fn main() {
     build_stamp();
+    let mut src = String::new();
+    if std::env::var_os("CARGO_FEATURE_HERDR_MOD").is_some() {
+        herdr_mod(&mut src);
+    }
+    // The kit (the Claude Code plugin of a coordinator and its workers), for <home>/herdr-contr/kit.
+    let kit_base = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../kit");
+    assert!(kit_base.join(".claude-plugin/plugin.json").is_file(), "kit/ must sit next to xplat/");
+    let mut kit = Vec::new();
+    walk(&kit_base, &kit_base, &mut kit);
+    kit.sort();
+    src.push_str("/// Every file of the kit, as (path relative to the kit folder, bytes), sorted by path.\npub static KIT: &[(&str, &[u8])] = &[\n");
+    for (rel, p) in &kit {
+        println!("cargo:rerun-if-changed={}", p.display());
+        src.push_str(&format!("    ({rel:?}, include_bytes!({:?})),\n", p.display().to_string()));
+    }
+    src.push_str("];\n");
+    let out = PathBuf::from(std::env::var("OUT_DIR").unwrap());
+    fs::write(out.join("embedded.rs"), src).unwrap();
+}
+
+/// The mod's part (feature herdr-mod): FILES, KEYS and KNOWN, from herdr-app/.
+fn herdr_mod(src: &mut String) {
     let base = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../herdr-app");
     assert!(base.join("keys.json").is_file(), "herdr-app/ must sit next to xplat/");
     let mut files = vec![
@@ -44,20 +67,8 @@ fn main() {
         walk(&base.join("mods").join(m), &base, &mut files);
     }
     files.sort();
-    let mut src = String::from("/// Every file `install` puts in the home, as (path relative to the home, bytes), sorted by path.\npub static FILES: &[(&str, &[u8])] = &[\n");
+    src.push_str("/// Every file `install` puts in the home, as (path relative to the home, bytes), sorted by path.\npub static FILES: &[(&str, &[u8])] = &[\n");
     for (rel, p) in &files {
-        println!("cargo:rerun-if-changed={}", p.display());
-        src.push_str(&format!("    ({rel:?}, include_bytes!({:?})),\n", p.display().to_string()));
-    }
-    src.push_str("];\n");
-    // The kit (the Claude Code plugin of a coordinator and its workers), for <home>/herdr-contr/kit.
-    let kit_base = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../kit");
-    assert!(kit_base.join(".claude-plugin/plugin.json").is_file(), "kit/ must sit next to xplat/");
-    let mut kit = Vec::new();
-    walk(&kit_base, &kit_base, &mut kit);
-    kit.sort();
-    src.push_str("/// Every file of the kit, as (path relative to the kit folder, bytes), sorted by path.\npub static KIT: &[(&str, &[u8])] = &[\n");
-    for (rel, p) in &kit {
         println!("cargo:rerun-if-changed={}", p.display());
         src.push_str(&format!("    ({rel:?}, include_bytes!({:?})),\n", p.display().to_string()));
     }
@@ -68,7 +79,6 @@ fn main() {
     let out = PathBuf::from(std::env::var("OUT_DIR").unwrap());
     let known = known_files(&out);
     src.push_str(&format!("/// The files of earlier versions (HERDR_CONTR_KNOWN_FILES, else empty): `<sha256>  <version>  <path>` lines.\npub static KNOWN: &[u8] = include_bytes!({:?});\n", known.display().to_string()));
-    fs::write(out.join("embedded.rs"), src).unwrap();
 }
 
 /// The known-files table: HERDR_CONTR_KNOWN_FILES when set (a file of `<sha256>  <version>  <path>` lines), else

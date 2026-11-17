@@ -1,9 +1,12 @@
 //! `herdr-contr-feed install`: the port of herdr-app/install.sh, with the mod built into the helper.
 //! Plain text for a person, and an exit code (0 done, 1 stopped, 2 bad arguments); not JSON Lines.
+//! Without the feature herdr-mod, `install` is the backend install (`install --backend`).
 
 use serde_json::Value;
+#[cfg(feature = "herdr-mod")]
 use std::collections::BTreeMap;
 use std::fs;
+#[cfg(feature = "herdr-mod")]
 use std::io::Write;
 use std::path::Path;
 
@@ -11,18 +14,26 @@ use herdr_core::places::{self, Places};
 
 mod backend;
 mod files;
+#[cfg(feature = "herdr-mod")]
 mod herdr;
 
 mod embedded {
     include!(concat!(env!("OUT_DIR"), "/embedded.rs"));
 }
 pub use backend::{KIT, MARKETPLACE};
+#[cfg(feature = "herdr-mod")]
 pub use herdr::{known_files, sort_files, Known, Sorted, FILES, KEYS, KNOWN, MODS, RETIRED};
 
-use backend::{old_orch_files, read_remote, Backend};
-use files::{put, sha_file, stop, walk_files};
+#[cfg(feature = "herdr-mod")]
+use backend::old_orch_files;
+use backend::{read_remote, Backend};
+#[cfg(feature = "herdr-mod")]
+use files::sha_file;
+use files::{put, stop, walk_files};
+#[cfg(feature = "herdr-mod")]
 use herdr::{in_our_mod, merge_keys, remove_retired};
 
+#[cfg(feature = "herdr-mod")]
 const HELP: &str = "\
 Installs the herdr-contr layout, mod, themes, keys and helper into a herdr-app home.
 Usage: herdr-contr-feed install [--home <herdr-app home>] [--helper <herdr-contr-feed>] [--orch <herdr-contr-orch>]
@@ -55,6 +66,18 @@ Usage: herdr-contr-feed install [--home <herdr-app home>] [--helper <herdr-contr
    \"build\" in install.json (the record of an install of the mod stays). It never writes a layout, a theme,
    a mod or keys.json, and never runs `herdr-app check`. The root is <home>/herdr-contr with --home, else
    $CONTR_HOME, else $HERDR_APP_HOME/herdr-contr, else ~/.config/herdr-app/herdr-contr.
+";
+
+#[cfg(not(feature = "herdr-mod"))]
+const HELP: &str = "\
+Installs the herdr-contr backend (this helper is built without the Herdr app mod).
+Usage: herdr-contr-feed install [--backend] [--home <herdr-app home>] [--helper <herdr-contr-feed>]
+                                [--orch <herdr-contr-orch>] [--remote <folder>] [--dry-run]
+ - It writes into the backend root only: kit/ (a file there that this version does not have is removed),
+   .claude-plugin/marketplace.json, bin/herdr-contr-feed (with --helper), bin/herdr-contr-orch (with --orch),
+   remote/ (with --remote), and \"build\" in install.json (the record of an install of the mod stays).
+ - The root is <home>/herdr-contr with --home, else $CONTR_HOME, else $HERDR_APP_HOME/herdr-contr, else
+   ~/.config/herdr-app/herdr-contr. --backend is accepted and changes nothing. --dry-run writes nothing.
 ";
 
 pub fn run(args: &[String]) -> i32 {
@@ -111,14 +134,25 @@ pub fn run(args: &[String]) -> i32 {
         }
         i += 2;
     }
-    let nonempty = |k: &str| std::env::var(k).ok().filter(|v| !v.is_empty());
     let env = |k: &str| std::env::var(k).unwrap_or_default();
-    if backend_only {
+    // Without the Herdr app mod in this build, `install` is the backend install.
+    if backend_only || !cfg!(feature = "herdr-mod") {
         let Some(root) = places::root(home.as_deref(), None, &env) else {
             return stop(&["STOP: no backend root is known: CONTR_HOME, HERDR_APP_HOME and HOME are not set. Name the folder with CONTR_HOME=<folder> or --home <herdr-app home>. Nothing was written.".into()]);
         };
         return install_backend(&Places::at(root), helper.as_deref(), orch.as_deref(), remote.as_deref(), dry);
     }
+    #[cfg(feature = "herdr-mod")]
+    return install_mod(home, helper, orch, remote, dry);
+    #[cfg(not(feature = "herdr-mod"))]
+    unreachable!("without herdr-mod, install is the backend install")
+}
+
+/// `install` with the mod: the mod's files and the backend parts, into the Herdr home.
+#[cfg(feature = "herdr-mod")]
+fn install_mod(home: Option<String>, helper: Option<String>, orch: Option<String>, remote: Option<String>, dry: bool) -> i32 {
+    let nonempty = |k: &str| std::env::var(k).ok().filter(|v| !v.is_empty());
+    let env = |k: &str| std::env::var(k).unwrap_or_default();
     let Some(home) = places::home(home.as_deref(), None, &env) else {
         return stop(&["STOP: HOME is not set, so there is no ~/.config/herdr-app. Name the folder with --home <herdr-app home>. Nothing was written.".into()]);
     };
