@@ -1,19 +1,18 @@
 #!/bin/sh
-# Lands one pull request: update its branch, wait for CI, squash merge the exact head, install merged main.
-#   scripts/land.sh <pr> [--after <pr>] [--shot <file>]
+# Lands one pull request: update its branch, wait for CI, squash merge the exact head, update main.
+# It installs nothing: the backend moved to the repository contr-backend (#253).
+#   scripts/land.sh <pr> [--after <pr>]
 # --after: first wait until that pull request is not open any more (land a queue with one job each).
-# --shot:  after the install, write a picture of the Herdr window to that file.
 # Before the merge it runs `herdr-contr-orch pr check-boundary`: a file outside the brief's Boundary: part stops it.
 # Run it from the main checkout. Each step that fails ends the script with status 1, and a line says which.
 set -u
 fail() { echo "land: $*" >&2; exit 1; }
-[ $# -ge 1 ] || fail "usage: scripts/land.sh <pr> [--after <pr>] [--shot <file>]"
+[ $# -ge 1 ] || fail "usage: scripts/land.sh <pr> [--after <pr>]"
 N=$1; shift
-AFTER=""; SHOT=""
+AFTER=""
 while [ $# -gt 0 ]; do
   case "$1" in
     --after) AFTER=${2:-}; shift 2 || fail "--after needs a pull request number" ;;
-    --shot) SHOT=${2:-}; shift 2 || fail "--shot needs a file" ;;
     *) fail "unknown argument: $1" ;;
   esac
 done
@@ -22,8 +21,6 @@ state() { gh pr view "$1" --json state --jq .state; }
 
 if [ -n "$AFTER" ]; then
   while [ "$(state "$AFTER")" = OPEN ]; do sleep 30; done
-  # The install of the pull request before this one must end first.
-  sleep 150
 fi
 [ "$(state "$N")" = OPEN ] || fail "pull request $N is not open"
 
@@ -53,15 +50,3 @@ gh pr merge "$N" --squash --match-head-commit "$SHA" || fail "the merge of $N fa
 echo "land: merged $N at $SHA"
 
 git switch -q main && git pull -q --ff-only || fail "cannot update main"
-(cd xplat && cargo build -q --release -p herdr-contr-feed -p herdr-contr-orch) || fail "the helper and the orchestration tool did not build"
-H=$PWD/xplat/target/release/herdr-contr-feed
-O=$PWD/xplat/target/release/herdr-contr-orch
-"$H" install --dry-run --helper "$H" --orch "$O" >/dev/null || fail "the install dry run failed"
-"$H" install --helper "$H" --orch "$O" || fail "the install failed"
-echo "land: installed main after $N"
-
-if [ -n "$SHOT" ]; then
-  # The app loads the new files by itself; give it time before the picture.
-  sleep 60
-  herdr-app shot "$SHOT" || fail "no picture"
-fi

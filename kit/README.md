@@ -1,5 +1,8 @@
 # contr kit
 
+> [!WARNING]
+> The backend moved. The helper, the orchestration tool and the kit are in the repository contr-backend. Do not change `xplat/`, `kit/`, `web/` and the other paths of `scripts/backend-paths.txt` here. This repository will be archived.
+
 A Claude Code plugin for agent work with `herdr-contr-orch agents` (the
 orchestration tool of this repository, `xplat/herdr-contr-orch`):
 
@@ -18,8 +21,7 @@ orchestration tool of this repository, `xplat/herdr-contr-orch`):
 ## Install
 
 The helper's `install` puts the kit in `<Herdr home>/herdr-contr/kit` and,
-with `--orch <file>`, the tool in `<Herdr home>/herdr-contr/bin`
-(`scripts/land.sh` does both for merged `main`). The hooks and the MCP
+with `--orch <file>`, the tool in `<Herdr home>/herdr-contr/bin`. The hooks and the MCP
 server look for `herdr-contr-orch` in `../bin` of the kit folder first, then
 on the PATH. Start `claude` with the kit: `claude --plugin-dir <kit>`.
 

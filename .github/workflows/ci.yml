@@ -1,7 +1,7 @@
 name: CI
 
-# The mod's tests and the helper's tests, and the backend's tests without herdr-app/. Linux only: no Herdr app
-# and no window.
+# The mod's tests and the helper's tests, the backend's tests without herdr-app/, and on a PR the check that it
+# changes no backend path. Linux only: no Herdr app and no window.
 on:
   push:
     branches: [main]
@@ -68,3 +68,17 @@ jobs:
 
       - name: Backend tests
         run: cargo test --locked --no-default-features --manifest-path xplat/Cargo.toml -p herdr-contr-feed -p herdr-core -p herdr-contr-orch
+
+  # The backend moved to the repository contr-backend (#253): a PR here changes no backend path.
+  frozen:
+    name: No backend change
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Frozen check
+        run: sh scripts/frozen-check.sh origin/main

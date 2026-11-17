@@ -5,6 +5,11 @@ and a helper program. Each agent tab shows as a conversation, and cards answer
 an agent's prompt or question. The orchestrator's questions and workers come
 next. The Herdr app gives the window, the sidebar, the tabs and the terminal.
 
+## The backend moved
+
+The helper, the orchestration tool and the kit are in the repository contr-backend. Do not change `xplat/`, `kit/`, `web/` and the other paths of `scripts/backend-paths.txt` here. This repository will be archived.
+`scripts/frozen-check.sh` checks it on each PR (CI job `frozen`).
+
 ## Where the code comes from
 
 - The first commit is a copy of Flockbook (MIT) at one commit; `NOTICE` names
@@ -70,6 +75,7 @@ stay ours. The top bar is our copy of Herdr's `tabs` mod.
 | `web`, `scripts/web-build.mjs`, `scripts/sw-test.mjs` | backend | the phone page's source, its build into `xplat/herdr-contr-feed/web`, and its service worker test |
 | `docs/design`, `docs/research` | backend | the notes on the phone page's protocol and on the question keys, that the helper's code names |
 | `scripts/backend-paths.txt`, `scripts/export-backend.sh`, `scripts/backend-paths.test.mjs` | both | the paths that move to the repository `contr-backend`, and the script that makes its history with `git filter-repo` in a new folder, with the checks before the first push (#253); the test gives each tracked file a side |
+| `scripts/frozen-check.sh` | mod | the check that a PR changes no backend path (CI job `frozen`, #253) |
 | `.github/workflows/ci.yml`, `.github/workflows/release.yml`, `scripts/land.sh` | both | the CI, the release and the landing of a PR: one job and one zip for both sides |
 
 A backend part does not read a file of `herdr-app/` at build time or at run time.
@@ -119,8 +125,8 @@ and `gpui-kit.d.ts`. Read them there. Do not copy them into this repository.
   edits. Register each test fixture in a file of its own.
 - **The life of a PR is code.** Worktree, CI wait, merge and cleanup are
   commands, not steps that a model does by hand.
-  `scripts/land.sh <pr> [--after <pr>] [--shot <file>]` lands a PR: update,
-  CI wait, squash merge of the exact head, install of merged `main`.
+  `scripts/land.sh <pr> [--after <pr>]` lands a PR: update, CI wait,
+  squash merge of the exact head. It installs nothing: the backend moved.
   `node scripts/sync-copies.mjs` writes the functions that one mod copies
   from another; `npm test` fails when a copy differs.
 - **One thing at a time.** Do not start a new screen while the one before
