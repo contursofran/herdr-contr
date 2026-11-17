@@ -1,6 +1,6 @@
 #!/bin/sh
 # Lands one pull request: update its branch, wait for CI, squash merge the exact head, update main.
-# It installs nothing: the backend moved to the repository contr-backend (#253).
+# It installs nothing: the backend moved to the repository contr-core (#253).
 #   scripts/land.sh <pr> [--after <pr>]
 # --after: first wait until that pull request is not open any more (land a queue with one job each).
 # Before the merge it runs `herdr-contr-orch pr check-boundary`: a file outside the brief's Boundary: part stops it.

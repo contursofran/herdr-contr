@@ -1,7 +1,7 @@
 # herdr-contr
 
 > [!WARNING]
-> The backend moved. The helper, the orchestration tool and the kit are in the repository contr-backend. Do not change `xplat/`, `kit/`, `web/` and the other paths of `scripts/backend-paths.txt` here. This repository will be archived.
+> The backend moved. The helper, the orchestration tool and the kit are in the repository contr-core. Do not change `xplat/`, `kit/`, `web/` and the other paths of `scripts/backend-paths.txt` here. This repository will be archived.
 
 contr for the [Herdr](https://herdr.dev) desktop app: a layout, a mod (JavaScript) and a helper program
 (Rust). Each agent tab shows as a conversation, and cards answer an agent's prompt or question.

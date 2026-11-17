@@ -7,7 +7,7 @@ next. The Herdr app gives the window, the sidebar, the tabs and the terminal.
 
 ## The backend moved
 
-The helper, the orchestration tool and the kit are in the repository contr-backend. Do not change `xplat/`, `kit/`, `web/` and the other paths of `scripts/backend-paths.txt` here. This repository will be archived.
+The helper, the orchestration tool and the kit are in the repository contr-core. Do not change `xplat/`, `kit/`, `web/` and the other paths of `scripts/backend-paths.txt` here. This repository will be archived.
 `scripts/frozen-check.sh` checks it on each PR (CI job `frozen`).
 
 ## Where the code comes from

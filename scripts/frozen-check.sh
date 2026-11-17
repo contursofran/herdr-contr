@@ -1,5 +1,5 @@
 #!/bin/sh
-# The backend moved to the repository contr-backend (#253). This check fails when a change since <base ref>
+# The backend moved to the repository contr-core (#253). This check fails when a change since <base ref>
 # touches a path of scripts/backend-paths.txt. The files below are allowed: the freeze and the last PR edit them.
 #   scripts/frozen-check.sh <base ref>
 # Exit 0: no backend path. Exit 1: backend paths, one on each line. Exit 2: bad arguments or no diff.
@@ -39,7 +39,7 @@ done <<EOF
 $files
 EOF
 if [ -n "$bad" ]; then
-  echo "frozen-check: these files are in contr-backend now; change them there:" >&2
+  echo "frozen-check: these files are in contr-core now; change them there:" >&2
   printf '%s' "$bad"
   exit 1
 fi

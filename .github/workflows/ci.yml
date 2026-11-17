@@ -69,7 +69,7 @@ jobs:
       - name: Backend tests
         run: cargo test --locked --no-default-features --manifest-path xplat/Cargo.toml -p herdr-contr-feed -p herdr-core -p herdr-contr-orch
 
-  # The backend moved to the repository contr-backend (#253): a PR here changes no backend path.
+  # The backend moved to the repository contr-core (#253): a PR here changes no backend path.
   frozen:
     name: No backend change
     if: github.event_name == 'pull_request'

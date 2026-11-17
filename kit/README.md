@@ -1,7 +1,7 @@
 # contr kit
 
 > [!WARNING]
-> The backend moved. The helper, the orchestration tool and the kit are in the repository contr-backend. Do not change `xplat/`, `kit/`, `web/` and the other paths of `scripts/backend-paths.txt` here. This repository will be archived.
+> The backend moved. The helper, the orchestration tool and the kit are in the repository contr-core. Do not change `xplat/`, `kit/`, `web/` and the other paths of `scripts/backend-paths.txt` here. This repository will be archived.
 
 A Claude Code plugin for agent work with `herdr-contr-orch agents` (the
 orchestration tool of this repository, `xplat/herdr-contr-orch`):

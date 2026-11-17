@@ -127,7 +127,7 @@ test('frozen-check fails on a change in xplat', () => {
   const r = frozenCheck('xplat/x.rs');
   assert.equal(r.status, 1, r.stderr);
   assert.equal(r.stdout, 'xplat/x.rs\n');
-  assert.match(r.stderr, /contr-backend/);
+  assert.match(r.stderr, /contr-core/);
 });
 
 test('frozen-check fails on a backend file and on the old install.sh', () => {
