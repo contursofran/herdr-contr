@@ -6,8 +6,9 @@ use herdr_core::places::{self, Places};
 
 use crate::owner::Store;
 
-/// The places of this tool in the backend root: CONTR_HOME, else HERDR_APP_HOME/herdr-contr,
-/// else ~/.config/herdr-app/herdr-contr.
+/// The places of this tool in the backend root: CONTR_HOME, else HERDR_APP_HOME/herdr-contr, else
+/// ~/.config/contr-backend when it exists, else ~/.config/herdr-app/herdr-contr when it exists, else
+/// ~/.config/contr-backend.
 pub fn places(env: &dyn Fn(&str) -> String) -> Result<Places, String> {
     places::root(None, None, env).map(Places::at).ok_or_else(|| "none of $CONTR_HOME, $HERDR_APP_HOME and $HOME is defined".to_string())
 }

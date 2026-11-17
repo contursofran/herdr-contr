@@ -29,7 +29,8 @@ impl Default for Config {
 
 /// The backend root (`herdr_core::places::root`): `<home>/herdr-contr` from `--home` (the mod always passes its
 /// appHome()), else CONTR_HOME, else `<HERDR_APP_HOME>/herdr-contr`, else the folder this helper is in when it is
-/// `<home>/herdr-contr/bin/herdr-contr-feed`, else `~/.config/herdr-app/herdr-contr`. None: no settings, the
+/// `<home>/herdr-contr/bin/herdr-contr-feed`, else `~/.config/contr-backend` when it exists, else
+/// `~/.config/herdr-app/herdr-contr` when it exists, else `~/.config/contr-backend`. None: no settings, the
 /// defaults apply.
 pub fn dir(home: Option<&str>) -> Option<PathBuf> {
     let installed = std::env::current_exe().ok().and_then(|e| places::installed_home(&e));

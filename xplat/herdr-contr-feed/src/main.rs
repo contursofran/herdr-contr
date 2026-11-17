@@ -10,6 +10,10 @@ fn main() {
     if argv.first().map(String::as_str) == Some("install") {
         std::process::exit(modfeedkit::install::run(&argv[1..]));
     }
+    // home move is for the owner too: plain text and an exit code.
+    if argv.first().map(String::as_str) == Some("home") {
+        std::process::exit(modfeedkit::home::run(&argv[1..]));
+    }
     // Claude Code's status line command: the owner's line as raw text, never an error of its own.
     if argv.first().map(String::as_str) == Some(modfeedkit::statusline::WORD) {
         use std::io::{Read, Write};
