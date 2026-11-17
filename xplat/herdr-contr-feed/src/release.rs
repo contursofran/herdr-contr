@@ -183,7 +183,12 @@ fn install_in(src: &dyn Source, rel: &Release, home: &Path, dir: &Path) -> Resul
     let (helper, orch) = checked(top)?;
     let run = |dry: bool| -> Result<String, Fail> {
         let mut c = Command::new(&helper);
-        c.arg("install").arg("--home").arg(home).arg("--helper").arg(&helper).arg("--remote").arg(top.join("remote"));
+        c.arg("install");
+        // Without the Herdr app mod in this build, the update installs only the backend.
+        if !cfg!(feature = "herdr-mod") {
+            c.arg("--backend");
+        }
+        c.arg("--home").arg(home).arg("--helper").arg(&helper).arg("--remote").arg(top.join("remote"));
         if let Some(o) = &orch {
             c.arg("--orch").arg(o);
         }
@@ -312,7 +317,8 @@ mod tests {
         assert_eq!((lines[1]["type"].as_str(), lines[1]["installed"].as_str()), (Some("update-done"), Some("abc1234 2026-11-16")));
         let runs: Vec<String> = std::fs::read_to_string(&log).unwrap().lines().map(String::from).collect();
         assert_eq!(runs.len(), 2);
-        assert!(runs[0].starts_with(&format!("install --home {} --helper ", home.display())) && runs[0].ends_with("--dry-run"));
+        let first = if cfg!(feature = "herdr-mod") { "install --home" } else { "install --backend --home" };
+        assert!(runs[0].starts_with(&format!("{first} {} --helper ", home.display())) && runs[0].ends_with("--dry-run"));
         assert!(!runs[1].contains("--dry-run") && runs[1].contains("--remote"));
         assert!(!t.path().join(format!("herdr-contr-update-{}", std::process::id())).exists(), "the temp folder goes");
     }

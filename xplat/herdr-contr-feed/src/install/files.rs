@@ -8,6 +8,7 @@ pub(super) fn sha(bytes: &[u8]) -> String {
     Sha256::digest(bytes).iter().map(|b| format!("{b:02x}")).collect()
 }
 
+#[cfg(feature = "herdr-mod")]
 pub(super) fn sha_file(p: &Path) -> Option<String> {
     fs::read(p).ok().map(|b| sha(&b))
 }

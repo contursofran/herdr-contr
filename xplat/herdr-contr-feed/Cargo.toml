@@ -14,6 +14,12 @@ path = "src/main.rs"
 name = "modfeedkit"
 path = "src/lib.rs"
 
+# herdr-mod: the Herdr app mod (herdr-app/) in `install` and in `health`. Without it, the helper is the backend
+# only: `install` is the backend install, and the build reads no file of herdr-app/.
+[features]
+default = ["herdr-mod"]
+herdr-mod = []
+
 [dependencies]
 herdr-core = { path = "../herdr-core" }
 serde.workspace = true

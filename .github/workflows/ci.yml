@@ -1,6 +1,7 @@
 name: CI
 
-# The mod's tests and the helper's tests. Linux only: no Herdr app and no window.
+# The mod's tests and the helper's tests, and the backend's tests without herdr-app/. Linux only: no Herdr app
+# and no window.
 on:
   push:
     branches: [main]
@@ -43,3 +44,23 @@ jobs:
         env:
           HERDR_CONTR_FEED: ${{ github.workspace }}/xplat/target/debug/herdr-contr-feed
         run: npm test
+
+  backend:
+    name: Backend without the mod
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      # The backend reads no file of herdr-app/ at build time or at run time.
+      - name: Remove the mod
+        run: rm -rf herdr-app
+
+      - name: Cache cargo
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: xplat -> target
+          key: backend
+
+      - name: Backend tests
+        run: cargo test --locked --no-default-features --manifest-path xplat/Cargo.toml -p herdr-contr-feed -p herdr-core -p herdr-contr-orch
