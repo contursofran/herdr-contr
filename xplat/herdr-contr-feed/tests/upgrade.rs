@@ -1,5 +1,5 @@
 //! `herdr-contr-feed install` over older files: the sorting of a home's files against a known-files table.
-#![cfg(unix)]
+#![cfg(all(unix, feature = "herdr-mod"))]
 
 // The sorting on its own, with a made-up table: files a newer version dropped, and paths that are never ours.
 mod sorting {

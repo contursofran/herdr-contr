@@ -324,7 +324,9 @@ asked for in 7 days are removed from the folder; other files never. Errors: `usa
 ```
 
 The checks of the install in `--home`, in this order (#217). It writes nothing. `state`: `ok`, `warn` or
-`fail`; `fix` is empty for `ok`. The mod gives the layout in use (`shared("layout")`) and the versions of Herdr
+`fail`; `fix` is empty for `ok`. The checks `orch` and `kit` read the backend root (`--home`'s `herdr-contr`,
+else `CONTR_HOME`, as the other commands); the others read the Herdr home. A helper built without the feature
+`herdr-mod` gives only `orch` and `kit`. The mod gives the layout in use (`shared("layout")`) and the versions of Herdr
 and hc (`updates()`); a missing one is "unknown".
 
 | `id` | Checks |
@@ -332,9 +334,9 @@ and hc (`updates()`); a missing one is "unknown".
 | `mods` | `herdr-contr/install.json` is there, the files of our mods match its hashes, and its `build` is the helper's build |
 | `layout` | the layout in use is `herdr-contr` or `herdr-contr-own`, and its file matches `install.json` |
 | `collisions` | no other mod has a name that starts with `herdr-contr` or the title of one of our mods, and each mod that our layouts name is in `mods/` |
-| `orch` | `herdr-contr/bin/herdr-contr-orch --version` runs and gives the helper's build |
+| `orch` | `bin/herdr-contr-orch --version` in the backend root runs and gives the helper's build |
 | `hc` | hc (herdr-core) answers on its socket |
-| `kit` | the kit is in `herdr-contr/kit`, and Claude Code's marketplace `contr` (`<CLAUDE_CONFIG_DIR or ~/.claude>/plugins/known_marketplaces.json`) is `herdr-contr` of this home |
+| `kit` | the kit is in `kit/` of the backend root, and Claude Code's marketplace `contr` (`<CLAUDE_CONFIG_DIR or ~/.claude>/plugins/known_marketplaces.json`) is the backend root |
 | `herdr` | Herdr is 0.1.16 or later |
 
 ### `favicon` (`favicon --path <file> --dir <folder>`)

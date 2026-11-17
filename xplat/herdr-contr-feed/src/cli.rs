@@ -76,17 +76,25 @@ pub fn run(argv: &[String]) -> String {
         }
         "health" => {
             let env = |k: &str| std::env::var(k).ok().filter(|v| !v.is_empty());
+            // orch and kit: the backend root. The mod's checks: the Herdr home.
+            let Some(root) = config::dir(home().as_deref()) else { return r.fail("usage", "health needs --home <herdr-app home>") };
+            #[cfg(feature = "herdr-mod")]
             let Some(h) = herdr_core::places::home(home().as_deref(), None, &|k| env(k).unwrap_or_default()) else {
                 return r.fail("usage", "health needs --home <herdr-app home>");
             };
-            let session = HcSession::resolve_env();
             let i = health::Inputs {
+                #[cfg(feature = "herdr-mod")]
                 home: h,
+                root,
                 build: crate::protocol::BUILD.into(),
+                #[cfg(feature = "herdr-mod")]
                 layout: opt("--layout"),
+                #[cfg(feature = "herdr-mod")]
                 herdr: opt("--herdr"),
+                #[cfg(feature = "herdr-mod")]
                 hc_version: opt("--hc"),
-                hc_up: session.is_available(),
+                #[cfg(feature = "herdr-mod")]
+                hc_up: HcSession::resolve_env().is_available(),
                 claude: health::claude_dir(&env),
                 orch_version: &health::run_orch_version,
             };

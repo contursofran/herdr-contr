@@ -1,6 +1,6 @@
 //! herdr-contr and an installed Flockbook in one Herdr home: neither install touches the other's files
 //! or keys. The Flockbook install here is a fake with Flockbook's names and rules. Temp homes only.
-#![cfg(unix)]
+#![cfg(all(unix, feature = "herdr-mod"))]
 
 use serde_json::{json, Value};
 use std::collections::BTreeMap;
