@@ -1,0 +1,55 @@
+# The paths that move to the repository contr-backend (#253), in the form of
+# `git filter-repo --paths-from-file`. A folder ends with `/`. A line with
+# `==>` renames a path; it does not select it, so the path has its own line
+# first. scripts/export-backend.sh reads this file, and
+# scripts/backend-paths.test.mjs checks it against `git ls-files`.
+
+# The three crates, their tests and fixtures.
+xplat/
+
+# The Claude Code plugin `contr`.
+kit/
+.claude-plugin/marketplace.json
+
+# The phone page's source, build and test.
+web/
+scripts/web-build.mjs
+scripts/sw-test.mjs
+
+# The contract and the notes that the code names.
+docs/protocol.md
+docs/design/remote-access.md
+docs/design/remote-protocol.md
+docs/research/ask-user-question-keys.md
+
+# The backend's decisions. 29 and 30 state rules of the helper (`usage`, the
+# ctx tag of `status`).
+docs/decisions/6-names.md
+docs/decisions/29-usage-sidebar.md
+docs/decisions/30-ctx-compact-limit.md
+docs/decisions/183-orchestration-tool.md
+docs/decisions/189-mod-through-tool.md
+docs/decisions/203-owner-open-todos.md
+docs/decisions/214-due-dates.md
+docs/decisions/261-backend-and-mod.md
+docs/decisions/266-neutral-home.md
+
+# CI, release and the landing of a PR.
+.github/workflows/ci.yml
+.github/workflows/release.yml
+scripts/land.sh
+
+# Licence, notices and the repository's own files.
+LICENSE
+NOTICE
+THIRD_PARTY_NOTICES.md
+CONTRIBUTORS.md
+.gitignore
+AGENTS.md
+CLAUDE.md
+README.md
+.claude/settings.json
+
+# The release zip's installer, at the root.
+herdr-app/install.sh
+herdr-app/install.sh==>install.sh

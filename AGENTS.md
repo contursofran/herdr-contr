@@ -69,6 +69,7 @@ stay ours. The top bar is our copy of Herdr's `tabs` mod.
 | `xplat/herdr-contr-feed/web` | backend | the phone page that the helper embeds (built output; do not edit) |
 | `web`, `scripts/web-build.mjs`, `scripts/sw-test.mjs` | backend | the phone page's source, its build into `xplat/herdr-contr-feed/web`, and its service worker test |
 | `docs/design`, `docs/research` | backend | the notes on the phone page's protocol and on the question keys, that the helper's code names |
+| `scripts/backend-paths.txt`, `scripts/export-backend.sh`, `scripts/backend-paths.test.mjs` | both | the paths that move to the repository `contr-backend`, and the script that makes its history with `git filter-repo` in a new folder, with the checks before the first push (#253); the test gives each tracked file a side |
 | `.github/workflows/ci.yml`, `.github/workflows/release.yml`, `scripts/land.sh` | both | the CI, the release and the landing of a PR: one job and one zip for both sides |
 
 A backend part does not read a file of `herdr-app/` at build time or at run time.
