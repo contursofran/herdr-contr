@@ -9,6 +9,7 @@ pub mod commands;
 pub mod config;
 pub mod favicon;
 pub mod feed;
+pub mod home;
 pub mod install;
 pub mod locate;
 pub mod mermaid;

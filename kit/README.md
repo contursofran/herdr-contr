@@ -30,7 +30,10 @@ theme, mod or `keys.json`. Run it with `--dry-run` first.
 
 The tool keeps its files (`agents.json`, `owner.json`, `state/`) in the
 backend root: `$CONTR_HOME` when set, else `$HERDR_APP_HOME/herdr-contr` (with `CONTR_HOME` unset),
-else `~/.config/herdr-app/herdr-contr`. `CONTR_AGENTS_CONFIG`,
+else the neutral folder `~/.config/contr-backend` when it exists, else `~/.config/herdr-app/herdr-contr`
+when it exists, else `~/.config/contr-backend`. `herdr-contr-feed home move` moves
+`~/.config/herdr-app/herdr-contr` to `~/.config/contr-backend` and leaves a link at the old path; the
+owner runs it (see the repository's README, "Install"). `CONTR_AGENTS_CONFIG`,
 `CONTR_OWNER_FILE` and `CONTR_STATE_DIR` name one file or folder each, and
 come before the root.
 

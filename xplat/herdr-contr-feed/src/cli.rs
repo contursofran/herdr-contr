@@ -21,11 +21,13 @@
 //!   herdr-contr-feed statusline on|off|status [--settings <file>]   (herdr-contr's status line wrapper in Claude Code)
 //!   herdr-contr-feed update check [--force]   (the installed and the newest release build; read only)
 //!   herdr-contr-feed update install   (downloads the newest build, checks it, installs it; after the user's press)
+//!   herdr-contr-feed home move [--dry-run]   (moves the backend root to ~/.config/contr-backend; plain text, the owner runs it)
 //!
 //! Every command takes `--home <herdr-app home>` (the mod passes it): its herdr-contr/config.json has the
 //! settings the helper follows. Without it, the backend root of `config::dir`: CONTR_HOME, else
 //! HERDR_APP_HOME/herdr-contr, else the folder this helper is in when that is <home>/herdr-contr/bin, else
-//! ~/.config/herdr-app/herdr-contr.
+//! ~/.config/contr-backend when it exists, else ~/.config/herdr-app/herdr-contr when it exists, else
+//! ~/.config/contr-backend.
 //!
 //! A terminal `m/tN` on another machine: the command runs there, in the helper there (`remote`). Rust only.
 
