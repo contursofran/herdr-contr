@@ -180,11 +180,20 @@ fn owner_usage_errors() {
 }
 
 #[test]
-fn the_default_files_are_in_the_herdr_home() {
+fn the_default_files_are_in_the_backend_root() {
+    // With no folder there, the default root is the neutral folder.
+    let fresh = tempfile::tempdir().unwrap();
+    let vars = [("HOME", path(fresh.path())), ("CONTR_PROJECT", "app")];
+    assert_eq!(call(&["owner", "ask", "Go?"], &vars, &Fake::default()).out, "D1\n");
+    assert!(fresh.path().join(".config/contr-backend/owner.json").exists());
+    assert!(!fresh.path().join(".config/herdr-app").exists());
+    // With the Herdr home's folder there and no neutral folder, the files stay in the Herdr home.
     let home = tempfile::tempdir().unwrap();
+    fs::create_dir_all(home.path().join(".config/herdr-app/herdr-contr")).unwrap();
     let vars = [("HOME", path(home.path())), ("CONTR_PROJECT", "app")];
     assert_eq!(call(&["owner", "ask", "Go?"], &vars, &Fake::default()).out, "D1\n");
     assert!(home.path().join(".config/herdr-app/herdr-contr/owner.json").exists());
+    assert!(!home.path().join(".config/contr-backend").exists());
     // The profiles file of that folder gives the flow.
     fs::write(home.path().join(".config/herdr-app/herdr-contr/agents.json"), r#"{"flow": {"workers": 7}}"#).unwrap();
     let r = call(&["agents", "flow"], &vars, &Fake::default());
