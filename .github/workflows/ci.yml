@@ -45,6 +45,10 @@ jobs:
           HERDR_CONTR_FEED: ${{ github.workspace }}/xplat/target/debug/herdr-contr-feed
         run: npm test
 
+      # The list of backend paths for the export to contr-backend (#253).
+      - name: Backend paths
+        run: node --test scripts/backend-paths.test.mjs
+
   backend:
     name: Backend without the mod
     runs-on: ubuntu-latest
