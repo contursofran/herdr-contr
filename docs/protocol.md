@@ -576,9 +576,16 @@ any other key: `failed`, nothing sent. No panel on screen: `changed`, nothing se
 
 - The plan usage of Claude and Codex, as contr's `internal/usage` reads it. Claude first, then Codex. A plan
   with no data is not in `plans`.
-- Claude: the file `usage/claude.json` (schema 1) in contr's state folder (`CONTR_STATE_DIR`, else macOS
-  `~/Library/Application Support/contr`, else `$XDG_STATE_HOME/contr` or `~/.local/state/contr`). contr's
-  status line command writes it. Kinds `five_hour` and `seven_day`.
+- Claude: kinds `five_hour` and `seven_day`, from two sources; when both have data, the one with the newer
+  `read_at` is used (the same time: the record).
+  1. The status line records: the `<session id>.json` files in `statusline` of the backend root (the root as in
+     `--home` above, without `--home`; the wrapper of `statusline` writes them). The files are sorted by file time, the
+     newest first, and only the newest 20 are read. The first with a `rate_limits` window is used:
+     `rate_limits.five_hour` and `rate_limits.seven_day`, each with `used_percentage` and `resets_at`; a window
+     can be absent. `read_at` is that file's time. Links and files over 256 KiB are not read.
+  2. The fallback: the file `usage/claude.json` (schema 1) in contr's state folder (`CONTR_STATE_DIR`, else
+     macOS `~/Library/Application Support/contr`, else `$XDG_STATE_HOME/contr` or `~/.local/state/contr`). The
+     old contr app's status line command writes it. `read_at` is its `updated_at`.
 - Codex: `codex app-server` (`initialize`, `initialized`, `account/rateLimits/read`; killed after 10 s), with
   `codex` from PATH, else from the login shell's PATH. Else the last `token_count` line of the newest rollout
   file in the two newest day folders of `$CODEX_HOME/sessions` (default `~/.codex`). Kinds `primary` (5 h) and

@@ -1,7 +1,9 @@
 //! The plan usage of Claude and Codex (the `usage` command), as contr's `internal/usage` reads it.
 //!
-//! - Claude: Claude Code gives its plan limits only to its status line command. contr's `contr statusline`
-//!   saves them to `<contr state dir>/usage/claude.json` (schema 1); this reads that file.
+//! - Claude: Claude Code gives its plan limits only to its status line command. herdr-contr's status line command
+//!   keeps each session's input as `<session id>.json` in `<backend root>/statusline`; this reads `rate_limits` of the
+//!   newest record that has them (of the newest `STATUSLINE_LOOK` records). The old contr app's `contr statusline`
+//!   saved them to `<contr state dir>/usage/claude.json` (schema 1); that file is the fallback. The newer one wins.
 //! - Codex: `codex app-server` (JSON-RPC, one message per line): `initialize`, `initialized`,
 //!   `account/rateLimits/read`. No answer in 10 s: killed. No `codex`, or no answer: the newest rollout file
 //!   under `<CODEX_HOME>/sessions` (the two newest day folders), its last `token_count` line.
@@ -21,6 +23,8 @@ pub const CODEX_TIMEOUT: Duration = Duration::from_secs(10);
 const TAIL_BYTES: u64 = 256 * 1024;
 /// The day folders searched for the newest rollout file.
 const DAY_FOLDERS: usize = 2;
+/// The most status line records read for Claude's limits, the newest first.
+pub const STATUSLINE_LOOK: usize = 20;
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Window {
@@ -41,8 +45,10 @@ pub struct Plan {
 
 /// Where the data is.
 pub struct Sources {
-    /// contr's state folder; None: no Claude data.
+    /// contr's state folder; None: no `usage/claude.json`.
     pub state_dir: Option<PathBuf>,
+    /// herdr-contr's status line folder; None: no status line records.
+    pub statusline_dir: Option<PathBuf>,
     /// Codex's home; None: no rollout files.
     pub codex_home: Option<PathBuf>,
     /// The `codex` program and the PATH to give it; None: no app-server read.
@@ -51,12 +57,14 @@ pub struct Sources {
 }
 
 impl Sources {
-    /// From the process: CONTR_STATE_DIR, CODEX_HOME, HOME, PATH, else the login shell's PATH.
+    /// From the process: CONTR_STATE_DIR, the backend root (`config::dir`: CONTR_HOME and the others), CODEX_HOME,
+    /// HOME, PATH, else the login shell's PATH.
     pub fn from_process() -> Sources {
         let env = |k: &str| std::env::var(k).ok().filter(|v| !v.is_empty());
         let home = env("HOME").map(PathBuf::from);
         Sources {
             state_dir: state_dir(&env, home.as_deref(), cfg!(target_os = "macos")),
+            statusline_dir: crate::config::dir(None).map(|root| crate::statusline::in_root(&root)),
             codex_home: env("CODEX_HOME").map(PathBuf::from).or_else(|| home.as_ref().map(|h| h.join(".codex"))),
             codex: find_codex(env("PATH").as_deref(), || login_path(&env("SHELL").unwrap_or_else(|| "/bin/zsh".into()), CODEX_TIMEOUT)),
             timeout: CODEX_TIMEOUT,
@@ -83,7 +91,9 @@ pub fn state_dir(env: &dyn Fn(&str) -> Option<String>, home: Option<&Path>, maco
 /// Both plans, Claude first; a plan with no data is left out.
 pub fn read(src: &Sources) -> Vec<Plan> {
     let mut out = Vec::new();
-    if let Some(p) = src.state_dir.as_deref().and_then(read_claude) {
+    let file = src.state_dir.as_deref().and_then(read_claude);
+    let record = src.statusline_dir.as_deref().and_then(read_statusline);
+    if let Some(p) = newer(record, file) {
         out.push(p);
     }
     let codex = src.codex.as_ref().and_then(|(prog, path)| read_app_server(prog, path.as_deref(), src.timeout).ok());
@@ -117,6 +127,52 @@ fn whole_seconds(v: Option<&Value>) -> Option<u64> {
 }
 
 // ---- Claude ----
+
+/// The plan with the higher `read_at`; `a` when both are the same.
+fn newer(a: Option<Plan>, b: Option<Plan>) -> Option<Plan> {
+    match (a, b) {
+        (Some(a), Some(b)) => Some(if b.read_at > a.read_at { b } else { a }),
+        (a, b) => a.or(b),
+    }
+}
+
+/// The newest `<session id>.json` in the status line folder whose `rate_limits` has a window, of the newest
+/// `STATUSLINE_LOOK` files by file time; `read_at` is that file's time. Links, other files and files over the
+/// record size are not read.
+pub fn read_statusline(dir: &Path) -> Option<Plan> {
+    let max = herdr_core::statusline::ClaudeStatusInfo::MAX_BYTES as u64;
+    let mut files: Vec<(u64, PathBuf)> = std::fs::read_dir(dir)
+        .ok()?
+        .flatten()
+        .filter(|e| e.file_name().to_str().is_some_and(|n| n.ends_with(".json") && !n.starts_with('.')))
+        .filter_map(|e| {
+            let m = std::fs::symlink_metadata(e.path()).ok()?;
+            if !m.file_type().is_file() || m.len() > max {
+                return None;
+            }
+            Some((m.modified().ok()?.duration_since(UNIX_EPOCH).ok()?.as_secs(), e.path()))
+        })
+        .collect();
+    files.sort_by(|a, b| b.cmp(a));
+    files.into_iter().take(STATUSLINE_LOOK).find_map(|(t, p)| {
+        let v: Value = serde_json::from_slice(&std::fs::read(&p).ok()?).ok()?;
+        Some(Plan { plan: "claude", windows: statusline_windows(&v)?, read_at: t })
+    })
+}
+
+/// `rate_limits.five_hour` and `rate_limits.seven_day` of a status line input (`used_percentage`, `resets_at`); a
+/// window can be absent. None: no window.
+pub fn statusline_windows(input: &Value) -> Option<Vec<Window>> {
+    let limits = input.get("rate_limits")?;
+    let windows: Vec<Window> = ["five_hour", "seven_day"]
+        .iter()
+        .filter_map(|kind| {
+            let w = limits.get(*kind)?;
+            Some(Window { kind: kind.to_string(), used_percent: w.get("used_percentage")?.as_f64()?, resets_at: whole_seconds(w.get("resets_at")) })
+        })
+        .collect();
+    (!windows.is_empty()).then_some(windows)
+}
 
 /// `usage/claude.json`: `{"schema":1,"updated_at":…,"windows":[{"kind","used_percent","resets_at"}]}`.
 pub fn read_claude(state_dir: &Path) -> Option<Plan> {
@@ -374,6 +430,89 @@ mod tests {
         }
     }
 
+    /// A status line record at `secs` (Unix seconds file time).
+    fn record(dir: &Path, name: &str, text: &str, secs: u64) -> PathBuf {
+        let p = dir.join(name);
+        write(&p, text);
+        std::fs::File::options().write(true).open(&p).unwrap().set_modified(UNIX_EPOCH + Duration::from_secs(secs)).unwrap();
+        p
+    }
+
+    const LIMITS: &str = r#"{"session_id":"s1","model":{"id":"claude-opus-5-5"},"rate_limits":{"five_hour":{"used_percentage":38.5,"resets_at":1795400000},"seven_day":{"used_percentage":17,"resets_at":1795453200}}}"#;
+    const NO_LIMITS: &str = r#"{"session_id":"s2","model":{"id":"claude-opus-5-5"},"context_window":{"used_percentage":40}}"#;
+
+    #[test]
+    fn statusline_newest_record_with_limits() {
+        let d = tempfile::tempdir().unwrap();
+        record(d.path(), "old.json", r#"{"rate_limits":{"seven_day":{"used_percentage":2,"resets_at":1}}}"#, 1_700_000_000);
+        record(d.path(), "a.json", LIMITS, 1_700_000_100);
+        record(d.path(), "b.json", NO_LIMITS, 1_700_000_200);
+        record(d.path(), "c.json", "{", 1_700_000_300);
+        record(d.path(), "d.out", LIMITS, 1_700_000_400);
+        let p = read_statusline(d.path()).unwrap();
+        assert_eq!(p.read_at, 1_700_000_100, "the file time of a.json");
+        assert_eq!(p.windows, vec![
+            Window { kind: "five_hour".into(), used_percent: 38.5, resets_at: Some(1795400000) },
+            Window { kind: "seven_day".into(), used_percent: 17.0, resets_at: Some(1795453200) },
+        ]);
+    }
+
+    #[test]
+    fn statusline_one_window_bad_window_or_none() {
+        let one = json!({"rate_limits": {"seven_day": {"used_percentage": 17, "resets_at": 1795453200}}});
+        assert_eq!(statusline_windows(&one).unwrap(), vec![Window { kind: "seven_day".into(), used_percent: 17.0, resets_at: Some(1795453200) }]);
+        let no_reset = json!({"rate_limits": {"five_hour": {"used_percentage": 3}, "seven_day": {"resets_at": 5}}});
+        assert_eq!(statusline_windows(&no_reset).unwrap(), vec![Window { kind: "five_hour".into(), used_percent: 3.0, resets_at: None }]);
+        assert!(statusline_windows(&json!({"rate_limits": {}})).is_none());
+        assert!(statusline_windows(&json!({"model": {}})).is_none());
+    }
+
+    #[test]
+    fn statusline_looks_at_the_newest_20_only() {
+        let d = tempfile::tempdir().unwrap();
+        record(d.path(), "limits.json", LIMITS, 1_700_000_000);
+        for i in 0..STATUSLINE_LOOK {
+            record(d.path(), &format!("n{i}.json"), NO_LIMITS, 1_700_000_100 + i as u64);
+        }
+        assert!(read_statusline(d.path()).is_none(), "the record with limits is the 21st");
+        std::fs::remove_file(d.path().join("n0.json")).unwrap();
+        assert_eq!(read_statusline(d.path()).unwrap().read_at, 1_700_000_000);
+    }
+
+    #[test]
+    fn statusline_skips_links_big_files_and_a_missing_folder() {
+        let d = tempfile::tempdir().unwrap();
+        let target = record(d.path(), "real/x.json", LIMITS, 1_700_000_000);
+        let dir = d.path().join("sl");
+        std::fs::create_dir_all(&dir).unwrap();
+        std::os::unix::fs::symlink(&target, dir.join("link.json")).unwrap();
+        let big = format!(r#"{{"pad":"{}","rate_limits":{{"five_hour":{{"used_percentage":1}}}}}}"#, "x".repeat(herdr_core::statusline::ClaudeStatusInfo::MAX_BYTES));
+        record(&dir, "big.json", &big, 1_700_000_100);
+        assert!(read_statusline(&dir).is_none());
+        assert!(read_statusline(&d.path().join("none")).is_none());
+    }
+
+    #[test]
+    fn claude_newer_of_record_and_file_wins() {
+        let d = tempfile::tempdir().unwrap();
+        let (state, sl) = (d.path().join("state"), d.path().join("statusline"));
+        let file = |at: u64| write(&state.join("usage/claude.json"), &format!(r#"{{"schema":1,"updated_at":{at},"windows":[{{"kind":"seven_day","used_percent":0}}]}}"#));
+        let src = Sources { state_dir: Some(state.clone()), statusline_dir: Some(sl.clone()), codex_home: None, codex: None, timeout: Duration::from_secs(1) };
+        let week = |src: &Sources| read(src)[0].windows.iter().find(|w| w.kind == "seven_day").unwrap().used_percent;
+        file(1_700_000_000);
+        assert_eq!(week(&src), 0.0, "no record: the file");
+        record(&sl, "s.json", NO_LIMITS, 1_700_000_500);
+        assert_eq!(week(&src), 0.0, "no record with limits: the file");
+        record(&sl, "s.json", LIMITS, 1_700_000_500);
+        assert_eq!(week(&src), 17.0, "the record is newer");
+        file(1_700_000_900);
+        assert_eq!(week(&src), 0.0, "the file is newer");
+        file(1_700_000_500);
+        assert_eq!(week(&src), 17.0, "the same time: the record");
+        std::fs::remove_file(state.join("usage/claude.json")).unwrap();
+        assert_eq!((read(&src).len(), week(&src)), (1, 17.0), "no file: the record");
+    }
+
     #[test]
     fn state_dir_order() {
         let home = Path::new("/h");
@@ -479,14 +618,14 @@ mod tests {
         let d = tempfile::tempdir().unwrap();
         write(&d.path().join("sessions/2026/11/12/rollout-b.jsonl"), &rollout_line(20.0, "codex"));
         let bad = fake_codex(d.path(), "exit 1");
-        let src = Sources { state_dir: Some(d.path().join("state")), codex_home: Some(d.path().into()), codex: Some((bad, None)), timeout: Duration::from_secs(5) };
+        let src = Sources { state_dir: Some(d.path().join("state")), statusline_dir: Some(d.path().join("statusline")), codex_home: Some(d.path().into()), codex: Some((bad, None)), timeout: Duration::from_secs(5) };
         let plans = read(&src);
         assert_eq!(plans.len(), 1, "no Claude file: no Claude plan");
         assert_eq!((plans[0].plan, plans[0].windows[0].used_percent), ("codex", 20.0));
         let ok = fake_codex(d.path(), r#"read a; echo '{"id":1,"result":{}}'; read b; read c; echo '{"id":2,"result":{"rateLimits":{"primary":{"usedPercent":3}}}}'"#);
         let src = Sources { codex: Some((ok, None)), ..src };
         assert_eq!(read(&src)[0].windows[0].used_percent, 3.0);
-        let none = Sources { state_dir: None, codex_home: None, codex: None, timeout: Duration::from_secs(1) };
+        let none = Sources { state_dir: None, statusline_dir: None, codex_home: None, codex: None, timeout: Duration::from_secs(1) };
         assert_eq!(line(&read(&none)), json!({"type": "usage", "plans": []}));
     }
 

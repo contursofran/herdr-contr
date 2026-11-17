@@ -24,7 +24,12 @@ pub const TIMEOUT: Duration = Duration::from_secs(5);
 
 /// The record folder in the Herdr home.
 pub fn dir(home: &Path) -> PathBuf {
-    home.join("herdr-contr").join("statusline")
+    in_root(&herdr_core::places::Places::new(home).folder())
+}
+
+/// The record folder in the backend root.
+pub fn in_root(root: &Path) -> PathBuf {
+    root.join("statusline")
 }
 
 fn b64() -> base64::engine::GeneralPurpose {
